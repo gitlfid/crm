@@ -48,12 +48,14 @@ if(!empty($f_end_date)) {
     $where .= " AND i.invoice_date <= '$safe_end'";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (CSV) ---
+// --- 3. LOGIKA EXPORT EXCEL (ITEM TERPISAH) ---
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean(); // Bersihkan buffer HTML
     
-    // [UPDATE] Query dimodifikasi untuk mengambil NOTES dari tabel scratchpad
+    // [UPDATE] Ambil Header Invoice Saja (Item diambil di dalam loop)
     $sqlEx = "SELECT 
+                i.id, 
+                i.quotation_id, 
                 i.invoice_date,
                 i.invoice_no,
                 i.status,
@@ -64,14 +66,6 @@ if (isset($_POST['export_excel'])) {
                 q.currency,
                 u.username as sales_name,
                 isp.general_notes, 
-                COALESCE(
-                    (SELECT SUM(qty * unit_price) FROM invoice_items WHERE invoice_id = i.id),
-                    (SELECT SUM(qty * unit_price) FROM quotation_items WHERE quotation_id = i.quotation_id)
-                ) as sub_total,
-                COALESCE(
-                    (SELECT GROUP_CONCAT(item_name SEPARATOR ', ') FROM invoice_items WHERE invoice_id = i.id),
-                    (SELECT GROUP_CONCAT(item_name SEPARATOR ', ') FROM quotation_items WHERE quotation_id = i.quotation_id)
-                ) as item_desc,
                 (
                     SELECT GROUP_CONCAT(do.do_number SEPARATOR ', ') 
                     FROM delivery_orders do 
@@ -93,42 +87,82 @@ if (isset($_POST['export_excel'])) {
     
     $output = fopen('php://output', 'w');
     
-    fputcsv($output, array('Date', 'Client', 'Invoice No', 'PO Client', 'Ref Quote', 'Description', 'Currency', 'Sub Total', 'VAT (11%)', 'Grand Total', 'Status', 'Sales Person', 'Delivery Order No', 'Status Faktur Pajak', 'Notes'));
+    // [UPDATE] Header Kolom CSV: Tambah Quantity dan Unit Price
+    fputcsv($output, array('Date', 'Client', 'Invoice No', 'PO Client', 'Ref Quote', 'Description', 'Quantity', 'Unit Price', 'Currency', 'Sub Total', 'VAT (11%)', 'Grand Total', 'Status', 'Sales Person', 'Delivery Order No', 'Status Faktur Pajak', 'Notes'));
     
     while($row = $resEx->fetch_assoc()) {
-        $subTotal = floatval($row['sub_total'] ?? 0);
+        $invId = $row['id'];
+        $quotId = $row['quotation_id'];
+
+        // 1. Ambil Item Detail (Prioritas Invoice Items, Fallback Quotation Items)
+        $itemsData = [];
+        $sqlItems = "SELECT item_name, description, qty, unit_price FROM invoice_items WHERE invoice_id = $invId";
+        $resItems = $conn->query($sqlItems);
         
-        // Logika Pajak Export (Sama seperti Display)
+        if ($resItems->num_rows == 0) {
+            $sqlItems = "SELECT item_name, description, qty, unit_price FROM quotation_items WHERE quotation_id = $quotId";
+            $resItems = $conn->query($sqlItems);
+        }
+
+        // 2. Hitung Total Invoice dan Tampung Data Item
+        $calcSub = 0;
+        while ($itm = $resItems->fetch_assoc()) {
+            $itemsData[] = $itm;
+            $calcSub += floatval($itm['qty']) * floatval($itm['unit_price']);
+        }
+        
+        // Logika Pajak
         $is_usd = ($row['currency'] == 'USD');
         $tax_rate = $is_usd ? 0 : 0.11;
         
-        $vat = $subTotal * $tax_rate;
-        $grandTotal = $subTotal + $vat;
+        $vat = $calcSub * $tax_rate;
+        $grandTotal = $calcSub + $vat;
         
+        // Data Umum Baris
         $doNum = !empty($row['do_numbers']) ? $row['do_numbers'] : '-';
         $poClient = !empty($row['po_number_client']) ? $row['po_number_client'] : '-';
         $salesPerson = !empty($row['sales_name']) ? $row['sales_name'] : '-';
         $taxStatus = (!empty($row['tax_invoice_file'])) ? 'Uploaded' : 'Pending';
-        
         $cleanNotes = !empty($row['general_notes']) ? str_replace(array("\r", "\n"), " ", $row['general_notes']) : '-';
 
-        fputcsv($output, array(
-            $row['invoice_date'],
-            $row['company_name'],
-            $row['invoice_no'],
-            $poClient,
-            $row['quotation_no'],
-            $row['item_desc'],
-            $row['currency'],
-            $subTotal,
-            $vat,
-            $grandTotal,
-            strtoupper($row['status']),
-            $salesPerson,
-            $doNum,
-            $taxStatus,
-            $cleanNotes 
-        ));
+        // 3. Tulis Baris CSV Per Item (Terpisah)
+        if (count($itemsData) > 0) {
+            foreach ($itemsData as $item) {
+                // Format Deskripsi
+                $desc = $item['item_name'];
+                if(!empty($item['description']) && $item['description'] !== 'Exclude Tax') {
+                    $desc .= ' (' . $item['description'] . ')';
+                }
+
+                fputcsv($output, array(
+                    $row['invoice_date'],
+                    $row['company_name'],
+                    $row['invoice_no'],
+                    $poClient,
+                    $row['quotation_no'],
+                    $desc,                  // Description Per Item
+                    $item['qty'],           // Quantity
+                    $item['unit_price'],    // Unit Price
+                    $row['currency'],
+                    $calcSub,    // Sub Total (Tetap total invoice)
+                    $vat,        // VAT (Tetap total invoice)
+                    $grandTotal, // Grand Total (Tetap total invoice)
+                    strtoupper($row['status']),
+                    $salesPerson,
+                    $doNum,
+                    $taxStatus,
+                    $cleanNotes 
+                ));
+            }
+        } else {
+            // Fallback jika tidak ada item (kasus error data)
+            fputcsv($output, array(
+                $row['invoice_date'], $row['company_name'], $row['invoice_no'], 
+                $poClient, $row['quotation_no'], 'No Items Found', 0, 0, 
+                $row['currency'], 0, 0, 0, 
+                strtoupper($row['status']), $salesPerson, $doNum, $taxStatus, $cleanNotes
+            ));
+        }
     }
     fclose($output);
     exit();
@@ -382,9 +416,7 @@ $res = $conn->query($sql);
                                 $vat = $subTotal * $tax_rate;
                                 $grandTotal = $subTotal + $vat;
                                 
-                                // LOGIKA TAMPILAN ANGKA:
-                                // USD: Pakai 2 Desimal (42,160.93)
-                                // IDR: Bulat (42.161)
+                                // LOGIKA TAMPILAN ANGKA
                                 $fmt = function($n) use ($is_usd) {
                                     if ($is_usd) return number_format($n, 2, '.', ',');
                                     return number_format($n, 0, ',', '.');
