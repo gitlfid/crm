@@ -176,36 +176,6 @@ else {
 }
 ?>
 
-<style>
-    /* Transisi halus untuk sidebar dan main content */
-    #sidebar, #main {
-        transition: all 0.3s ease-in-out;
-    }
-    
-    /* Rapikan header bar */
-    .navbar-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .right-elements {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem; /* Jarak antar elemen kanan */
-    }
-
-    .theme-toggle-btn {
-        cursor: pointer;
-        padding: 5px;
-        border-radius: 50%;
-        transition: background-color 0.2s;
-    }
-    .theme-toggle-btn:hover {
-        background-color: rgba(0,0,0,0.05);
-    }
-</style>
-
 <div id="sidebar" class="active">
     <div class="sidebar-wrapper active">
         <div class="sidebar-header position-relative">
@@ -278,25 +248,27 @@ else {
 <div id="main">
     <header class="mb-3">
         <nav class="navbar navbar-expand navbar-light navbar-top">
-            <div class="container-fluid d-flex justify-content-between align-items-center">
-                <a href="#" class="burger-btn d-block" onclick="toggleSidebar(event)">
+            <div class="container-fluid">
+                <a href="#" class="burger-btn d-block">
                     <i class="bi bi-justify fs-3"></i>
                 </a>
-
-                <div class="right-elements">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav ms-auto mb-2 mb-lg-0"></ul>
                     
-                    <div class="theme-toggle-btn" onclick="toggleTheme()" title="Ganti Tema">
-                        <i class="bi bi-sun-fill fs-4" id="theme-icon"></i>
+                    <div class="theme-toggle d-flex gap-2 align-items-center mt-2 me-4">
+                        <i class="bi bi-sun-fill fs-4" id="theme-icon" style="cursor: pointer;" onclick="toggleTheme()" title="Ganti Tema"></i>
                     </div>
-
                     <div class="dropdown">
                         <a href="#" data-bs-toggle="dropdown" aria-expanded="false">
-                            <div class="user-menu d-flex align-items-center">
+                            <div class="user-menu d-flex">
                                 <div class="user-name text-end me-3">
                                     <h6 class="mb-0 text-gray-600"><?= htmlspecialchars($username) ?></h6>
                                     <p class="mb-0 text-sm text-gray-600">
                                         <?= ucfirst($role_name) ?> 
-                                    </p>
+                                        </p>
                                 </div>
                                 <div class="user-img d-flex align-items-center">
                                     <div class="avatar avatar-md bg-primary">
@@ -305,7 +277,7 @@ else {
                                 </div>
                             </div>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="dropdownMenuButton" style="min-width: 11rem;">
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton" style="min-width: 11rem;">
                             <li><h6 class="dropdown-header">Hello, <?= htmlspecialchars($username) ?>!</h6></li>
                             <li><a class="dropdown-item" href="../admin/profile.php"><i class="icon-mid bi bi-person me-2"></i> My Profile</a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -318,13 +290,6 @@ else {
     </header>
 
 <script>
-    // Fungsi Toggle Sidebar Manual (untuk memastikan trigger smooth)
-    function toggleSidebar(e) {
-        e.preventDefault();
-        document.getElementById('sidebar').classList.toggle('active');
-        document.getElementById('main').classList.toggle('layout-navbar'); // Class ini opsional tergantung template Mazer version
-    }
-
     // 1. Cek Tema saat Load
     document.addEventListener('DOMContentLoaded', () => {
         const savedTheme = localStorage.getItem('theme');
