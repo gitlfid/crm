@@ -158,7 +158,7 @@ $res = $conn->query($sql);
                         <div class="col-md-4">
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
-                                <input type="text" name="search" class="form-control" placeholder="No PO / No Quote..." value="<?= htmlspecialchars($search) ?>">
+                                <input type="text" name="search" class="form-control" placeholder="No PO / No Quote..." value="<?= htmlspecialchars($search ?? '') ?>">
                             </div>
                         </div>
 
@@ -193,9 +193,9 @@ $res = $conn->query($sql);
 
                 <div class="col-lg-3 border-start d-flex align-items-center justify-content-end">
                     <form method="POST" class="w-100">
-                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-                        <input type="hidden" name="client_id" value="<?= htmlspecialchars($f_client) ?>">
-                        <input type="hidden" name="status" value="<?= htmlspecialchars($f_status) ?>">
+                        <input type="hidden" name="search" value="<?= htmlspecialchars($search ?? '') ?>">
+                        <input type="hidden" name="client_id" value="<?= htmlspecialchars($f_client ?? '') ?>">
+                        <input type="hidden" name="status" value="<?= htmlspecialchars($f_status ?? '') ?>">
                         
                         <button type="submit" name="export_excel" class="btn btn-success w-100 text-white">
                             <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export to Excel
@@ -231,11 +231,11 @@ $res = $conn->query($sql);
                         <?php if($res->num_rows > 0): ?>
                             <?php while($row = $res->fetch_assoc()): ?>
                             <tr>
-                                <td class="fw-bold text-success"><?= htmlspecialchars($row['po_number_client']) ?></td>
-                                <td class="text-muted font-monospace"><?= $row['quotation_no'] ?></td>
+                                <td class="fw-bold text-success"><?= htmlspecialchars($row['po_number_client'] ?? '') ?></td>
+                                <td class="text-muted font-monospace"><?= htmlspecialchars($row['quotation_no'] ?? '') ?></td>
                                 <td>
-                                    <div class="fw-bold"><?= htmlspecialchars($row['company_name']) ?></div>
-                                    <small class="text-muted"><i class="bi bi-person me-1"></i> <?= $row['username'] ?></small>
+                                    <div class="fw-bold"><?= htmlspecialchars($row['company_name'] ?? '') ?></div>
+                                    <small class="text-muted"><i class="bi bi-person me-1"></i> <?= htmlspecialchars($row['username'] ?? '') ?></small>
                                 </td>
                                 <td>
                                     <?php if($row['status'] == 'po_received'): ?>
@@ -267,7 +267,7 @@ $res = $conn->query($sql);
                                             </li>
 
                                             <li>
-                                                <button class="dropdown-item" onclick="openUploadModal(<?= $row['id'] ?>, '<?= $row['po_number_client'] ?>')">
+                                                <button class="dropdown-item" onclick="openUploadModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['po_number_client'] ?? '') ?>')">
                                                     <i class="bi bi-cloud-upload me-2"></i> <?= $row['po_file_client'] ? 'Update PO Doc' : 'Upload PO Doc' ?>
                                                 </button>
                                             </li>
