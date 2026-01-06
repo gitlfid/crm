@@ -59,8 +59,6 @@ function smart_format($num, $curr = 'IDR') {
         .text-right { text-align: right; }
         .remark-box { margin-top: 15px; font-size: 10px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 10px; }
         .remark-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; display: block; }
-        
-        /* SIGNATURE FIX: Menggunakan Table agar Simetris & Center */
         .sign-table { width: 100%; margin-top: 40px; page-break-inside: avoid; }
         .sign-cell { text-align: center; vertical-align: bottom; }
         .sign-img { height: 80px; width: auto; display: block; margin: 10px auto; }
@@ -117,13 +115,35 @@ function smart_format($num, $curr = 'IDR') {
         </thead>
         <tbody>
             <?php $no = 1; while($item = $items->fetch_assoc()): ?>
+            <?php
+                // --- LOGIKA PEMBERSIH UNTUK PRINT ---
+                
+                // 1. Bersihkan Nama Item (Hapus teks dalam kurung di akhir, misal: "(Telkomsel IOT)")
+                $clean_item_name = preg_replace('/\s*\([^)]+\)$/', '', $item['item_name']);
+
+                // 2. Bersihkan Charge Mode (Jika isinya masih Card Type, ganti jadi Duration)
+                $mode = $item['card_type'];
+                
+                // Daftar kata terlarang (Credential/Card Type)
+                if (preg_match('/(Telkomsel|Indosat|XL|Tri|Smartfren|IOT|BBC|Factory|Test|PCCW|M2M|Econ)/i', $mode)) {
+                    // Jika terdeteksi kata terlarang, kita TEBAK durasinya dari nama item
+                    if (stripos($item['item_name'], 'Month') !== false || stripos($item['item_name'], 'Bulan') !== false) {
+                        $mode = 'Monthly';
+                    } elseif (stripos($item['item_name'], 'Year') !== false || stripos($item['item_name'], 'Tahun') !== false) {
+                        $mode = 'Annually';
+                    } else {
+                        $mode = 'One Time'; // Default aman jika tidak ada kata Month/Year
+                    }
+                }
+            ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
-                <td><?= htmlspecialchars($item['item_name']) ?></td>
+                <td><?= htmlspecialchars($clean_item_name) ?></td>
                 <td class="text-center"><?= smart_format($item['qty'], $quot['currency']) ?></td>
                 <td class="text-right"><?= smart_format($item['unit_price'], $quot['currency']) ?></td>
                 <td><?= htmlspecialchars($item['description']) ?></td>
-                <td class="text-center"><?= htmlspecialchars($item['card_type']) ?></td>
+                
+                <td class="text-center"><?= htmlspecialchars($mode) ?></td>
             </tr>
             <?php endwhile; ?>
         </tbody>
@@ -143,15 +163,14 @@ function smart_format($num, $curr = 'IDR') {
 
     <table class="sign-table">
         <tr>
-            <td width="60%"></td> <td width="40%" class="sign-cell">
+            <td width="60%"></td>
+            <td width="40%" class="sign-cell">
                 <div style="margin-bottom: 10px;">PT. Linksfield Networks Indonesia</div>
-                
                 <?php if (!empty($quot['sales_sign']) && file_exists('../uploads/signatures/' . $quot['sales_sign'])): ?>
                     <img src="../uploads/signatures/<?= $quot['sales_sign'] ?>" class="sign-img">
                 <?php else: ?>
                     <div style="height: 80px;"></div>
                 <?php endif; ?>
-                
                 <div class="sign-name"><?= htmlspecialchars($quot['sales_name']) ?></div>
             </td>
         </tr>

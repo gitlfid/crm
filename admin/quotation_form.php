@@ -77,41 +77,38 @@ if (isset($_POST['save_quotation'])) {
         $msg = "Quotation Created Successfully!";
     }
 
-    // SIMPAN ITEMS
+    // ITEM ARRAYS
     $items = $_POST['item_name'];
     $qtys  = $_POST['qty']; 
     $prices= $_POST['unit_price'];
     $descs = $_POST['description'];
     
-    // INPUT USER
-    $cards = $_POST['card_type']; // Contoh: Telkomsel IOT
-    $dur_texts = $_POST['duration_text']; // Contoh: Monthly, One Time
+    // INPUT DURATION TEXT (LABEL)
+    $dur_texts = $_POST['duration_text']; 
 
     for ($i = 0; $i < count($items); $i++) {
         if (!empty($items[$i])) {
             $raw_name = $conn->real_escape_string($items[$i]);
-            $raw_card = isset($cards[$i]) ? $conn->real_escape_string($cards[$i]) : '';
             
-            // --- LOGIKA UTAMA PERBAIKAN ---
-            // 1. Ambil teks Duration (Monthly/One Time)
+            // Simpan Teks Duration (misal: "2 Years", "Monthly") ke DB kolom card_type
             $text_duration = isset($dur_texts[$i]) ? $conn->real_escape_string($dur_texts[$i]) : 'One Time';
             
-            // 2. Gabungkan "Telkomsel IOT" ke Nama Item supaya tidak hilang
-            // Cek dulu apakah nama item sudah mengandung kurung (biar gak double saat edit berulang)
-            $db_item_name = $raw_name;
-            if(!empty($raw_card) && strpos($raw_name, $raw_card) === false) {
-                $db_item_name .= " (" . $raw_card . ")"; 
-            }
+            // Bersihkan nama item jika ada sisa kurung credential lama (Opsional, agar bersih)
+            $db_item_name = preg_replace('/\s*\([^)]+\)$/', '', $raw_name);
 
+            // QTY DISIMPAN APA ADANYA (Tanpa Kali Duration)
             $it_qty  = floatval($qtys[$i]);
             $it_dsc  = $conn->real_escape_string($descs[$i]);
             
-            $clean_price = str_replace(['Rp', '$', ' '], '', $prices[$i]);
-            if ($curr == 'IDR') { $clean_price = str_replace('.', '', $clean_price); $clean_price = str_replace(',', '.', $clean_price); } 
-            else { $clean_price = str_replace(',', '', $clean_price); }
-            $it_prc = floatval($clean_price);
+            // Clean Price
+            if ($curr == 'IDR') {
+               $p = str_replace(['Rp', ' ', '.'], '', $prices[$i]);
+               $it_prc = floatval(str_replace(',', '.', $p));
+            } else {
+               $p = str_replace(['$', ' ', ','], '', $prices[$i]);
+               $it_prc = floatval($p);
+            }
             
-            // 3. Simpan text_duration ke kolom card_type di DB
             $conn->query("INSERT INTO quotation_items (quotation_id, item_name, qty, unit_price, description, card_type) VALUES ($quot_id, '$db_item_name', $it_qty, $it_prc, '$it_dsc', '$text_duration')");
         }
     }
@@ -123,7 +120,7 @@ if (isset($_POST['save_quotation'])) {
     <h3><?= $page_title ?></h3>
     <div class="alert alert-light-primary border-primary">
         <i class="bi bi-info-circle me-2"></i>
-        <strong>Info:</strong> Pilih <b>Duration</b> untuk mengisi Charge Mode (Monthly, One Time, dll). Total Qty dihitung otomatis.
+        <strong>Info:</strong> Gunakan opsi <b>Custom...</b> pada Charge Mode untuk input durasi manual (Bulan/Tahun). Qty tetap input manual.
     </div>
 </div>
 
@@ -204,11 +201,9 @@ if (isset($_POST['save_quotation'])) {
                     <table class="table table-bordered mb-0" id="itemTable">
                         <thead class="bg-light">
                             <tr>
-                                <th width="25%">Item Name</th>
-                                <th width="10%">Card Type</th>
-                                <th width="10%">Unit/Pcs</th> 
-                                <th width="18%">Duration (Charge Mode)</th> 
-                                <th width="10%">Total Qty</th> 
+                                <th width="30%">Item Name</th>
+                                <th width="10%">Qty</th>
+                                <th width="25%">Charge Mode (Duration)</th> 
                                 <th width="15%">Unit Price</th>
                                 <th>Desc</th>
                                 <th width="5%">Action</th>
@@ -217,31 +212,20 @@ if (isset($_POST['save_quotation'])) {
                         <tbody>
                             <?php if($is_edit && count($q_items) > 0): ?>
                                 <?php foreach($q_items as $itm): 
-                                    // SAAT EDIT: Pisahkan Nama Item dan Card Type
                                     $db_name = $itm['item_name'];
-                                    $display_name = $db_name;
-                                    $display_card = "";
-                                    
-                                    // Regex untuk mengambil teks dalam kurung di akhir string: "Nama Item (CardType)"
+                                    // Bersihkan nama item
                                     if (preg_match('/^(.*)\s\((.*)\)$/', $db_name, $matches)) {
-                                        $display_name = trim($matches[1]);
-                                        $display_card = trim($matches[2]);
+                                        $db_name = trim($matches[1]);
                                     }
                                     
-                                    // Di DB kolom card_type berisi Duration Text (krn kita tukar saat save)
-                                    $duration_text_db = $itm['card_type']; 
-                                    
-                                    // Jika ternyata isinya bukan duration (misal data lama), defaultkan
-                                    $valid_durations = ['One Time', 'Monthly', '3 Months', '6 Months', 'Annually'];
-                                    if(!in_array($duration_text_db, $valid_durations) && strpos($duration_text_db, 'Months') === false) {
-                                        // Berarti ini data lama yg belum di-convert
-                                        $duration_text_db = "One Time"; 
-                                    }
+                                    // Text Duration (Monthly/One Time/2 Years)
+                                    $duration_text_db = $itm['card_type'];
                                 ?>
                                 <tr>
-                                    <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($display_name) ?>" required></td>
-                                    <td><input type="text" name="card_type[]" class="form-control" value="<?= htmlspecialchars($display_card) ?>"></td>
-                                    <td><input type="number" class="form-control text-center base-qty" value="<?= $itm['qty'] ?>" min="1" oninput="calcQty(this)" required></td>
+                                    <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($db_name) ?>" required></td>
+                                    
+                                    <td><input type="number" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" min="1" required></td>
+                                    
                                     <td>
                                         <select class="form-select duration-select" onchange="updateDuration(this)">
                                             <option value="1" data-txt="One Time" <?= $duration_text_db=='One Time'?'selected':'' ?>>One Time</option>
@@ -253,12 +237,16 @@ if (isset($_POST['save_quotation'])) {
                                         </select>
                                         <input type="hidden" name="duration_text[]" class="duration-text-input" value="<?= $duration_text_db ?>">
                                         
-                                        <div class="input-group duration-input-group d-none">
-                                            <input type="number" class="form-control text-center duration-custom" placeholder="Bulan" oninput="calcQty(this)">
+                                        <div class="input-group duration-input-group d-none" style="flex-wrap: nowrap;">
+                                            <input type="number" class="form-control text-center duration-custom" placeholder="0" oninput="updateCustomDuration(this)" style="min-width: 60px;">
+                                            <select class="form-select duration-unit" onchange="updateCustomDuration(this)" style="max-width: 100px; background-color: #f8f9fa;">
+                                                <option value="Months">Bulan</option>
+                                                <option value="Years">Tahun</option>
+                                            </select>
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetDuration(this)"><i class="bi bi-x"></i></button>
                                         </div>
                                     </td>
-                                    <td><input type="number" name="qty[]" class="form-control text-center final-qty bg-light text-muted" value="<?= $itm['qty'] ?>" readonly tabindex="-1"></td>
+
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= number_format($itm['unit_price'], ($current_curr=='IDR'?0:2), ($current_curr=='IDR'?',':'.'), ($current_curr=='IDR'?'.':',')) ?>" required></td>
                                     <td><input type="text" name="description[]" class="form-control" value="<?= htmlspecialchars($itm['description']) ?>"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
@@ -267,8 +255,7 @@ if (isset($_POST['save_quotation'])) {
                             <?php else: ?>
                                 <tr>
                                     <td><input type="text" name="item_name[]" class="form-control" required></td>
-                                    <td><input type="text" name="card_type[]" class="form-control"></td>
-                                    <td><input type="number" class="form-control text-center base-qty" value="1" min="1" oninput="calcQty(this)" required></td>
+                                    <td><input type="number" name="qty[]" class="form-control text-center" value="1" min="1" required></td>
                                     <td>
                                         <select class="form-select duration-select" onchange="updateDuration(this)">
                                             <option value="1" data-txt="One Time">One Time</option>
@@ -279,12 +266,16 @@ if (isset($_POST['save_quotation'])) {
                                             <option value="custom" class="fw-bold text-primary">Custom...</option>
                                         </select>
                                         <input type="hidden" name="duration_text[]" class="duration-text-input" value="One Time">
-                                        <div class="input-group duration-input-group d-none">
-                                            <input type="number" class="form-control text-center duration-custom" placeholder="Bulan" oninput="calcQty(this)">
+                                        
+                                        <div class="input-group duration-input-group d-none" style="flex-wrap: nowrap;">
+                                            <input type="number" class="form-control text-center duration-custom" placeholder="0" oninput="updateCustomDuration(this)" style="min-width: 60px;">
+                                            <select class="form-select duration-unit" onchange="updateCustomDuration(this)" style="max-width: 100px; background-color: #f8f9fa;">
+                                                <option value="Months">Bulan</option>
+                                                <option value="Years">Tahun</option>
+                                            </select>
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetDuration(this)"><i class="bi bi-x"></i></button>
                                         </div>
                                     </td>
-                                    <td><input type="number" name="qty[]" class="form-control text-center final-qty bg-light text-muted" value="1" readonly tabindex="-1"></td>
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" required></td>
                                     <td><input type="text" name="description[]" class="form-control"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
@@ -325,9 +316,8 @@ if (isset($_POST['save_quotation'])) {
         
         for(var i=0; i<inputs.length; i++) { 
             inputs[i].value = ""; 
-            if(inputs[i].classList.contains("base-qty")) inputs[i].value = "1";
+            if(inputs[i].name == "qty[]") inputs[i].value = "1";
             if(inputs[i].classList.contains("duration-text-input")) inputs[i].value = "One Time"; 
-            if(inputs[i].classList.contains("final-qty")) inputs[i].value = "1";
         }
         
         var selectElem = newRow.querySelector('.duration-select');
@@ -365,7 +355,21 @@ if (isset($_POST['save_quotation'])) {
         } else {
             let selectedText = selectElem.options[selectElem.selectedIndex].getAttribute('data-txt');
             hiddenText.value = selectedText;
-            calcQty(selectElem);
+        }
+    }
+
+    // UPDATE: Gabungkan Angka + Satuan (Bulan/Tahun)
+    function updateCustomDuration(elem) {
+        let row = elem.closest('tr');
+        let inputNum = row.querySelector('.duration-custom');
+        let unitSel = row.querySelector('.duration-unit');
+        let hiddenText = row.querySelector('.duration-text-input');
+        
+        if(inputNum.value) {
+            // Hasil: "2 Years" atau "5 Months"
+            hiddenText.value = inputNum.value + " " + unitSel.value;
+        } else {
+            hiddenText.value = "";
         }
     }
 
@@ -374,31 +378,14 @@ if (isset($_POST['save_quotation'])) {
         let selectElem = row.querySelector('.duration-select');
         let inputGroup = row.querySelector('.duration-input-group');
         let hiddenText = row.querySelector('.duration-text-input');
+        
+        // Reset Unit ke Default
+        let unitSel = row.querySelector('.duration-unit');
+        unitSel.value = "Months"; 
 
         inputGroup.classList.add('d-none');
         selectElem.classList.remove('d-none');
         selectElem.value = "1"; 
         hiddenText.value = "One Time"; 
-        calcQty(selectElem);
-    }
-
-    function calcQty(element) {
-        let row = element.closest('tr');
-        let baseQty = parseFloat(row.querySelector('.base-qty').value) || 0;
-        let hiddenText = row.querySelector('.duration-text-input');
-        
-        let multiplier = 1;
-        let selectElem = row.querySelector('.duration-select');
-        let customInput = row.querySelector('.duration-custom');
-
-        if (!selectElem.classList.contains('d-none')) {
-            multiplier = parseFloat(selectElem.value) || 1;
-        } else {
-            multiplier = parseFloat(customInput.value) || 0;
-            if(multiplier > 0) hiddenText.value = multiplier + " Months";
-        }
-        
-        let total = baseQty * multiplier;
-        row.querySelector('.final-qty').value = total;
     }
 </script>

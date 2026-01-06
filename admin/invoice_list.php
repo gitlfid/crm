@@ -97,7 +97,12 @@ if (isset($_POST['export_excel'])) {
     
     while($row = $resEx->fetch_assoc()) {
         $subTotal = floatval($row['sub_total'] ?? 0);
-        $vat = $subTotal * 0.11;
+        
+        // Logika Pajak Export (Sama seperti Display)
+        $is_usd = ($row['currency'] == 'USD');
+        $tax_rate = $is_usd ? 0 : 0.11;
+        
+        $vat = $subTotal * $tax_rate;
         $grandTotal = $subTotal + $vat;
         
         $doNum = !empty($row['do_numbers']) ? $row['do_numbers'] : '-';
@@ -208,6 +213,11 @@ if (isset($_POST['upload_tax_invoice'])) {
 if (isset($_GET['action']) && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     $act = $_GET['action'];
+    
+    // [BARU] Revert to Draft Logic
+    if ($act == 'draft') {
+        $conn->query("UPDATE invoices SET status='draft' WHERE id=$id");
+    }
     
     if ($act == 'sent') {
         $conn->query("UPDATE invoices SET status='sent' WHERE id=$id");
@@ -353,7 +363,7 @@ $res = $conn->query($sql);
                             <th>Date</th>
                             <th>Client</th>
                             <th class="text-end">Sub Total</th>
-                            <th class="text-end">VAT (11%)</th>
+                            <th class="text-end">VAT</th>
                             <th class="text-end">Grand Total</th>
                             <th class="text-center">Note</th> <th class="text-center">Status</th>
                             <th class="text-end pe-4">Action</th>
@@ -364,8 +374,22 @@ $res = $conn->query($sql);
                             <?php while($row = $res->fetch_assoc()): ?>
                             <?php
                                 $subTotal = floatval($row['sub_total'] ?? 0);
-                                $vat = $subTotal * 0.11;
+                                $curr = $row['currency'];
+                                $is_usd = ($curr == 'USD');
+                                
+                                // LOGIKA PAJAK: USD = 0%, IDR = 11%
+                                $tax_rate = $is_usd ? 0 : 0.11;
+                                $vat = $subTotal * $tax_rate;
                                 $grandTotal = $subTotal + $vat;
+                                
+                                // LOGIKA TAMPILAN ANGKA:
+                                // USD: Pakai 2 Desimal (42,160.93)
+                                // IDR: Bulat (42.161)
+                                $fmt = function($n) use ($is_usd) {
+                                    if ($is_usd) return number_format($n, 2, '.', ',');
+                                    return number_format($n, 0, ',', '.');
+                                };
+
                                 $st = $row['status'];
                                 $bg = ($st=='paid')?'success':(($st=='cancel')?'danger':(($st=='sent')?'info':'secondary'));
                                 $hasTax = !empty($row['tax_invoice_file']);
@@ -387,10 +411,10 @@ $res = $conn->query($sql);
                                 <td><?= date('d/m/Y', strtotime($row['invoice_date'])) ?></td>
                                 <td><div class="fw-bold text-truncate" style="max-width: 200px;"><?= htmlspecialchars($row['company_name']) ?></div></td>
                                 
-                                <td class="text-end text-muted"><?= number_format($subTotal, 0, ',', '.') ?></td>
-                                <td class="text-end text-muted"><?= number_format($vat, 0, ',', '.') ?></td>
+                                <td class="text-end text-muted"><?= $fmt($subTotal) ?></td>
+                                <td class="text-end text-muted"><?= $fmt($vat) ?></td>
                                 <td class="text-end fw-bold text-primary">
-                                    <small class="text-muted me-1"><?= $row['currency'] ?></small><?= number_format($grandTotal, 0, ',', '.') ?>
+                                    <small class="text-muted me-1"><?= $curr ?></small><?= $fmt($grandTotal) ?>
                                 </td>
 
                                 <td class="text-center">
@@ -423,6 +447,10 @@ $res = $conn->query($sql);
                                                 <?php if($st == 'draft'): ?>
                                                 <li><a class="dropdown-item text-warning" href="invoice_edit.php?id=<?= $row['id'] ?>"><i class="bi bi-pencil me-2"></i> Edit Invoice</a></li>
                                                 <li><a class="dropdown-item text-info" href="?action=sent&id=<?= $row['id'] ?>"><i class="bi bi-send me-2"></i> Mark Sent</a></li>
+                                                <?php endif; ?>
+                                                
+                                                <?php if($st == 'sent'): ?>
+                                                <li><a class="dropdown-item text-secondary" href="?action=draft&id=<?= $row['id'] ?>"><i class="bi bi-arrow-counterclockwise me-2"></i> Revert to Draft</a></li>
                                                 <?php endif; ?>
                                                 
                                                 <li><button class="dropdown-item text-success" onclick="openPayModal(<?= $row['id'] ?>, '<?= $row['invoice_no'] ?>', <?= $grandTotal ?>)"><i class="bi bi-check-circle me-2"></i> Mark Paid</button></li>

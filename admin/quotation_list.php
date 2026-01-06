@@ -95,7 +95,7 @@ if (isset($_GET['delete_id'])) {
         }
     }
 }
-// Update Status
+// Update Status (Digunakan untuk Sent, Cancel, dan REVERT TO DRAFT)
 if (isset($_GET['status_id']) && isset($_GET['st'])) {
     $st_id = intval($_GET['status_id']);
     $st_val = $conn->real_escape_string($_GET['st']);
@@ -304,22 +304,33 @@ $res = $conn->query($sql);
                                     <div class="dropdown">
                                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="viewport">Action</button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                            
                                             <li><a class="dropdown-item" href="quotation_print.php?id=<?= $row['id'] ?>" target="_blank"><i class="bi bi-printer me-2"></i> Print PDF</a></li>
                                             
-                                            <?php if(!in_array($st, ['po_received', 'invoiced', 'cancel'])): ?>
+                                            <li><hr class="dropdown-divider"></li>
+
+                                            <?php if($st == 'draft'): ?>
                                                 <li><a class="dropdown-item text-primary" href="quotation_form.php?edit_id=<?= $row['id'] ?>"><i class="bi bi-pencil-square me-2"></i> Edit Quote</a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <?php if($st == 'draft'): ?>
                                                 <li><a class="dropdown-item text-info" href="?status_id=<?= $row['id'] ?>&st=sent"><i class="bi bi-send me-2"></i> Mark as Sent</a></li>
-                                                <?php endif; ?>
                                                 <li><button class="dropdown-item text-success fw-bold" onclick="openPOModal(<?= $row['id'] ?>, '<?= $row['quotation_no'] ?>')"><i class="bi bi-file-earmark-check me-2"></i> Process to PO</button></li>
                                                 <li><a class="dropdown-item text-danger" href="?status_id=<?= $row['id'] ?>&st=cancel" onclick="return confirm('Batalkan Quotation ini?')"><i class="bi bi-x-circle me-2"></i> Cancel Quote</a></li>
-                                            <?php endif; ?>
-
-                                            <?php if($st == 'draft' || $st == 'cancel'): ?>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li><a class="dropdown-item text-danger" href="?delete_id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                            
+                                            <?php elseif(in_array($st, ['sent', 'po_received', 'invoiced'])): ?>
+                                                <li><a class="dropdown-item text-warning" href="?status_id=<?= $row['id'] ?>&st=draft" onclick="return confirm('Kembalikan status ke DRAFT agar bisa diedit?')"><i class="bi bi-arrow-counterclockwise me-2"></i> Revert to Draft</a></li>
+                                                
+                                                <?php if($st == 'sent'): ?>
+                                                    <li><button class="dropdown-item text-success fw-bold" onclick="openPOModal(<?= $row['id'] ?>, '<?= $row['quotation_no'] ?>')"><i class="bi bi-file-earmark-check me-2"></i> Process to PO</button></li>
+                                                <?php endif; ?>
+                                                
                                             <?php endif; ?>
+
+                                            <?php if($st == 'cancel'): ?>
+                                                <li><a class="dropdown-item text-warning" href="?status_id=<?= $row['id'] ?>&st=draft"><i class="bi bi-arrow-counterclockwise me-2"></i> Revert to Draft</a></li>
+                                                <li><a class="dropdown-item text-danger" href="?delete_id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')"><i class="bi bi-trash me-2"></i> Delete</a></li>
+                                            <?php endif; ?>
+
                                         </ul>
                                     </div>
                                 </td>
@@ -349,7 +360,7 @@ $res = $conn->query($sql);
                 <div class="mb-3"><label class="form-label fw-bold">Client PO Number</label><input type="text" name="po_number_client" class="form-control" required></div>
                 <div class="mb-3"><label class="form-label fw-bold">Upload PO Document</label><input type="file" name="po_document" class="form-control" accept=".pdf,.jpg,.png,.jpeg" required></div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button><button type="submit" name="process_po" class="btn btn-success">Proses</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss=\"modal\">Batal</button><button type="submit" name="process_po" class="btn btn-success">Proses</button></div>
         </form>
     </div>
 </div>
