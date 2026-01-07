@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 2. Pastikan Koneksi Database Ada (Pencegahan Error)
+// 2. Pastikan Koneksi Database Ada
 if (!isset($conn)) {
     $db_path = __DIR__ . '/../../config/database.php'; 
     if (file_exists($db_path)) {
@@ -17,7 +17,7 @@ $role_name = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 's
 $username = $_SESSION['username'] ?? 'User';
 $user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 
-// --- Refresh Division ID (Pastikan Session Sinkron dengan DB) ---
+// --- Refresh Division ID ---
 $user_division_id = isset($_SESSION['division_id']) ? intval($_SESSION['division_id']) : 0;
 if ($user_division_id <= 0 && $user_id > 0 && isset($conn) && !$conn->connect_error) {
     $stmt = $conn->prepare("SELECT division_id FROM users WHERE id = ? LIMIT 1");
@@ -65,7 +65,7 @@ $sidebar_menu = [];
 $debug_msg = "";
 
 // =========================================================================
-// LOGIKA 1: ADMIN HARDCODED BYPASS (PASTI FULL AKSES)
+// LOGIKA 1: ADMIN HARDCODED BYPASS
 // =========================================================================
 if ($role_name === 'admin') {
     $sidebar_menu['dashboard'] = ['menu_label' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'bi bi-grid-fill', 'children' => []];
@@ -198,7 +198,6 @@ else {
                             <span class="fw-bold">Akses Ditolak</span><br>
                             <small>
                                 Role: <?= htmlspecialchars($role_name) ?><br>
-                                Div ID: <?= htmlspecialchars($user_division_id) ?><br>
                                 <?= !empty($debug_msg) ? "Msg: $debug_msg" : "" ?>
                             </small>
                         </div>
@@ -206,46 +205,56 @@ else {
                 <?php endif; ?>
             </ul>
         </div>
-
-        <div class="sidebar-footer p-3 border-top">
-            <div class="theme-toggle d-flex align-items-center justify-content-between p-2 bg-light rounded cursor-pointer" onclick="toggleTheme()" title="Ganti Tema" style="cursor: pointer;">
-                <span class="small fw-bold text-muted">Mode Tampilan</span>
-                <i class="bi bi-sun-fill fs-5 text-warning" id="theme-icon"></i>
-            </div>
-        </div>
     </div>
 </div>
-<div id="main">
-    <header class="mb-3">
+
+<div id="main" class='layout-navbar'>
+    <header class='mb-3'>
         <nav class="navbar navbar-expand navbar-light navbar-top">
-            <div class="container-fluid d-flex justify-content-between align-items-center px-0">
+            <div class="container-fluid px-3">
                 
-                <a href="#" class="burger-btn d-block p-2">
+                <a href="#" class="burger-btn d-block" onclick="toggleSidebar(event)">
                     <i class="bi bi-justify fs-3"></i>
                 </a>
 
-                <div class="dropdown">
-                    <a href="#" data-bs-toggle="dropdown" aria-expanded="false" class="d-block text-decoration-none">
-                        <div class="user-menu d-flex align-items-center">
-                            <div class="user-name text-end me-3">
-                                <h6 class="mb-0 text-gray-600"><?= htmlspecialchars($username) ?></h6>
-                                <p class="mb-0 text-sm text-gray-600">
-                                    <?= ucfirst($role_name) ?> 
-                                </p>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <div class="d-flex align-items-center ms-auto gap-4">
+                        
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-sun fs-6 text-secondary"></i>
+                            <div class="form-check form-switch mb-0" style="min-height: auto;">
+                                <input class="form-check-input" type="checkbox" id="darkmode-toggle" style="cursor: pointer; width: 3em; height: 1.5em; margin-top: 0;">
                             </div>
-                            <div class="user-img d-flex align-items-center">
-                                <div class="avatar avatar-md bg-primary">
-                                    <span class="avatar-content text-white"><?= strtoupper(substr($username, 0, 1)) ?></span>
-                                </div>
-                            </div>
+                            <i class="bi bi-moon fs-6 text-secondary"></i>
                         </div>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="dropdownMenuButton" style="min-width: 12rem;">
-                        <li><h6 class="dropdown-header text-muted">Hello, <?= htmlspecialchars($username) ?>!</h6></li>
-                        <li><a class="dropdown-item" href="../admin/profile.php"><i class="icon-mid bi bi-person me-2"></i> My Profile</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="../logout.php"><i class="icon-mid bi bi-box-arrow-left me-2"></i> Logout</a></li>
-                    </ul>
+
+                        <div class="dropdown">
+                            <a href="#" data-bs-toggle="dropdown" aria-expanded="false" class="d-block text-decoration-none">
+                                <div class="user-menu d-flex align-items-center">
+                                    <div class="user-name text-end me-3 d-none d-md-block">
+                                        <h6 class="mb-0 text-gray-600 font-bold"><?= htmlspecialchars($username) ?></h6>
+                                        <p class="mb-0 text-sm text-gray-600"><?= ucfirst($role_name) ?></p>
+                                    </div>
+                                    <div class="user-img">
+                                        <div class="avatar avatar-md bg-primary">
+                                            <span class="avatar-content text-white font-bold"><?= strtoupper(substr($username, 0, 1)) ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 12rem;">
+                                <li><h6 class="dropdown-header text-muted">Hello, <?= htmlspecialchars($username) ?>!</h6></li>
+                                <li><a class="dropdown-item" href="../admin/profile.php"><i class="icon-mid bi bi-person me-2"></i> My Profile</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="../logout.php"><i class="icon-mid bi bi-box-arrow-left me-2"></i> Logout</a></li>
+                            </ul>
+                        </div>
+
+                    </div>
                 </div>
 
             </div>
@@ -253,55 +262,50 @@ else {
     </header>
 
 <script>
-    // 1. Cek Tema saat Load
-    document.addEventListener('DOMContentLoaded', () => {
-        const savedTheme = localStorage.getItem('theme');
-        const themeIcon = document.getElementById('theme-icon');
+    // --- 1. FUNGSI TOGGLE SIDEBAR ---
+    // Diperbaiki untuk memastikan sidebar di-select dengan benar
+    function toggleSidebar(e) {
+        if(e) e.preventDefault();
         
-        // Cek apakah user punya preferensi tersimpan
+        // Ambil elemen sidebar
+        var sidebar = document.getElementById('sidebar');
+        
+        // Toggle class 'active'
+        // Di Mazer, jika sidebar punya class 'active', dia muncul. Jika tidak, dia hidden (di mobile) atau collapsed (di desktop).
+        sidebar.classList.toggle('active');
+    }
+
+    // --- 2. FUNGSI DARK MODE SWITCH ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggleSwitch = document.getElementById('darkmode-toggle');
+        const savedTheme = localStorage.getItem('theme');
+        
+        // Set kondisi awal checkbox berdasarkan localStorage
         if (savedTheme === 'dark') {
             document.body.classList.add('theme-dark');
-            document.documentElement.setAttribute('data-bs-theme', 'dark'); 
-            if(themeIcon) {
-                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
-                themeIcon.classList.add('bi-moon-fill', 'text-white');
-            }
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+            if(toggleSwitch) toggleSwitch.checked = true;
         } else {
-            // Default Light
-            if(themeIcon) {
-                themeIcon.classList.add('bi-sun-fill', 'text-warning');
-                themeIcon.classList.remove('bi-moon-fill', 'text-white');
-            }
+            document.body.classList.remove('theme-dark');
+            document.documentElement.setAttribute('data-bs-theme', 'light');
+            if(toggleSwitch) toggleSwitch.checked = false;
+        }
+
+        // Listener saat switch digeser
+        if(toggleSwitch) {
+            toggleSwitch.addEventListener('change', function() {
+                if (this.checked) {
+                    // Aktifkan Dark Mode
+                    document.body.classList.add('theme-dark');
+                    document.documentElement.setAttribute('data-bs-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    // Aktifkan Light Mode
+                    document.body.classList.remove('theme-dark');
+                    document.documentElement.setAttribute('data-bs-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
         }
     });
-
-    // 2. Fungsi Ganti Tema
-    function toggleTheme() {
-        const html = document.documentElement;
-        const themeIcon = document.getElementById('theme-icon');
-        
-        if (html.getAttribute('data-bs-theme') === 'dark') {
-            // Ubah ke Light
-            html.setAttribute('data-bs-theme', 'light');
-            document.body.classList.remove('theme-dark');
-            localStorage.setItem('theme', 'light');
-            
-            // Icon Matahari
-            if(themeIcon) {
-                themeIcon.classList.remove('bi-moon-fill', 'text-white');
-                themeIcon.classList.add('bi-sun-fill', 'text-warning');
-            }
-        } else {
-            // Ubah ke Dark
-            html.setAttribute('data-bs-theme', 'dark');
-            document.body.classList.add('theme-dark');
-            localStorage.setItem('theme', 'dark');
-            
-            // Icon Bulan
-            if(themeIcon) {
-                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
-                themeIcon.classList.add('bi-moon-fill', 'text-white');
-            }
-        }
-    }
 </script>
