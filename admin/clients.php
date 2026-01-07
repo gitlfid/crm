@@ -49,12 +49,16 @@ if (isset($_POST['save_client'])) {
     $is_edit = !empty($_POST['client_id']);
     $id = $is_edit ? intval($_POST['client_id']) : 0;
 
-    $comp = $conn->real_escape_string($_POST['company_name']);
-    $addr = $conn->real_escape_string($_POST['address']);
-    $pic  = $conn->real_escape_string($_POST['pic_name']);
-    $phone= $conn->real_escape_string($_POST['pic_phone']);
-    $sub_type = $conn->real_escape_string($_POST['subscription_type']);
-    $status   = $conn->real_escape_string($_POST['status']);
+    // [FIX] Tambahkan operator ?? '' untuk mencegah error Undefined array key
+    $comp = $conn->real_escape_string($_POST['company_name'] ?? '');
+    $addr = $conn->real_escape_string($_POST['address'] ?? '');
+    $pic  = $conn->real_escape_string($_POST['pic_name'] ?? '');
+    $phone= $conn->real_escape_string($_POST['pic_phone'] ?? '');
+    
+    // [FIX] Berikan default value agar tidak Data Truncated di database
+    $sub_type = $conn->real_escape_string($_POST['subscription_type'] ?? 'Monthly');
+    $status   = $conn->real_escape_string($_POST['status'] ?? 'Trial');
+    
     $sales_id = !empty($_POST['sales_person_id']) ? intval($_POST['sales_person_id']) : "NULL";
 
     // Upload Logic (Sama seperti sebelumnya)
