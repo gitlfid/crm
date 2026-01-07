@@ -48,22 +48,30 @@ if (isset($_POST['submit_reply'])) {
         $new_status = $conn->real_escape_string($_POST['status']);
     }
     
-    // --- [PERBAIKAN] LOGIKA UPLOAD REPLY ---
+    // --- [PERBAIKAN] LOGIKA UPLOAD & PERMISSION ---
     $attachment = null;
     $uploadDir = __DIR__ . '/../uploads/';
     
-    // Cek Folder
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+    // 1. Buat folder jika belum ada
+    if (!is_dir($uploadDir)) {
+        @mkdir($uploadDir, 0777, true);
+    }
+    
+    // 2. PAKSA PERMISSION FOLDER KE 777 (Agar bisa upload)
+    @chmod($uploadDir, 0777);
 
+    // Proses Upload
     if (isset($_FILES['attachment']) && $_FILES['attachment']['name'] != '') {
         $fErr = $_FILES['attachment']['error'];
         
-        if ($fErr === 0) {
+        if (!is_writable($uploadDir)) {
+             $msg_status = "<div class='alert alert-danger'>Error Server: Folder 'uploads' terkunci (Permission Denied). Mohon set permission folder ke 777 via File Manager.</div>";
+        } elseif ($fErr === 0) {
             $fileName = time() . '_rep_' . preg_replace("/[^a-zA-Z0-9.]/", "", $_FILES['attachment']['name']);
             if (move_uploaded_file($_FILES['attachment']['tmp_name'], $uploadDir . $fileName)) {
                 $attachment = $fileName;
             } else {
-                $msg_status = "<div class='alert alert-danger'>Gagal Upload: Permission Denied.</div>";
+                $msg_status = "<div class='alert alert-danger'>Gagal Upload: Permission Denied (Gagal memindahkan file).</div>";
             }
         } elseif ($fErr === 1) {
             $msg_status = "<div class='alert alert-danger'>Gagal Upload: File terlalu besar (Melebihi batas server).</div>";
@@ -80,12 +88,12 @@ if (isset($_POST['submit_reply'])) {
         $stmt->bind_param("iiss", $ticket_id, $current_user_id, $reply_msg, $attachment);
         
         if ($stmt->execute()) {
-            // Update Status Tiket Utama (Jika berubah)
+            // Update Status Tiket Utama
             if ($new_status != $ticket['status']) {
                 $conn->query("UPDATE internal_tickets SET status = '$new_status' WHERE id = $ticket_id");
             }
             
-            // --- 1. NOTIFIKASI DISCORD (KODE ASLI) ---
+            // --- 1. NOTIFIKASI DISCORD ---
             if (function_exists('sendInternalDiscord')) {
                 $discordFields = [
                     ["name" => "Ticket ID", "value" => $ticket['ticket_code'], "inline" => true],
@@ -104,7 +112,7 @@ if (isset($_POST['submit_reply'])) {
                 } catch(Exception $e) {}
             }
 
-            // --- 2. NOTIFIKASI EMAIL (KODE ASLI) ---
+            // --- 2. NOTIFIKASI EMAIL ---
             if (function_exists('sendEmailNotification')) {
                 $emailSubject = "Update Ticket #" . $ticket['ticket_code'];
                 $emailBody  = "<h3>Update Ticket #" . $ticket['ticket_code'] . "</h3>";
@@ -114,18 +122,15 @@ if (isset($_POST['submit_reply'])) {
                 if ($attachment) $emailBody .= "<p><em>*Ada file lampiran.</em></p>";
                 
                 if ($current_user_id == $ticket['user_id']) {
-                    // Balasan dari Pembuat -> Kirim ke Anggota Divisi Tujuan
                     $divMembers = $conn->query("SELECT email FROM users WHERE division_id=" . $ticket['target_division_id']);
                     while($m = $divMembers->fetch_assoc()) {
                         try { sendEmailNotification($m['email'], $emailSubject, $emailBody); } catch(Exception $e) {}
                     }
                 } else {
-                    // Balasan dari Divisi Tujuan -> Kirim ke Pembuat Tiket
                     try { sendEmailNotification($ticket['creator_email'], $emailSubject, $emailBody); } catch(Exception $e) {}
                 }
             }
             
-            // Refresh Page
             echo "<script>window.location.href='internal_view.php?id=$ticket_id';</script>"; 
             exit;
         }
