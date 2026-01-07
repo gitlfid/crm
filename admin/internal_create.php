@@ -21,23 +21,17 @@ while($row = $div_res->fetch_assoc()) {
 if (isset($_POST['submit_internal'])) {
     $target_div = intval($_POST['target_division']);
     
-    // --- PERBAIKAN UTAMA: PISAHKAN DATA RAW DAN DATA DB ---
-    
-    // 1. Data Mentah (Untuk Email & Discord agar format Enter tetap terjaga)
+    // --- 1. SIAPKAN DATA ---
     $subjectRaw = $_POST['subject'];
     $descRaw    = $_POST['description']; 
     
-    // 2. Data Aman (Untuk Database)
     $subjectDB  = $conn->real_escape_string($subjectRaw);
     $descDB     = $conn->real_escape_string($descRaw);
     $type_ticket = $conn->real_escape_string($_POST['type']);
     
-    // ------------------------------------------------------
-
-    // Generate ID
     $ticketCode = generateInternalTicketID($target_div, $conn);
     
-    // Upload Attachment
+    // --- 2. UPLOAD FILE ---
     $attachment = null;
     $uploadDir = __DIR__ . '/../uploads/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
@@ -49,20 +43,23 @@ if (isset($_POST['submit_internal'])) {
         }
     }
     
-    // Insert Database (Gunakan variabel $descDB yang aman)
+    // --- 3. INSERT DATABASE (PRIORITAS UTAMA) ---
+    // Simpan dulu agar user merasa "selesai" lebih cepat jika nanti ada delay email
     $stmt = $conn->prepare("INSERT INTO internal_tickets (ticket_code, user_id, target_division_id, subject, description, attachment) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("siisss", $ticketCode, $user_id, $target_div, $subjectDB, $descDB, $attachment);
     
     if ($stmt->execute()) {
+        
+        // --- 4. KIRIM NOTIFIKASI (SETELAH INSERT SUKSES) ---
+        // Jika bagian ini lemot, setidaknya data sudah aman di DB.
+        
         // Ambil Nama Divisi Tujuan
         $targetDivName = "Unknown";
         foreach($divisions as $d) { if($d['id'] == $target_div) $targetDivName = $d['name']; }
 
-        // --- 1. NOTIF DISCORD INTERNAL ---
+        // A. Notif Discord
         if (function_exists('sendInternalDiscord')) {
-            // Gunakan $descRaw agar format baris baru terbaca oleh Discord
             $discordDesc = (strlen($descRaw) > 1000) ? substr($descRaw, 0, 1000) . "..." : $descRaw;
-
             $discordFields = [
                 ["name" => "From", "value" => $user_data['username'], "inline" => true],
                 ["name" => "To Division", "value" => $targetDivName, "inline" => true],
@@ -70,54 +67,56 @@ if (isset($_POST['submit_internal'])) {
                 ["name" => "Description", "value" => $discordDesc]
             ];
             
-            $titleDiscord = "$ticketCode: $subjectRaw";
-            
-            $response = sendInternalDiscord($titleDiscord, "A new internal ticket has been submitted.", $discordFields, null, $titleDiscord);
-            
-            if (isset($response['id'])) {
-                $thread_id = $response['id'];
-                $conn->query("UPDATE internal_tickets SET discord_thread_id = '$thread_id' WHERE ticket_code = '$ticketCode'");
+            // Coba kirim Discord (dengan error suppression agar tidak fatal error jika timeout)
+            try {
+                $titleDiscord = "$ticketCode: $subjectRaw";
+                $response = sendInternalDiscord($titleDiscord, "A new internal ticket has been submitted.", $discordFields, null, $titleDiscord);
+                
+                if (isset($response['id'])) {
+                    $thread_id = $response['id'];
+                    $conn->query("UPDATE internal_tickets SET discord_thread_id = '$thread_id' WHERE ticket_code = '$ticketCode'");
+                }
+            } catch (Exception $e) {
+                // Ignore error discord agar flow tetap jalan
             }
         }
         
-        // --- 2. KIRIM EMAIL KE PEMBUAT (KONFIRMASI) ---
+        // B. Notif Email Pembuat
         if (function_exists('sendEmailNotification')) {
-            $body = "Halo " . $user_data['username'] . ",<br>Tiket Internal Anda ke divisi <strong>$targetDivName</strong> berhasil dibuat.<br>ID: $ticketCode<br>Subject: $subjectRaw";
-            sendEmailNotification($user_data['email'], "Internal Ticket Created: $ticketCode", $body);
+            try {
+                $body = "Halo " . $user_data['username'] . ",<br>Tiket Internal Anda ke divisi <strong>$targetDivName</strong> berhasil dibuat.<br>ID: $ticketCode<br>Subject: $subjectRaw";
+                sendEmailNotification($user_data['email'], "Internal Ticket Created: $ticketCode", $body);
+            } catch (Exception $e) { /* Ignore */ }
         }
 
-        // --- 3. KIRIM EMAIL KE SELURUH USER DIVISI TUJUAN ---
+        // C. Notif Email Divisi Tujuan (Looping Email bisa bikin lama)
         if (function_exists('sendEmailNotification')) {
             $stmtDivUsers = $conn->prepare("SELECT username, email FROM users WHERE division_id = ?");
             $stmtDivUsers->bind_param("i", $target_div);
             $stmtDivUsers->execute();
             $resDivUsers = $stmtDivUsers->get_result();
 
+            // Batasi jumlah email jika terlalu banyak user (misal max 5 user pertama) untuk mencegah timeout
+            $emailCount = 0; 
             while ($targetUser = $resDivUsers->fetch_assoc()) {
                 if ($targetUser['email'] === $user_data['email']) continue;
+                // if ($emailCount >= 5) break; // Opsional: Uncomment jika divisi anggotanya ratusan
 
                 $subjectTarget = "[New Ticket] Masuk dari " . $user_data['username'];
                 $bodyTarget  = "<h3>Halo " . $targetUser['username'] . ",</h3>";
-                $bodyTarget .= "<p>Ada tiket internal baru yang ditujukan ke Divisi Anda (<strong>$targetDivName</strong>).</p>";
-                $bodyTarget .= "<hr>";
-                $bodyTarget .= "<ul>
-                                    <li><strong>Ticket ID:</strong> $ticketCode</li>
-                                    <li><strong>Pengirim:</strong> " . $user_data['username'] . "</li>
-                                    <li><strong>Jenis:</strong> $type_ticket</li>
-                                    <li><strong>Subject:</strong> " . htmlspecialchars($subjectRaw) . "</li>
-                                </ul>";
-                
-                // Gunakan $descRaw yang masih murni, lalu konversi Enter (\n) menjadi <br>
-                $bodyTarget .= "<p><strong>Deskripsi:</strong><br>" . nl2br(htmlspecialchars($descRaw)) . "</p>";
-                
-                $bodyTarget .= "<hr>";
-                $bodyTarget .= "<p>Mohon segera dicek pada sistem Helpdesk Internal.</p>";
+                $bodyTarget .= "<p>Ada tiket internal baru ke Divisi Anda (<strong>$targetDivName</strong>).</p>";
+                $bodyTarget .= "<ul><li>Ticket ID: $ticketCode</li><li>Subject: " . htmlspecialchars($subjectRaw) . "</li></ul>";
+                $bodyTarget .= "<p>Mohon cek sistem Helpdesk.</p>";
 
-                sendEmailNotification($targetUser['email'], $subjectTarget, $bodyTarget);
+                try {
+                    sendEmailNotification($targetUser['email'], $subjectTarget, $bodyTarget);
+                } catch (Exception $e) { /* Ignore */ }
+                
+                $emailCount++;
             }
         }
         
-        echo "<script>alert('Tiket Internal Berhasil Dibuat & Notifikasi dikirim!'); window.location='internal_tickets.php';</script>";
+        echo "<script>alert('Tiket Internal Berhasil Dibuat!'); window.location='internal_tickets.php';</script>";
     } else {
         echo "<script>alert('Gagal membuat tiket: " . $conn->error . "');</script>";
     }
