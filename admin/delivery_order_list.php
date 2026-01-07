@@ -25,7 +25,8 @@ if (!empty($f_client)) {
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
-    $sqlEx = "SELECT d.*, c.company_name 
+    // [UPDATE] Tambahkan c.address dan ID untuk ambil item
+    $sqlEx = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
               FROM delivery_orders d 
               JOIN payments p ON d.payment_id = p.id 
               JOIN invoices i ON p.invoice_id = i.id
@@ -40,18 +41,48 @@ if (isset($_POST['export_excel'])) {
     
     $output = fopen('php://output', 'w');
     
-    // Header CSV
-    fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Receiver Name', 'Receiver Phone', 'Status', 'Created At'));
+    // [UPDATE] Header CSV: Ditambahkan Address, Item, Unit, Charge Mode, Description
+    fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Address', 'Item List', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
     
     while($row = $resEx->fetch_assoc()) {
+        // --- Ambil Detail Item ---
+        $inv_id = $row['invoice_id'];
+        $quo_id = $row['quotation_id'];
+        
+        // Prioritas ambil dari Invoice Items
+        $items_sql = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = $inv_id";
+        $resItems = $conn->query($items_sql);
+        if($resItems->num_rows == 0) {
+            // Fallback ke Quotation Items
+            $items_sql = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = $quo_id";
+            $resItems = $conn->query($items_sql);
+        }
+
+        // Tampung data item untuk digabung dalam satu cell (dipisah koma/pipe)
+        $arr_items = [];
+        $arr_qtys  = [];
+        $arr_modes = [];
+        $arr_descs = [];
+
+        while($itm = $resItems->fetch_assoc()) {
+            $arr_items[] = $itm['item_name'];
+            $arr_qtys[]  = floatval($itm['qty']);
+            $arr_modes[] = $itm['card_type'];
+            $arr_descs[] = $itm['description'];
+        }
+
         fputcsv($output, array(
             $row['do_number'],
             $row['do_date'],
             $row['company_name'],
+            $row['address'], // Address
+            implode(" | ", $arr_items), // Item
+            implode(" | ", $arr_qtys),  // Unit/Qty
+            implode(" | ", $arr_modes), // Charge Mode
+            implode(" | ", $arr_descs), // Description
             $row['pic_name'],
             $row['pic_phone'],
-            strtoupper($row['status']),
-            $row['created_at']
+            strtoupper($row['status'])
         ));
     }
     fclose($output);
@@ -63,11 +94,11 @@ $page_title = "Delivery Orders";
 include 'includes/header.php';
 include 'includes/sidebar.php';
 
-// Ambil List Client untuk Dropdown Filter
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
 // QUERY DATA TAMPILAN
-$sql = "SELECT d.*, c.company_name 
+// [UPDATE] Fetch Address dan ID referensi
+$sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
         FROM delivery_orders d 
         JOIN payments p ON d.payment_id = p.id 
         JOIN invoices i ON p.invoice_id = i.id
@@ -80,6 +111,9 @@ $res = $conn->query($sql);
 
 <style>
     .table-responsive { overflow: visible !important; }
+    .item-list { font-size: 0.85rem; }
+    .item-row { border-bottom: 1px dashed #eee; padding: 2px 0; }
+    .item-row:last-child { border-bottom: none; }
 </style>
 
 <div class="page-heading">
@@ -150,70 +184,100 @@ $res = $conn->query($sql);
     <div class="card shadow-sm">
         <div class="card-body">
             <div class="table-responsive" style="overflow:visible;">
-                <table class="table table-hover align-middle" id="table1">
+                <table class="table table-hover align-middle table-sm" id="table1">
                     <thead class="bg-light">
                         <tr>
                             <th>DO Number</th>
                             <th>Date</th>
-                            <th>Client</th>
-                            <th>Receiver (PIC)</th>
+                            <th width="15%">Client & Address</th>
+                            <th width="20%">Item</th>
+                            <th>Unit</th>
+                            <th>Charge Mode</th>
+                            <th width="15%">Desc</th>
+                            <th>Receiver</th>
                             <th>Status</th>
-                            <th width="10%">Action</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php if ($res->num_rows > 0): ?>
                             <?php while($row = $res->fetch_assoc()): ?>
+                            <?php
+                                // --- Ambil Detail Item untuk Tampilan HTML ---
+                                $inv_id = $row['invoice_id'];
+                                $quo_id = $row['quotation_id'];
+                                
+                                $items_sql = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = $inv_id";
+                                $resItems = $conn->query($items_sql);
+                                if($resItems->num_rows == 0) {
+                                    $items_sql = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = $quo_id";
+                                    $resItems = $conn->query($items_sql);
+                                }
+                                
+                                // Simpan dalam array untuk diloop di TD
+                                $itemsData = [];
+                                while($itm = $resItems->fetch_assoc()) {
+                                    $itemsData[] = $itm;
+                                }
+                            ?>
                             <tr>
-                                <td>
-                                    <span class="fw-bold text-warning text-dark font-monospace"><?= $row['do_number'] ?></span>
+                                <td class="align-top">
+                                    <span class="fw-bold text-dark font-monospace"><?= $row['do_number'] ?></span>
                                 </td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-calendar3 text-muted me-2"></i>
-                                        <?= date('d M Y', strtotime($row['do_date'])) ?>
+                                <td class="align-top">
+                                    <div class="small text-muted"><?= date('d M Y', strtotime($row['do_date'])) ?></div>
+                                </td>
+                                <td class="align-top">
+                                    <div class="fw-bold text-primary mb-1"><?= htmlspecialchars($row['company_name']) ?></div>
+                                    <div class="small text-muted lh-sm" style="font-size: 0.75rem;">
+                                        <i class="bi bi-geo-alt me-1"></i> <?= htmlspecialchars(substr($row['address'], 0, 50)) ?>...
                                     </div>
                                 </td>
-                                <td>
-                                    <div class="fw-bold"><?= htmlspecialchars($row['company_name']) ?></div>
+
+                                <td class="align-top">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row fw-bold"><?= htmlspecialchars($d['item_name']) ?></div>
+                                    <?php endforeach; ?>
                                 </td>
-                                <td>
+                                <td class="align-top text-center">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row"><?= floatval($d['qty']) ?></div>
+                                    <?php endforeach; ?>
+                                </td>
+                                <td class="align-top text-center">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row badge bg-light text-dark border"><?= htmlspecialchars($d['card_type']) ?></div>
+                                    <?php endforeach; ?>
+                                </td>
+                                <td class="align-top">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row small text-muted"><?= htmlspecialchars($d['description']) ?></div>
+                                    <?php endforeach; ?>
+                                </td>
+
+                                <td class="align-top">
                                     <div class="d-flex align-items-center">
-                                        <div class="avatar avatar-sm bg-light text-dark me-2">
-                                            <span class="avatar-content small"><i class="bi bi-person"></i></span>
+                                        <i class="bi bi-person-circle me-2 text-secondary"></i>
+                                        <div class="lh-1">
+                                            <span class="d-block small fw-bold"><?= htmlspecialchars($row['pic_name']) ?></span>
+                                            <span class="d-block text-muted" style="font-size:0.7rem;"><?= htmlspecialchars($row['pic_phone']) ?></span>
                                         </div>
-                                        <span><?= htmlspecialchars($row['pic_name']) ?></span>
                                     </div>
-                                    <?php if(!empty($row['pic_phone'])): ?>
-                                        <small class="text-muted ms-5"><?= htmlspecialchars($row['pic_phone']) ?></small>
-                                    <?php endif; ?>
                                 </td>
-                                <td>
+                                <td class="align-top">
                                     <?php 
                                         $st = $row['status']; 
                                         $bg = ($st == 'sent') ? 'success' : 'secondary';
                                     ?>
                                     <span class="badge bg-<?= $bg ?>"><?= strtoupper($st) ?></span>
                                 </td>
-                                <td>
+                                <td class="align-top">
                                     <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="viewport">
-                                            Action
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
-                                            <li>
-                                                <a class="dropdown-item" href="delivery_order_print.php?id=<?= $row['id'] ?>" target="_blank">
-                                                    <i class="bi bi-printer me-2 text-danger"></i> Print DO
-                                                </a>
-                                            </li>
-                                            
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle py-0" type="button" data-bs-toggle="dropdown">Act</button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 small">
+                                            <li><a class="dropdown-item" href="delivery_order_print.php?id=<?= $row['id'] ?>" target="_blank"><i class="bi bi-printer me-2"></i> Print</a></li>
                                             <li><hr class="dropdown-divider"></li>
-                                            
-                                            <li>
-                                                <a class="dropdown-item" href="delivery_order_form.php?edit_id=<?= $row['id'] ?>">
-                                                    <i class="bi bi-pencil-square me-2 text-primary"></i> Edit Data
-                                                </a>
-                                            </li>
+                                            <li><a class="dropdown-item" href="delivery_order_form.php?edit_id=<?= $row['id'] ?>"><i class="bi bi-pencil me-2"></i> Edit</a></li>
                                         </ul>
                                     </div>
                                 </td>
@@ -221,7 +285,7 @@ $res = $conn->query($sql);
                             <?php endwhile; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
+                                <td colspan="10" class="text-center py-5 text-muted">
                                     <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
                                     Tidak ada data Delivery Order ditemukan.
                                 </td>
