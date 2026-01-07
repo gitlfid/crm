@@ -1,268 +1,233 @@
 <?php
-$page_title = "Internal Tickets";
+$page_title = "Buat Tiket Internal";
 include 'includes/header.php';
 include 'includes/sidebar.php';
 include '../config/functions.php';
 
-// --- 0. AMBIL DATA USER LOGIN ---
-$current_user_id = $_SESSION['user_id'];
-$current_role    = $_SESSION['role'];
+// Ambil Data User yang Login
+$user_id = $_SESSION['user_id'];
+$user_sql = "SELECT * FROM users WHERE id = $user_id";
+$user_data = $conn->query($user_sql)->fetch_assoc();
 
-// Ambil ID Divisi user saat ini
-$uQuery = $conn->query("SELECT division_id FROM users WHERE id = $current_user_id");
-$uData  = $uQuery->fetch_assoc();
-$current_user_div = $uData['division_id'];
+// Ambil Daftar Divisi
+$divisions = [];
+$div_sql = "SELECT * FROM divisions";
+$div_res = $conn->query($div_sql);
+while($row = $div_res->fetch_assoc()) {
+    $divisions[] = $row;
+}
 
-// --- 1. LOGIKA FILTER ---
-$search_keyword  = isset($_GET['search']) ? $_GET['search'] : '';
-$filter_division = isset($_GET['division']) ? $_GET['division'] : '';
-$filter_status   = isset($_GET['status']) ? $_GET['status'] : '';
+// PROSES SUBMIT
+if (isset($_POST['submit_internal'])) {
+    $target_div = intval($_POST['target_division']);
+    
+    // --- 1. SIAPKAN DATA ---
+    // Data Mentah (Untuk Email & Discord agar format Enter tetap terjaga)
+    $subjectRaw = $_POST['subject'];
+    $descRaw    = $_POST['description']; 
+    
+    // Data Aman (Untuk Database)
+    $subjectDB  = $conn->real_escape_string($subjectRaw);
+    $descDB     = $conn->real_escape_string($descRaw);
+    $type_ticket = $conn->real_escape_string($_POST['type']);
+    
+    // Generate ID
+    $ticketCode = generateInternalTicketID($target_div, $conn);
+    
+    // --- 2. UPLOAD FILE (DIPERBAIKI) ---
+    $attachment = null;
+    $uploadDir = __DIR__ . '/../uploads/';
+    
+    // Cek apakah folder uploads ada, jika tidak buat folder
+    if (!is_dir($uploadDir)) {
+        if (!mkdir($uploadDir, 0777, true)) {
+            echo "<script>alert('Gagal membuat folder uploads. Cek permission server.');</script>";
+        }
+    }
 
-// --- 2. QUERY UTAMA ---
-$sql = "SELECT t.*, u.username, d.name as target_div_name, d.code as target_div_code
-        FROM internal_tickets t 
-        JOIN users u ON t.user_id = u.id 
-        JOIN divisions d ON t.target_division_id = d.id 
-        WHERE 1=1";
+    // Cek apakah user mengupload file
+    if (isset($_FILES['attachment']) && $_FILES['attachment']['name'] != '') {
+        $fileError = $_FILES['attachment']['error'];
+        $fileSize = $_FILES['attachment']['size'];
+        
+        // 0 = Tidak ada error
+        if ($fileError === 0) {
+            // Bersihkan nama file agar aman
+            $cleanName = preg_replace("/[^a-zA-Z0-9.]/", "", $_FILES['attachment']['name']);
+            $fileName = time() . '_int_' . $cleanName;
+            $targetPath = $uploadDir . $fileName;
+            
+            // Pindahkan file dari temp ke folder uploads
+            if (move_uploaded_file($_FILES['attachment']['tmp_name'], $targetPath)) {
+                $attachment = $fileName;
+            } else {
+                echo "<script>alert('Gagal upload: Folder tidak bisa ditulisi (Permission Denied).');</script>";
+            }
+        } 
+        // 1 = File melebihi upload_max_filesize di php.ini
+        elseif ($fileError === 1) {
+            echo "<script>alert('Gagal upload: File terlalu besar (Melebihi batas server/php.ini).');</script>";
+        } 
+        // Error lainnya
+        else {
+            echo "<script>alert('Gagal upload: Terjadi kesalahan sistem (Code: $fileError).');</script>";
+        }
+    }
+    
+    // --- 3. INSERT DATABASE ---
+    // Simpan ke database (termasuk nama file attachment jika ada)
+    $stmt = $conn->prepare("INSERT INTO internal_tickets (ticket_code, user_id, target_division_id, subject, description, attachment) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("siisss", $ticketCode, $user_id, $target_div, $subjectDB, $descDB, $attachment);
+    
+    if ($stmt->execute()) {
+        
+        // --- 4. KIRIM NOTIFIKASI (KODE ASLI DIPERTAHANKAN) ---
+        
+        // Ambil Nama Divisi Tujuan
+        $targetDivName = "Unknown";
+        foreach($divisions as $d) { if($d['id'] == $target_div) $targetDivName = $d['name']; }
 
-// --- 3. FILTER PERMISSION ---
-if ($current_role != 'admin') {
-    if ($current_user_div) {
-        $sql .= " AND (t.user_id = $current_user_id OR t.target_division_id = $current_user_div)";
+        // --- A. NOTIF DISCORD INTERNAL ---
+        if (function_exists('sendInternalDiscord')) {
+            $discordDesc = (strlen($descRaw) > 1000) ? substr($descRaw, 0, 1000) . "..." : $descRaw;
+
+            $discordFields = [
+                ["name" => "From", "value" => $user_data['username'], "inline" => true],
+                ["name" => "To Division", "value" => $targetDivName, "inline" => true],
+                ["name" => "Type", "value" => $type_ticket, "inline" => true],
+                ["name" => "Description", "value" => $discordDesc]
+            ];
+            
+            // Tambahkan info attachment di Discord jika ada
+            if ($attachment) {
+                $discordFields[] = ["name" => "Attachment", "value" => "File Terlampir", "inline" => true];
+            }
+            
+            $titleDiscord = "$ticketCode: $subjectRaw";
+            
+            $response = sendInternalDiscord($titleDiscord, "A new internal ticket has been submitted.", $discordFields, null, $titleDiscord);
+            
+            if (isset($response['id'])) {
+                $thread_id = $response['id'];
+                $conn->query("UPDATE internal_tickets SET discord_thread_id = '$thread_id' WHERE ticket_code = '$ticketCode'");
+            }
+        }
+        
+        // --- B. KIRIM EMAIL KE PEMBUAT (KONFIRMASI) ---
+        if (function_exists('sendEmailNotification')) {
+            $body = "Halo " . $user_data['username'] . ",<br>Tiket Internal Anda ke divisi <strong>$targetDivName</strong> berhasil dibuat.<br>ID: $ticketCode<br>Subject: $subjectRaw";
+            sendEmailNotification($user_data['email'], "Internal Ticket Created: $ticketCode", $body);
+        }
+
+        // --- C. KIRIM EMAIL KE SELURUH USER DIVISI TUJUAN ---
+        // (Looping ini yang mungkin menyebabkan delay jika user divisi banyak, tapi tetap dipertahankan sesuai permintaan)
+        if (function_exists('sendEmailNotification')) {
+            $stmtDivUsers = $conn->prepare("SELECT username, email FROM users WHERE division_id = ?");
+            $stmtDivUsers->bind_param("i", $target_div);
+            $stmtDivUsers->execute();
+            $resDivUsers = $stmtDivUsers->get_result();
+
+            while ($targetUser = $resDivUsers->fetch_assoc()) {
+                if ($targetUser['email'] === $user_data['email']) continue;
+
+                $subjectTarget = "[New Ticket] Masuk dari " . $user_data['username'];
+                $bodyTarget  = "<h3>Halo " . $targetUser['username'] . ",</h3>";
+                $bodyTarget .= "<p>Ada tiket internal baru yang ditujukan ke Divisi Anda (<strong>$targetDivName</strong>).</p>";
+                $bodyTarget .= "<hr>";
+                $bodyTarget .= "<ul>
+                                    <li><strong>Ticket ID:</strong> $ticketCode</li>
+                                    <li><strong>Pengirim:</strong> " . $user_data['username'] . "</li>
+                                    <li><strong>Jenis:</strong> $type_ticket</li>
+                                    <li><strong>Subject:</strong> " . htmlspecialchars($subjectRaw) . "</li>
+                                </ul>";
+                
+                $bodyTarget .= "<p><strong>Deskripsi:</strong><br>" . nl2br(htmlspecialchars($descRaw)) . "</p>";
+                
+                if ($attachment) {
+                    $bodyTarget .= "<p><em>*Tiket ini memiliki lampiran file.</em></p>";
+                }
+                
+                $bodyTarget .= "<hr>";
+                $bodyTarget .= "<p>Mohon segera dicek pada sistem Helpdesk Internal.</p>";
+
+                sendEmailNotification($targetUser['email'], $subjectTarget, $bodyTarget);
+            }
+        }
+        
+        echo "<script>alert('Tiket Internal Berhasil Dibuat & Notifikasi dikirim!'); window.location='internal_tickets.php';</script>";
     } else {
-        $sql .= " AND t.user_id = $current_user_id";
+        echo "<script>alert('Gagal membuat tiket: " . $conn->error . "');</script>";
     }
 }
-
-// --- 4. FILTER PENCARIAN ---
-if (!empty($search_keyword)) {
-    $safe_key = $conn->real_escape_string($search_keyword);
-    $sql .= " AND (t.ticket_code LIKE '%$safe_key%' OR t.subject LIKE '%$safe_key%' OR u.username LIKE '%$safe_key%')";
-}
-if (!empty($filter_division)) {
-    $safe_div = intval($filter_division);
-    $sql .= " AND t.target_division_id = $safe_div";
-}
-if (!empty($filter_status)) {
-    $safe_stat = $conn->real_escape_string($filter_status);
-    $sql .= " AND t.status = '$safe_stat'";
-}
-
-$sql .= " ORDER BY t.created_at DESC";
-$result = $conn->query($sql);
-
-$div_list = $conn->query("SELECT * FROM divisions");
 ?>
 
-<style>
-    /* Perkecil font tabel secara global */
-    .table-compact {
-        font-size: 0.9rem;
-    }
-    .table-compact thead th {
-        background-color: #f4f6f8; /* Abu-abu muda header */
-        color: #637381;
-        font-weight: 600;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        padding: 12px 16px;
-        border-bottom: 1px solid #dfe3e8;
-    }
-    .table-compact tbody td {
-        padding: 10px 16px;
-        vertical-align: middle;
-        border-bottom: 1px dashed #eff2f5;
-        color: #212b36;
-    }
-    /* Ticket Code Style */
-    .ticket-code {
-        font-family: 'Consolas', 'Monaco', monospace;
-        font-weight: 700;
-        color: #435ebe;
-    }
-    /* Avatar Initials */
-    .avatar-initial {
-        width: 32px;
-        height: 32px;
-        background-color: #dfe3e8;
-        color: #637381;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        font-weight: 600;
-        font-size: 0.8rem;
-    }
-    /* Status Badges - Pill Style */
-    .badge-status {
-        padding: 6px 12px;
-        border-radius: 30px;
-        font-weight: 700;
-        font-size: 0.75rem;
-    }
-    .badge-open { background-color: #e9fcd4; color: #54d62c; }
-    .badge-progress { background-color: #fff7cd; color: #ffc107; }
-    .badge-closed { background-color: #f4f6f8; color: #637381; }
-    
-    /* Input Form Compact */
-    .form-control-sm, .form-select-sm, .btn-sm {
-        font-size: 0.85rem;
-        border-radius: 0.3rem;
-    }
-</style>
-
-<div class="page-heading mb-4">
-    <div class="row align-items-center">
-        <div class="col-12 col-md-6">
-            <h3 class="mb-1">Internal Tickets</h3>
-            <p class="text-muted small mb-0">Kelola tiket internal dan permintaan antar divisi.</p>
-        </div>
-        <div class="col-12 col-md-6 text-end">
-            <a href="internal_create.php" class="btn btn-primary btn-sm shadow-sm px-3">
-                <i class="bi bi-plus-lg me-1"></i> Buat Ticket
-            </a>
-        </div>
-    </div>
+<div class="page-heading">
+    <h3>Buat Ticket Internal</h3>
 </div>
 
 <div class="page-content">
-    
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body py-3 px-4">
-            <form method="GET">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label small text-muted mb-1">Search Keyword</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Cari ID, Subject, atau User..." value="<?= htmlspecialchars($search_keyword) ?>">
-                        </div>
+    <div class="card">
+        <div class="card-header">Form Ticket Antar Divisi</div>
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Nama Pembuat</label>
+                        <input type="text" class="form-control bg-light" value="<?= $user_data['username'] ?>" readonly>
                     </div>
-                    
-                    <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Target Divisi</label>
-                        <select name="division" class="form-select form-select-sm">
-                            <option value="">- Semua Divisi -</option>
-                            <?php while($d = $div_list->fetch_assoc()): ?>
-                                <option value="<?= $d['id'] ?>" <?= ($filter_division == $d['id']) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($d['name']) ?>
-                                </option>
-                            <?php endwhile; ?>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="text" class="form-control bg-light" value="<?= $user_data['email'] ?>" readonly>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Nomor Telepon</label>
+                        <input type="text" class="form-control bg-light" value="<?= $user_data['phone'] ?? '-' ?>" readonly>
+                    </div>
+
+                    <div class="col-md-12"><hr></div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Tujuan Divisi</label>
+                        <select name="target_division" class="form-select" required>
+                            <option value="">-- Pilih Divisi Tujuan --</option>
+                            <?php foreach($divisions as $div): ?>
+                                <option value="<?= $div['id'] ?>"><?= $div['name'] ?> (<?= $div['code'] ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Semua staff di divisi ini akan menerima notifikasi email.</small>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Jenis Ticket</label>
+                        <select name="type" class="form-select">
+                            <option value="Request">Request</option>
+                            <option value="Incident">Incident</option>
+                            <option value="Question">Question</option>
                         </select>
                     </div>
 
-                    <div class="col-md-3">
-                        <label class="form-label small text-muted mb-1">Status Tiket</label>
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">- Semua Status -</option>
-                            <option value="open" <?= ($filter_status == 'open') ? 'selected' : '' ?>>OPEN</option>
-                            <option value="progress" <?= ($filter_status == 'progress') ? 'selected' : '' ?>>PROGRESS</option>
-                            <option value="closed" <?= ($filter_status == 'closed') ? 'selected' : '' ?>>CLOSED</option>
-                        </select>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-bold">Subject</label>
+                        <input type="text" name="subject" class="form-control" required placeholder="Judul permasalahan...">
                     </div>
 
-                    <div class="col-md-2">
-                        <div class="d-flex gap-1">
-                            <button type="submit" class="btn btn-primary btn-sm w-100">Filter</button>
-                            <a href="internal_tickets.php" class="btn btn-light btn-sm border"><i class="bi bi-arrow-counterclockwise"></i></a>
-                        </div>
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-bold">Deskripsi</label>
+                        <textarea name="description" class="form-control" rows="5" required placeholder="Jelaskan detail kebutuhan..."></textarea>
+                    </div>
+
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-bold">Attachment (Optional)</label>
+                        <input type="file" name="attachment" class="form-control">
+                        <div class="form-text text-muted small">Max file size mengikuti konfigurasi server (biasanya 2MB).</div>
+                    </div>
+
+                    <div class="col-12 d-flex justify-content-end">
+                        <button type="submit" name="submit_internal" class="btn btn-primary px-5">Kirim Ticket Internal</button>
                     </div>
                 </div>
             </form>
         </div>
-    </div>
-
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-compact table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>ID Ticket</th>
-                            <th>Subject</th>
-                            <th>From (User)</th>
-                            <th>To (Divisi)</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if ($result->num_rows > 0): ?>
-                            <?php while($row = $result->fetch_assoc()): ?>
-                            <tr>
-                                <td>
-                                    <div class="ticket-code"><?= $row['ticket_code'] ?></div>
-                                    <div class="text-muted small" style="font-size: 0.75rem;">
-                                        <?= date('d M Y, H:i', strtotime($row['created_at'])) ?>
-                                    </div>
-                                </td>
-
-                                <td style="max-width: 300px;">
-                                    <div class="fw-bold text-dark text-truncate" title="<?= htmlspecialchars($row['subject']) ?>">
-                                        <?= htmlspecialchars($row['subject']) ?>
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar-initial me-2">
-                                            <?= strtoupper(substr($row['username'], 0, 1)) ?>
-                                        </div>
-                                        <div>
-                                            <div class="fw-bold small <?= ($row['username'] == $_SESSION['username']) ? 'text-primary' : 'text-dark' ?>">
-                                                <?= htmlspecialchars($row['username']) ?>
-                                            </div>
-                                            <?php if($row['username'] == $_SESSION['username']): ?>
-                                                <div class="text-muted" style="font-size: 0.7rem;">(Anda)</div>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </td>
-
-                                <td>
-                                    <span class="badge bg-light text-secondary border fw-normal">
-                                        <i class="bi bi-building me-1"></i> <?= htmlspecialchars($row['target_div_name']) ?>
-                                    </span>
-                                </td>
-
-                                <td class="text-center">
-                                    <?php 
-                                        $st = $row['status'];
-                                        $badgeClass = 'badge-closed';
-                                        if($st == 'open') $badgeClass = 'badge-open';
-                                        elseif($st == 'progress') $badgeClass = 'badge-progress';
-                                    ?>
-                                    <span class="badge badge-status <?= $badgeClass ?>">
-                                        <?= strtoupper($st) ?>
-                                    </span>
-                                </td>
-
-                                <td class="text-center">
-                                    <a href="internal_view.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-primary py-1 px-3" style="font-size: 0.8rem;">
-                                        Detail <i class="bi bi-arrow-right ms-1"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-2 opacity-25"></i>
-                                    <p class="mt-2 small">Tidak ada data tiket ditemukan.</p>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <?php if($result->num_rows > 10): ?>
-        <div class="card-footer bg-white border-top py-2 text-center text-muted small" style="font-size: 0.8rem;">
-            End of list
-        </div>
-        <?php endif; ?>
     </div>
 </div>
 
