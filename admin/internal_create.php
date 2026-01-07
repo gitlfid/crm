@@ -22,65 +22,75 @@ if (isset($_POST['submit_internal'])) {
     $target_div = intval($_POST['target_division']);
     
     // --- 1. SIAPKAN DATA ---
+    // Data Mentah (Untuk Email & Discord agar format Enter tetap terjaga)
     $subjectRaw = $_POST['subject'];
     $descRaw    = $_POST['description']; 
     
+    // Data Aman (Untuk Database)
     $subjectDB  = $conn->real_escape_string($subjectRaw);
     $descDB     = $conn->real_escape_string($descRaw);
     $type_ticket = $conn->real_escape_string($_POST['type']);
     
+    // Generate ID
     $ticketCode = generateInternalTicketID($target_div, $conn);
     
     // --- 2. UPLOAD FILE (DIPERBAIKI) ---
     $attachment = null;
     $uploadDir = __DIR__ . '/../uploads/';
     
-    // Pastikan folder ada dan writable
+    // Cek apakah folder uploads ada, jika tidak buat folder
     if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
+        if (!mkdir($uploadDir, 0777, true)) {
+            echo "<script>alert('Gagal membuat folder uploads. Cek permission server.');</script>";
+        }
     }
 
-    // Cek apakah user mencoba upload file
+    // Cek apakah user mengupload file
     if (isset($_FILES['attachment']) && $_FILES['attachment']['name'] != '') {
         $fileError = $_FILES['attachment']['error'];
         $fileSize = $_FILES['attachment']['size'];
         
-        // Cek Error Upload
+        // 0 = Tidak ada error
         if ($fileError === 0) {
-            // Validasi Ukuran (Contoh Max 5MB di Script, tapi tetap dibatasi PHP.ini)
-            if ($fileSize <= 5 * 1024 * 1024) { 
-                $fileName = time() . '_int_' . preg_replace("/[^a-zA-Z0-9.]/", "", $_FILES['attachment']['name']);
-                $targetPath = $uploadDir . $fileName;
-                
-                if (move_uploaded_file($_FILES['attachment']['tmp_name'], $targetPath)) {
-                    $attachment = $fileName;
-                } else {
-                    echo "<script>alert('Gagal memindahkan file ke folder uploads. Cek permission folder!');</script>";
-                }
+            // Bersihkan nama file agar aman
+            $cleanName = preg_replace("/[^a-zA-Z0-9.]/", "", $_FILES['attachment']['name']);
+            $fileName = time() . '_int_' . $cleanName;
+            $targetPath = $uploadDir . $fileName;
+            
+            // Pindahkan file dari temp ke folder uploads
+            if (move_uploaded_file($_FILES['attachment']['tmp_name'], $targetPath)) {
+                $attachment = $fileName;
             } else {
-                echo "<script>alert('File terlalu besar! Maksimal 5MB.');</script>";
+                echo "<script>alert('Gagal upload: Folder tidak bisa ditulisi (Permission Denied).');</script>";
             }
-        } elseif ($fileError === 1) {
-            echo "<script>alert('File melebihi batas upload_max_filesize di server (PHP.ini).');</script>";
-        } else {
-            echo "<script>alert('Terjadi error saat upload file. Kode Error: $fileError');</script>";
+        } 
+        // 1 = File melebihi upload_max_filesize di php.ini
+        elseif ($fileError === 1) {
+            echo "<script>alert('Gagal upload: File terlalu besar (Melebihi batas server/php.ini).');</script>";
+        } 
+        // Error lainnya
+        else {
+            echo "<script>alert('Gagal upload: Terjadi kesalahan sistem (Code: $fileError).');</script>";
         }
     }
     
-    // --- 3. INSERT DATABASE (DATA AMAN DULU) ---
+    // --- 3. INSERT DATABASE ---
+    // Simpan ke database (termasuk nama file attachment jika ada)
     $stmt = $conn->prepare("INSERT INTO internal_tickets (ticket_code, user_id, target_division_id, subject, description, attachment) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("siisss", $ticketCode, $user_id, $target_div, $subjectDB, $descDB, $attachment);
     
     if ($stmt->execute()) {
         
-        // --- 4. KIRIM NOTIFIKASI (Background Process Style) ---
+        // --- 4. KIRIM NOTIFIKASI (KODE ASLI DIPERTAHANKAN) ---
+        
         // Ambil Nama Divisi Tujuan
         $targetDivName = "Unknown";
         foreach($divisions as $d) { if($d['id'] == $target_div) $targetDivName = $d['name']; }
 
-        // A. Notif Discord
+        // --- A. NOTIF DISCORD INTERNAL ---
         if (function_exists('sendInternalDiscord')) {
             $discordDesc = (strlen($descRaw) > 1000) ? substr($descRaw, 0, 1000) . "..." : $descRaw;
+
             $discordFields = [
                 ["name" => "From", "value" => $user_data['username'], "inline" => true],
                 ["name" => "To Division", "value" => $targetDivName, "inline" => true],
@@ -88,31 +98,29 @@ if (isset($_POST['submit_internal'])) {
                 ["name" => "Description", "value" => $discordDesc]
             ];
             
-            // Tambahkan Info Attachment di Discord jika ada
+            // Tambahkan info attachment di Discord jika ada
             if ($attachment) {
-                $discordFields[] = ["name" => "Attachment", "value" => "Ada file terlampir", "inline" => true];
+                $discordFields[] = ["name" => "Attachment", "value" => "File Terlampir", "inline" => true];
             }
-
-            try {
-                $titleDiscord = "$ticketCode: $subjectRaw";
-                $response = sendInternalDiscord($titleDiscord, "A new internal ticket has been submitted.", $discordFields, null, $titleDiscord);
-                
-                if (isset($response['id'])) {
-                    $thread_id = $response['id'];
-                    $conn->query("UPDATE internal_tickets SET discord_thread_id = '$thread_id' WHERE ticket_code = '$ticketCode'");
-                }
-            } catch (Exception $e) { /* Ignore Error Discord */ }
+            
+            $titleDiscord = "$ticketCode: $subjectRaw";
+            
+            $response = sendInternalDiscord($titleDiscord, "A new internal ticket has been submitted.", $discordFields, null, $titleDiscord);
+            
+            if (isset($response['id'])) {
+                $thread_id = $response['id'];
+                $conn->query("UPDATE internal_tickets SET discord_thread_id = '$thread_id' WHERE ticket_code = '$ticketCode'");
+            }
         }
         
-        // B. Notif Email Pembuat
+        // --- B. KIRIM EMAIL KE PEMBUAT (KONFIRMASI) ---
         if (function_exists('sendEmailNotification')) {
-            try {
-                $body = "Halo " . $user_data['username'] . ",<br>Tiket Internal Anda ke divisi <strong>$targetDivName</strong> berhasil dibuat.<br>ID: $ticketCode<br>Subject: $subjectRaw";
-                sendEmailNotification($user_data['email'], "Internal Ticket Created: $ticketCode", $body);
-            } catch (Exception $e) { /* Ignore Error Email */ }
+            $body = "Halo " . $user_data['username'] . ",<br>Tiket Internal Anda ke divisi <strong>$targetDivName</strong> berhasil dibuat.<br>ID: $ticketCode<br>Subject: $subjectRaw";
+            sendEmailNotification($user_data['email'], "Internal Ticket Created: $ticketCode", $body);
         }
 
-        // C. Notif Email Divisi Tujuan
+        // --- C. KIRIM EMAIL KE SELURUH USER DIVISI TUJUAN ---
+        // (Looping ini yang mungkin menyebabkan delay jika user divisi banyak, tapi tetap dipertahankan sesuai permintaan)
         if (function_exists('sendEmailNotification')) {
             $stmtDivUsers = $conn->prepare("SELECT username, email FROM users WHERE division_id = ?");
             $stmtDivUsers->bind_param("i", $target_div);
@@ -124,22 +132,29 @@ if (isset($_POST['submit_internal'])) {
 
                 $subjectTarget = "[New Ticket] Masuk dari " . $user_data['username'];
                 $bodyTarget  = "<h3>Halo " . $targetUser['username'] . ",</h3>";
-                $bodyTarget .= "<p>Ada tiket internal baru ke Divisi Anda (<strong>$targetDivName</strong>).</p>";
-                $bodyTarget .= "<ul><li>Ticket ID: $ticketCode</li><li>Subject: " . htmlspecialchars($subjectRaw) . "</li></ul>";
+                $bodyTarget .= "<p>Ada tiket internal baru yang ditujukan ke Divisi Anda (<strong>$targetDivName</strong>).</p>";
+                $bodyTarget .= "<hr>";
+                $bodyTarget .= "<ul>
+                                    <li><strong>Ticket ID:</strong> $ticketCode</li>
+                                    <li><strong>Pengirim:</strong> " . $user_data['username'] . "</li>
+                                    <li><strong>Jenis:</strong> $type_ticket</li>
+                                    <li><strong>Subject:</strong> " . htmlspecialchars($subjectRaw) . "</li>
+                                </ul>";
+                
+                $bodyTarget .= "<p><strong>Deskripsi:</strong><br>" . nl2br(htmlspecialchars($descRaw)) . "</p>";
                 
                 if ($attachment) {
-                    $bodyTarget .= "<p><em>*Tiket ini memiliki lampiran.</em></p>";
+                    $bodyTarget .= "<p><em>*Tiket ini memiliki lampiran file.</em></p>";
                 }
+                
+                $bodyTarget .= "<hr>";
+                $bodyTarget .= "<p>Mohon segera dicek pada sistem Helpdesk Internal.</p>";
 
-                $bodyTarget .= "<p>Mohon cek sistem Helpdesk.</p>";
-
-                try {
-                    sendEmailNotification($targetUser['email'], $subjectTarget, $bodyTarget);
-                } catch (Exception $e) { /* Ignore Error Email */ }
+                sendEmailNotification($targetUser['email'], $subjectTarget, $bodyTarget);
             }
         }
         
-        echo "<script>alert('Tiket Internal Berhasil Dibuat!'); window.location='internal_tickets.php';</script>";
+        echo "<script>alert('Tiket Internal Berhasil Dibuat & Notifikasi dikirim!'); window.location='internal_tickets.php';</script>";
     } else {
         echo "<script>alert('Gagal membuat tiket: " . $conn->error . "');</script>";
     }
@@ -204,7 +219,7 @@ if (isset($_POST['submit_internal'])) {
                     <div class="col-md-12 mb-3">
                         <label class="form-label fw-bold">Attachment (Optional)</label>
                         <input type="file" name="attachment" class="form-control">
-                        <div class="form-text text-muted small">Max file size depends on server config (Usually 2MB).</div>
+                        <div class="form-text text-muted small">Max file size mengikuti konfigurasi server (biasanya 2MB).</div>
                     </div>
 
                     <div class="col-12 d-flex justify-content-end">
