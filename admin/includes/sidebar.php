@@ -52,7 +52,6 @@ if (!function_exists('isChildActive')) {
                 'tsel_upload.php' => 'tsel_inject.php',
                 'tsel_history.php' => 'tsel_inject.php',
                 'leave_form.php' => 'leave_list.php',
-                // [BARU] Mapping Delivery
                 'delivery_form.php' => 'delivery_list.php' 
             ];
             
@@ -69,38 +68,13 @@ $debug_msg = "";
 // LOGIKA 1: ADMIN HARDCODED BYPASS (PASTI FULL AKSES)
 // =========================================================================
 if ($role_name === 'admin') {
-    // Menu Dashboard
     $sidebar_menu['dashboard'] = ['menu_label' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'bi bi-grid-fill', 'children' => []];
-
-    // Menu Leave Request
-    $sidebar_menu['leave'] = [
-        'menu_label' => 'Leave Request', 
-        'url' => 'leave_list.php', 
-        'icon' => 'bi bi-calendar-check-fill', 
-        'children' => []
-    ];
-
-    // [BARU] Menu Delivery
-    $sidebar_menu['delivery'] = [
-        'menu_label' => 'Delivery', 
-        'url' => 'delivery_list.php', 
-        'icon' => 'bi bi-truck', 
-        'children' => []
-    ];
-
-    // Menu Helpdesk
+    $sidebar_menu['leave'] = ['menu_label' => 'Leave Request', 'url' => 'leave_list.php', 'icon' => 'bi bi-calendar-check-fill', 'children' => []];
+    $sidebar_menu['delivery'] = ['menu_label' => 'Delivery', 'url' => 'delivery_list.php', 'icon' => 'bi bi-truck', 'children' => []];
     $sidebar_menu['helpdesk'] = ['menu_label' => 'Helpdesk', 'url' => '#', 'icon' => 'bi bi-ticket-detailed-fill', 'children' => [['menu_label' => 'External Tickets', 'url' => 'tickets.php'], ['menu_label' => 'Internal Tickets', 'url' => 'internal_tickets.php']]];
-    
-    // Menu Sales
     $sidebar_menu['sales'] = ['menu_label' => 'Sales', 'url' => '#', 'icon' => 'bi bi-hand-thumbs-up-fill', 'children' => [['menu_label' => 'Dashboard Clients', 'url' => 'dashboard_clients.php'], ['menu_label' => 'Client List', 'url' => 'clients.php']]];
-    
-    // Menu Finance
     $sidebar_menu['finance'] = ['menu_label' => 'Finance', 'url' => '#', 'icon' => 'bi bi-currency-dollar', 'children' => [['menu_label' => 'Vendor List', 'url' => 'vendor_list.php'], ['menu_label' => 'Purchase Orders', 'url' => 'po_list.php'], ['menu_label' => 'Quotations', 'url' => 'quotation_list.php'], ['menu_label' => 'PO From Client', 'url' => 'po_client_list.php'], ['menu_label' => 'Invoices', 'url' => 'invoice_list.php'], ['menu_label' => 'Payments', 'url' => 'payment_list.php'], ['menu_label' => 'Delivery Orders', 'url' => 'delivery_order_list.php']]];
-    
-    // Menu Administration
     $sidebar_menu['admin'] = ['menu_label' => 'Administration', 'url' => '#', 'icon' => 'bi bi-gear-fill', 'children' => [['menu_label' => 'Manage Users', 'url' => 'manage_users.php'], ['menu_label' => 'Manage Divisions', 'url' => 'manage_divisions.php'], ['menu_label' => 'Manage Permissions', 'url' => 'manage_roles.php'], ['menu_label' => 'Settings', 'url' => 'settings.php']]];
-    
-    // Menu Telkomsel Ops
     $sidebar_menu['ops'] = ['menu_label' => 'Telkomsel Ops', 'url' => '#', 'icon' => 'bi bi-broadcast-pin', 'children' => [['menu_label' => 'Package List', 'url' => 'tsel_packages.php'], ['menu_label' => 'Inject Data', 'url' => 'tsel_inject.php']]];
 } 
 
@@ -110,8 +84,6 @@ if ($role_name === 'admin') {
 else {
     if (isset($conn) && !$conn->connect_error) {
         if ($user_division_id > 0) {
-            
-            // 1. Ambil SEMUA ID Menu yang diizinkan (Flat List)
             $allowed_ids = [];
             $resPerm = $conn->query("SELECT menu_id FROM division_permissions WHERE division_id = $user_division_id");
             if ($resPerm) {
@@ -120,11 +92,8 @@ else {
                 }
             }
 
-            // 2. Ambil Detail Menu & Susun Tree
             if (!empty($allowed_ids)) {
                 $ids_str = implode(',', $allowed_ids);
-                
-                // Query mengambil menu yang diizinkan ATAU dia adalah parent dari menu yang diizinkan
                 $sqlMenu = "SELECT * FROM menus 
                             WHERE id IN ($ids_str) 
                             OR menu_key IN (SELECT parent_menu FROM menus WHERE id IN ($ids_str)) 
@@ -136,21 +105,17 @@ else {
                     $temp_menus = [];
                     while ($row = $resMenu->fetch_assoc()) {
                         $temp_menus[$row['menu_key']] = $row;
-                        // Inisialisasi children array
                         if (!isset($temp_menus[$row['menu_key']]['children'])) {
                             $temp_menus[$row['menu_key']]['children'] = [];
                         }
                     }
 
-                    // Susun Hierarki Parent-Child
                     foreach ($temp_menus as $key => $menu) {
                         if (empty($menu['parent_menu'])) {
-                            // Ini Parent
                             if (!isset($sidebar_menu[$key])) {
                                 $sidebar_menu[$key] = $menu;
                             }
                         } else {
-                            // Ini Child
                             $parentKey = $menu['parent_menu'];
                             if (isset($sidebar_menu[$parentKey])) {
                                 $sidebar_menu[$parentKey]['children'][] = $menu;
@@ -177,7 +142,7 @@ else {
 ?>
 
 <div id="sidebar" class="active">
-    <div class="sidebar-wrapper active">
+    <div class="sidebar-wrapper active d-flex flex-column" style="height: 100vh;">
         <div class="sidebar-header position-relative">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="logo">
@@ -189,7 +154,7 @@ else {
             </div>
         </div>
         
-        <div class="sidebar-menu">
+        <div class="sidebar-menu flex-grow-1">
             <ul class="menu">
                 <li class="sidebar-title">Menu Utama</li>
 
@@ -239,52 +204,50 @@ else {
                         </div>
                     </li>
                 <?php endif; ?>
-
             </ul>
+        </div>
+
+        <div class="sidebar-footer p-3 border-top">
+            <div class="theme-toggle d-flex align-items-center justify-content-between p-2 bg-light rounded cursor-pointer" onclick="toggleTheme()" title="Ganti Tema" style="cursor: pointer;">
+                <span class="small fw-bold text-muted">Mode Tampilan</span>
+                <i class="bi bi-sun-fill fs-5 text-warning" id="theme-icon"></i>
+            </div>
         </div>
     </div>
 </div>
-
 <div id="main">
     <header class="mb-3">
         <nav class="navbar navbar-expand navbar-light navbar-top">
-            <div class="container-fluid">
-                <a href="#" class="burger-btn d-block">
+            <div class="container-fluid d-flex justify-content-between align-items-center px-0">
+                
+                <a href="#" class="burger-btn d-block p-2">
                     <i class="bi bi-justify fs-3"></i>
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                    <ul class="navbar-nav ms-auto mb-2 mb-lg-0"></ul>
-                    
-                    <div class="theme-toggle d-flex gap-2 align-items-center mt-2 me-4">
-                        <i class="bi bi-sun-fill fs-4" id="theme-icon" style="cursor: pointer;" onclick="toggleTheme()" title="Ganti Tema"></i>
-                    </div>
-                    <div class="dropdown">
-                        <a href="#" data-bs-toggle="dropdown" aria-expanded="false">
-                            <div class="user-menu d-flex">
-                                <div class="user-name text-end me-3">
-                                    <h6 class="mb-0 text-gray-600"><?= htmlspecialchars($username) ?></h6>
-                                    <p class="mb-0 text-sm text-gray-600">
-                                        <?= ucfirst($role_name) ?> 
-                                        </p>
-                                </div>
-                                <div class="user-img d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-primary">
-                                        <span class="avatar-content text-white"><?= strtoupper(substr($username, 0, 1)) ?></span>
-                                    </div>
+
+                <div class="dropdown">
+                    <a href="#" data-bs-toggle="dropdown" aria-expanded="false" class="d-block text-decoration-none">
+                        <div class="user-menu d-flex align-items-center">
+                            <div class="user-name text-end me-3">
+                                <h6 class="mb-0 text-gray-600"><?= htmlspecialchars($username) ?></h6>
+                                <p class="mb-0 text-sm text-gray-600">
+                                    <?= ucfirst($role_name) ?> 
+                                </p>
+                            </div>
+                            <div class="user-img d-flex align-items-center">
+                                <div class="avatar avatar-md bg-primary">
+                                    <span class="avatar-content text-white"><?= strtoupper(substr($username, 0, 1)) ?></span>
                                 </div>
                             </div>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton" style="min-width: 11rem;">
-                            <li><h6 class="dropdown-header">Hello, <?= htmlspecialchars($username) ?>!</h6></li>
-                            <li><a class="dropdown-item" href="../admin/profile.php"><i class="icon-mid bi bi-person me-2"></i> My Profile</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="../logout.php"><i class="icon-mid bi bi-box-arrow-left me-2"></i> Logout</a></li>
-                        </ul>
-                    </div>
+                        </div>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="dropdownMenuButton" style="min-width: 12rem;">
+                        <li><h6 class="dropdown-header text-muted">Hello, <?= htmlspecialchars($username) ?>!</h6></li>
+                        <li><a class="dropdown-item" href="../admin/profile.php"><i class="icon-mid bi bi-person me-2"></i> My Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="../logout.php"><i class="icon-mid bi bi-box-arrow-left me-2"></i> Logout</a></li>
+                    </ul>
                 </div>
+
             </div>
         </nav>
     </header>
@@ -298,17 +261,16 @@ else {
         // Cek apakah user punya preferensi tersimpan
         if (savedTheme === 'dark') {
             document.body.classList.add('theme-dark');
-            document.documentElement.setAttribute('data-bs-theme', 'dark'); // Support Bootstrap 5.3
+            document.documentElement.setAttribute('data-bs-theme', 'dark'); 
             if(themeIcon) {
-                themeIcon.classList.remove('bi-sun-fill');
-                themeIcon.classList.add('bi-moon-fill');
-                themeIcon.classList.add('text-white');
+                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
+                themeIcon.classList.add('bi-moon-fill', 'text-white');
             }
         } else {
             // Default Light
             if(themeIcon) {
-                themeIcon.classList.add('bi-sun-fill');
-                themeIcon.classList.remove('bi-moon-fill');
+                themeIcon.classList.add('bi-sun-fill', 'text-warning');
+                themeIcon.classList.remove('bi-moon-fill', 'text-white');
             }
         }
     });
@@ -325,8 +287,10 @@ else {
             localStorage.setItem('theme', 'light');
             
             // Icon Matahari
-            themeIcon.classList.remove('bi-moon-fill', 'text-white');
-            themeIcon.classList.add('bi-sun-fill');
+            if(themeIcon) {
+                themeIcon.classList.remove('bi-moon-fill', 'text-white');
+                themeIcon.classList.add('bi-sun-fill', 'text-warning');
+            }
         } else {
             // Ubah ke Dark
             html.setAttribute('data-bs-theme', 'dark');
@@ -334,8 +298,10 @@ else {
             localStorage.setItem('theme', 'dark');
             
             // Icon Bulan
-            themeIcon.classList.remove('bi-sun-fill');
-            themeIcon.classList.add('bi-moon-fill', 'text-white');
+            if(themeIcon) {
+                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
+                themeIcon.classList.add('bi-moon-fill', 'text-white');
+            }
         }
     }
 </script>
