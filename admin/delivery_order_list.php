@@ -21,11 +21,11 @@ if (!empty($f_client)) {
     $where .= " AND c.id = $safe_client";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (CSV) ---
+// --- 3. LOGIKA EXPORT EXCEL (CSV - ITEM PER ROW) ---
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
-    // [UPDATE] Tambahkan c.address dan ID untuk ambil item
+    // Ambil Data Header DO
     $sqlEx = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
               FROM delivery_orders d 
               JOIN payments p ON d.payment_id = p.id 
@@ -37,67 +37,77 @@ if (isset($_POST['export_excel'])) {
     $resEx = $conn->query($sqlEx);
 
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename=DeliveryOrders_Data_' . date('Ymd_His') . '.csv');
+    header('Content-Disposition: attachment; filename=DeliveryOrders_Detailed_' . date('Ymd_His') . '.csv');
     
     $output = fopen('php://output', 'w');
     
-    // [UPDATE] Header CSV: Ditambahkan Address, Item, Unit, Charge Mode, Description
-    fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Address', 'Item List', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
+    // Header CSV
+    fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
     
     while($row = $resEx->fetch_assoc()) {
         // --- Ambil Detail Item ---
         $inv_id = $row['invoice_id'];
         $quo_id = $row['quotation_id'];
         
-        // Prioritas ambil dari Invoice Items
+        $itemsData = [];
+        
+        // Prioritas 1: Ambil dari Invoice Items
         $items_sql = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = $inv_id";
         $resItems = $conn->query($items_sql);
+        
+        // Prioritas 2: Jika kosong, ambil dari Quotation Items
         if($resItems->num_rows == 0) {
-            // Fallback ke Quotation Items
             $items_sql = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = $quo_id";
             $resItems = $conn->query($items_sql);
         }
 
-        // Tampung data item untuk digabung dalam satu cell (dipisah koma/pipe)
-        $arr_items = [];
-        $arr_qtys  = [];
-        $arr_modes = [];
-        $arr_descs = [];
-
         while($itm = $resItems->fetch_assoc()) {
-            $arr_items[] = $itm['item_name'];
-            $arr_qtys[]  = floatval($itm['qty']);
-            $arr_modes[] = $itm['card_type'];
-            $arr_descs[] = $itm['description'];
+            $itemsData[] = $itm;
         }
 
-        fputcsv($output, array(
-            $row['do_number'],
-            $row['do_date'],
-            $row['company_name'],
-            $row['address'], // Address
-            implode(" | ", $arr_items), // Item
-            implode(" | ", $arr_qtys),  // Unit/Qty
-            implode(" | ", $arr_modes), // Charge Mode
-            implode(" | ", $arr_descs), // Description
-            $row['pic_name'],
-            $row['pic_phone'],
-            strtoupper($row['status'])
-        ));
+        // --- TULIS KE CSV (SATU BARIS PER ITEM) ---
+        if (count($itemsData) > 0) {
+            foreach ($itemsData as $item) {
+                fputcsv($output, array(
+                    $row['do_number'],
+                    $row['do_date'],
+                    $row['company_name'],
+                    $row['address'],
+                    $item['item_name'],         // Item Sendiri
+                    floatval($item['qty']),     // Qty Sendiri
+                    $item['card_type'],         // Charge Mode Sendiri
+                    $item['description'],       // Desc Sendiri
+                    $row['pic_name'],
+                    $row['pic_phone'],
+                    strtoupper($row['status'])
+                ));
+            }
+        } else {
+            // Fallback: Jika DO tidak ada item (kasus jarang/error), tetap print header DO
+            fputcsv($output, array(
+                $row['do_number'],
+                $row['do_date'],
+                $row['company_name'],
+                $row['address'],
+                '- No Item -', '', '', '', // Kolom Item Kosong
+                $row['pic_name'],
+                $row['pic_phone'],
+                strtoupper($row['status'])
+            ));
+        }
     }
     fclose($output);
     exit();
 }
 
-// --- 4. LOAD TAMPILAN HTML ---
+// --- 4. LOAD TAMPILAN HTML (TIDAK BERUBAH) ---
 $page_title = "Delivery Orders";
 include 'includes/header.php';
 include 'includes/sidebar.php';
 
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
-// QUERY DATA TAMPILAN
-// [UPDATE] Fetch Address dan ID referensi
+// QUERY DATA TAMPILAN DASHBOARD
 $sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
         FROM delivery_orders d 
         JOIN payments p ON d.payment_id = p.id 
