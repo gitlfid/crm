@@ -35,7 +35,7 @@ if (!$ticket) {
     include 'includes/footer.php'; exit;
 }
 
-// Cek Permission Edit Status (Admin ATAU Anggota Divisi Tujuan)
+// Cek Permission Edit Status
 $can_edit_status = ($current_role == 'admin' || $current_user_div == $ticket['target_division_id']);
 
 // 3. PROSES REPLY
@@ -43,27 +43,38 @@ if (isset($_POST['submit_reply'])) {
     $reply_msg = $conn->real_escape_string($_POST['reply_message']);
     
     // Tentukan Status Baru
-    $new_status = $ticket['status']; // Default status lama
+    $new_status = $ticket['status']; 
     if ($can_edit_status && isset($_POST['status'])) {
         $new_status = $conn->real_escape_string($_POST['status']);
     }
     
-    // Upload File
+    // --- [PERBAIKAN] LOGIKA UPLOAD REPLY ---
     $attachment = null;
     $uploadDir = __DIR__ . '/../uploads/';
-    if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] == 0) {
-        $allowed = 2 * 1024 * 1024; 
-        if ($_FILES['attachment']['size'] <= $allowed) {
+    
+    // Cek Folder
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+
+    if (isset($_FILES['attachment']) && $_FILES['attachment']['name'] != '') {
+        $fErr = $_FILES['attachment']['error'];
+        
+        if ($fErr === 0) {
             $fileName = time() . '_rep_' . preg_replace("/[^a-zA-Z0-9.]/", "", $_FILES['attachment']['name']);
             if (move_uploaded_file($_FILES['attachment']['tmp_name'], $uploadDir . $fileName)) {
                 $attachment = $fileName;
+            } else {
+                $msg_status = "<div class='alert alert-danger'>Gagal Upload: Permission Denied.</div>";
             }
+        } elseif ($fErr === 1) {
+            $msg_status = "<div class='alert alert-danger'>Gagal Upload: File terlalu besar (Melebihi batas server).</div>";
         } else {
-            $msg_status = "<div class='alert alert-danger'>File Max 2MB.</div>";
+            $msg_status = "<div class='alert alert-danger'>Gagal Upload: Kode Error $fErr</div>";
         }
     }
 
+    // Lanjut Simpan Jika Tidak Ada Error Fatal
     if (strpos($msg_status, 'alert-danger') === false) {
+        
         // Insert Reply Database
         $stmt = $conn->prepare("INSERT INTO internal_ticket_replies (internal_ticket_id, user_id, message, attachment) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("iiss", $ticket_id, $current_user_id, $reply_msg, $attachment);
@@ -74,7 +85,7 @@ if (isset($_POST['submit_reply'])) {
                 $conn->query("UPDATE internal_tickets SET status = '$new_status' WHERE id = $ticket_id");
             }
             
-            // --- 1. NOTIFIKASI DISCORD (DIKEMBALIKAN) ---
+            // --- 1. NOTIFIKASI DISCORD (KODE ASLI) ---
             if (function_exists('sendInternalDiscord')) {
                 $discordFields = [
                     ["name" => "Ticket ID", "value" => $ticket['ticket_code'], "inline" => true],
@@ -84,31 +95,33 @@ if (isset($_POST['submit_reply'])) {
                 
                 $discordMsg = (strlen($reply_msg) > 900) ? substr($reply_msg, 0, 900) . "..." : $reply_msg;
                 $discordFields[] = ["name" => "Message", "value" => $discordMsg];
+                if ($attachment) $discordFields[] = ["name" => "Attachment", "value" => "File Terlampir"];
 
-                // Cek Thread ID
                 $thread_id = isset($ticket['discord_thread_id']) ? $ticket['discord_thread_id'] : null;
                 
-                sendInternalDiscord("New Reply", "User has replied to ticket.", $discordFields, $thread_id);
+                try {
+                    sendInternalDiscord("New Reply", "User has replied to ticket.", $discordFields, $thread_id);
+                } catch(Exception $e) {}
             }
 
-            // --- 2. NOTIFIKASI EMAIL (FORMAT TETAP SESUAI REQUEST) ---
+            // --- 2. NOTIFIKASI EMAIL (KODE ASLI) ---
             if (function_exists('sendEmailNotification')) {
                 $emailSubject = "Update Ticket #" . $ticket['ticket_code'];
-                
                 $emailBody  = "<h3>Update Ticket #" . $ticket['ticket_code'] . "</h3>";
                 $emailBody .= "<p><strong>Penjawab:</strong> " . $_SESSION['username'] . "</p>";
                 $emailBody .= "<p><strong>Status:</strong> " . strtoupper($new_status) . "</p>";
                 $emailBody .= "<p><strong>Pesan:</strong><br>" . nl2br(htmlspecialchars($reply_msg)) . "</p>";
+                if ($attachment) $emailBody .= "<p><em>*Ada file lampiran.</em></p>";
                 
                 if ($current_user_id == $ticket['user_id']) {
                     // Balasan dari Pembuat -> Kirim ke Anggota Divisi Tujuan
                     $divMembers = $conn->query("SELECT email FROM users WHERE division_id=" . $ticket['target_division_id']);
                     while($m = $divMembers->fetch_assoc()) {
-                        sendEmailNotification($m['email'], $emailSubject, $emailBody);
+                        try { sendEmailNotification($m['email'], $emailSubject, $emailBody); } catch(Exception $e) {}
                     }
                 } else {
                     // Balasan dari Divisi Tujuan -> Kirim ke Pembuat Tiket
-                    sendEmailNotification($ticket['creator_email'], $emailSubject, $emailBody);
+                    try { sendEmailNotification($ticket['creator_email'], $emailSubject, $emailBody); } catch(Exception $e) {}
                 }
             }
             
@@ -217,7 +230,15 @@ function isImg($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTE
                             <?= formatText($ticket['description']) ?>
                         </div>
                         <?php if($ticket['attachment']): ?>
-                            <a href="../uploads/<?= $ticket['attachment'] ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-paperclip"></i> Lampiran Awal</a>
+                            <div class="mt-3">
+                                <?php if(isImg($ticket['attachment'])): ?>
+                                    <a href="../uploads/<?= $ticket['attachment'] ?>" target="_blank">
+                                        <img src="../uploads/<?= $ticket['attachment'] ?>" class="img-fluid rounded border" style="max-height: 200px;">
+                                    </a>
+                                <?php else: ?>
+                                    <a href="../uploads/<?= $ticket['attachment'] ?>" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-paperclip"></i> Lihat Lampiran Awal</a>
+                                <?php endif; ?>
+                            </div>
                         <?php endif; ?>
                     </div>
                 </div>
