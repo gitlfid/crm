@@ -42,10 +42,13 @@ if (isset($_POST['save_invoice'])) {
     $due_date = $_POST['due_date'];
     $pymt_method = $conn->real_escape_string($_POST['payment_method_col']);
     
-    // Ambil Data Form Item (Data hasil edit/validasi user)
+    // Ambil Mata Uang untuk Logika Format Angka
+    $curr = isset($_POST['currency']) ? $_POST['currency'] : 'IDR';
+
+    // Ambil Data Form Item
     $items = $_POST['item_name'];
     $qtys  = $_POST['qty'];
-    $prices= $_POST['unit_price'];
+    $prices= $_POST['unit_price']; // Sekarang ini format TEXT (bisa ada titik/koma)
     $descs = $_POST['description'];
     $cards = isset($_POST['card_type']) ? $_POST['card_type'] : [];
     
@@ -53,26 +56,38 @@ if (isset($_POST['save_invoice'])) {
     if ($is_manual) {
         // --- JIKA MANUAL: BUAT QUOTATION BAYANGAN DULU (LOGIKA LAMA) ---
         $client_id = intval($_POST['client_id']);
-        $curr = $_POST['currency'];
         
-        // [BARU] Ambil Input PO Reference Manual
         $po_ref = isset($_POST['po_ref']) ? $conn->real_escape_string($_POST['po_ref']) : '';
-        
         $q_no_dummy = "Q-AUTO-" . time(); 
         
-        // 1. Insert Quotation Dummy (Sekarang menyimpan PO Number Client juga)
+        // 1. Insert Quotation Dummy
         $sqlQ = "INSERT INTO quotations (quotation_no, client_id, created_by_user_id, quotation_date, currency, status, po_number_client) 
                  VALUES ('$q_no_dummy', $client_id, $my_id, '$inv_date', '$curr', 'invoiced', '$po_ref')";
         
         if($conn->query($sqlQ)) {
             $quot_id_ref = $conn->insert_id;
             
-            // 2. Insert Items ke Quotation Items (untuk manual)
+            // 2. Insert Items ke Quotation Items
             for ($i = 0; $i < count($items); $i++) {
                 if (!empty($items[$i])) {
                     $it_name = $conn->real_escape_string($items[$i]);
                     $it_qty  = intval($qtys[$i]);
-                    $it_prc  = floatval($prices[$i]);
+                    
+                    // --- [FIX] LOGIKA PEMBERSIH HARGA ---
+                    $raw_price = $prices[$i];
+                    $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
+                    
+                    if ($curr == 'IDR') {
+                        // IDR: 1.500.000 -> Hapus titik, koma jadi titik desimal
+                        $clean_price = str_replace('.', '', $clean_price); 
+                        $clean_price = str_replace(',', '.', $clean_price); 
+                    } else {
+                        // USD: 1,500.50 -> Hapus koma
+                        $clean_price = str_replace(',', '', $clean_price); 
+                    }
+                    $it_prc = floatval($clean_price);
+                    // ------------------------------------
+
                     $it_dsc  = $conn->real_escape_string($descs[$i]);
                     $it_card = isset($cards[$i]) ? $conn->real_escape_string($cards[$i]) : '';
                     
@@ -90,32 +105,42 @@ if (isset($_POST['save_invoice'])) {
     }
 
     // --- INSERT INVOICE ---
-    // Invoice tetap merujuk ke Quotation Asli ID ($quot_id_ref)
     $sqlInv = "INSERT INTO invoices (invoice_no, quotation_id, invoice_date, due_date, status, payment_method, created_by_user_id) 
                VALUES ('$inv_no', $quot_id_ref, '$inv_date', '$due_date', 'draft', '$pymt_method', $my_id)";
     
     if ($conn->query($sqlInv)) {
         $invoice_id = $conn->insert_id;
         
-        // --- INSERT ITEMS KE TABEL BARU invoice_items ---
-        // Item Invoice disimpan terpisah dari Quotation items
+        // --- INSERT ITEMS KE invoice_items ---
         if (!$is_manual) {
             for ($i = 0; $i < count($items); $i++) {
                 if (!empty($items[$i])) {
                     $it_name = $conn->real_escape_string($items[$i]);
                     $it_qty  = intval($qtys[$i]);
-                    $it_prc  = floatval($prices[$i]);
+                    
+                    // --- [FIX] LOGIKA PEMBERSIH HARGA (SAMA SEPERTI DIATAS) ---
+                    $raw_price = $prices[$i];
+                    $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
+                    
+                    if ($curr == 'IDR') {
+                        $clean_price = str_replace('.', '', $clean_price); 
+                        $clean_price = str_replace(',', '.', $clean_price); 
+                    } else {
+                        $clean_price = str_replace(',', '', $clean_price); 
+                    }
+                    $it_prc = floatval($clean_price);
+                    // ------------------------------------
+
                     $it_dsc  = $conn->real_escape_string($descs[$i]);
                     $it_card = isset($cards[$i]) ? $conn->real_escape_string($cards[$i]) : '';
                     
-                    // MEMASUKKAN KE TABEL BARU: invoice_items
                     $conn->query("INSERT INTO invoice_items (invoice_id, item_name, qty, unit_price, description, card_type) 
                                   VALUES ($invoice_id, '$it_name', $it_qty, $it_prc, '$it_dsc', '$it_card')");
                 }
             }
         }
         
-        // Update status quotation asli jika dari PO
+        // Update status quotation asli
         if (!$is_manual) {
             $conn->query("UPDATE quotations SET status='invoiced' WHERE id=$quot_id_ref");
         }
@@ -132,7 +157,7 @@ if (isset($_POST['save_invoice'])) {
     <?php if(!$is_manual): ?>
     <div class="alert alert-light-primary border-primary">
         <i class="bi bi-info-circle me-2"></i>
-        <strong>Validasi Invoice:</strong> Anda dapat menghapus atau mengubah Quantity item di bawah sebelum menyimpan. Invoice akan mereferensikan Quotation Asli.
+        <strong>Validasi Invoice:</strong> Anda dapat menghapus atau mengubah Quantity item di bawah sebelum menyimpan.
     </div>
     <?php endif; ?>
 </div>
@@ -231,6 +256,7 @@ if (isset($_POST['save_invoice'])) {
                             <div class="mb-3">
                                 <label class="fw-bold">Currency</label>
                                 <input type="text" class="form-control bg-light" value="<?= $source_data['currency'] ?>" readonly>
+                                <input type="hidden" name="currency" value="<?= $source_data['currency'] ?>">
                             </div>
                         <?php endif; ?>
 
@@ -268,7 +294,9 @@ if (isset($_POST['save_invoice'])) {
                                     <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($itm['item_name']) ?>" required></td>
                                     <td><input type="text" name="card_type[]" class="form-control" value="<?= htmlspecialchars($itm['card_type']) ?>"></td>
                                     <td><input type="number" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" required></td>
-                                    <td><input type="number" name="unit_price[]" class="form-control text-end" value="<?= $itm['unit_price'] ?>" required></td>
+                                    
+                                    <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $itm['unit_price'] ?>" required></td>
+                                    
                                     <td><input type="text" name="description[]" class="form-control" value="<?= htmlspecialchars($itm['description']) ?>"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                                 </tr>
@@ -279,7 +307,9 @@ if (isset($_POST['save_invoice'])) {
                                     <td><input type="text" name="item_name[]" class="form-control" required></td>
                                     <td><input type="text" name="card_type[]" class="form-control" placeholder="Optional"></td>
                                     <td><input type="number" name="qty[]" class="form-control text-center" value="1" required></td>
-                                    <td><input type="number" name="unit_price[]" class="form-control text-end" required></td>
+                                    
+                                    <td><input type="text" name="unit_price[]" class="form-control text-end" required></td>
+                                    
                                     <td><input type="text" name="description[]" class="form-control"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                                 </tr>
@@ -313,7 +343,6 @@ if (isset($_POST['save_invoice'])) {
 
     function addRow() {
         var table = document.getElementById("itemTable").getElementsByTagName('tbody')[0];
-        // Clone baris pertama untuk struktur
         var newRow = table.rows[0].cloneNode(true);
         var inputs = newRow.getElementsByTagName("input");
         for(var i=0; i<inputs.length; i++) { 
