@@ -48,15 +48,13 @@ if (isset($_POST['save_invoice'])) {
     // Ambil Data Form Item
     $items = $_POST['item_name'];
     $qtys  = $_POST['qty'];
-    $prices= $_POST['unit_price']; // Sekarang ini format TEXT (bisa ada titik/koma)
+    $prices= $_POST['unit_price']; // Format TEXT (bisa titik/koma)
     $descs = $_POST['description'];
     $cards = isset($_POST['card_type']) ? $_POST['card_type'] : [];
     
     // Tentukan Quotation ID yang akan direferensikan oleh Invoice
     if ($is_manual) {
-        // --- JIKA MANUAL: BUAT QUOTATION BAYANGAN DULU (LOGIKA LAMA) ---
         $client_id = intval($_POST['client_id']);
-        
         $po_ref = isset($_POST['po_ref']) ? $conn->real_escape_string($_POST['po_ref']) : '';
         $q_no_dummy = "Q-AUTO-" . time(); 
         
@@ -73,16 +71,14 @@ if (isset($_POST['save_invoice'])) {
                     $it_name = $conn->real_escape_string($items[$i]);
                     $it_qty  = intval($qtys[$i]);
                     
-                    // --- [FIX] LOGIKA PEMBERSIH HARGA ---
+                    // --- LOGIKA PEMBERSIH HARGA ---
                     $raw_price = $prices[$i];
                     $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
                     
                     if ($curr == 'IDR') {
-                        // IDR: 1.500.000 -> Hapus titik, koma jadi titik desimal
                         $clean_price = str_replace('.', '', $clean_price); 
                         $clean_price = str_replace(',', '.', $clean_price); 
                     } else {
-                        // USD: 1,500.50 -> Hapus koma
                         $clean_price = str_replace(',', '', $clean_price); 
                     }
                     $it_prc = floatval($clean_price);
@@ -100,7 +96,6 @@ if (isset($_POST['save_invoice'])) {
         }
 
     } else {
-        // --- JIKA DARI PO / OTOMATIS: REFER KE QUOTATION ASLI ---
         $quot_id_ref = intval($_POST['quotation_id']);
     }
 
@@ -118,7 +113,7 @@ if (isset($_POST['save_invoice'])) {
                     $it_name = $conn->real_escape_string($items[$i]);
                     $it_qty  = intval($qtys[$i]);
                     
-                    // --- [FIX] LOGIKA PEMBERSIH HARGA (SAMA SEPERTI DIATAS) ---
+                    // --- LOGIKA PEMBERSIH HARGA ---
                     $raw_price = $prices[$i];
                     $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
                     
@@ -236,11 +231,11 @@ if (isset($_POST['save_invoice'])) {
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="fw-bold">Invoice Date</label>
-                                <input type="date" name="invoice_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
+                                <input type="date" name="invoice_date" class="form-control" value="<?= date('Y-m-d') ?>" required onchange="updateDueDate()">
                             </div>
                             <div class="col-6 mb-3">
-                                <label class="fw-bold">Due Date</label>
-                                <input type="date" name="due_date" class="form-control" value="<?= date('Y-m-d', strtotime('+30 days')) ?>" required>
+                                <label class="fw-bold">Due Date (+5 Days)</label>
+                                <input type="date" name="due_date" class="form-control" value="<?= date('Y-m-d', strtotime('+5 days')) ?>" required>
                             </div>
                         </div>
                         
@@ -294,9 +289,7 @@ if (isset($_POST['save_invoice'])) {
                                     <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($itm['item_name']) ?>" required></td>
                                     <td><input type="text" name="card_type[]" class="form-control" value="<?= htmlspecialchars($itm['card_type']) ?>"></td>
                                     <td><input type="number" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" required></td>
-                                    
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $itm['unit_price'] ?>" required></td>
-                                    
                                     <td><input type="text" name="description[]" class="form-control" value="<?= htmlspecialchars($itm['description']) ?>"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                                 </tr>
@@ -307,9 +300,7 @@ if (isset($_POST['save_invoice'])) {
                                     <td><input type="text" name="item_name[]" class="form-control" required></td>
                                     <td><input type="text" name="card_type[]" class="form-control" placeholder="Optional"></td>
                                     <td><input type="number" name="qty[]" class="form-control text-center" value="1" required></td>
-                                    
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" required></td>
-                                    
                                     <td><input type="text" name="description[]" class="form-control"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                                 </tr>
@@ -338,6 +329,25 @@ if (isset($_POST['save_invoice'])) {
         } else if(select) {
             document.getElementById("cl_addr").value = "";
             document.getElementById("cl_pic").value = "";
+        }
+    }
+
+    // [UPDATE] FUNGSI AUTO DUE DATE (+5 Hari)
+    function updateDueDate() {
+        var invDateInput = document.getElementsByName("invoice_date")[0];
+        var dueDateInput = document.getElementsByName("due_date")[0];
+        
+        if (invDateInput.value) {
+            var date = new Date(invDateInput.value);
+            // Tambah 5 hari
+            date.setDate(date.getDate() + 5);
+            
+            // Format ke YYYY-MM-DD
+            var yyyy = date.getFullYear();
+            var mm = String(date.getMonth() + 1).padStart(2, '0');
+            var dd = String(date.getDate()).padStart(2, '0');
+            
+            dueDateInput.value = yyyy + '-' + mm + '-' + dd;
         }
     }
 
