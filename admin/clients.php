@@ -18,7 +18,6 @@ if (isset($_POST['import_clients'])) {
         
         $success = 0;
         while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-            // Format CSV: Company, Address, PIC Name, PIC Phone, Subscription (Daily/Monthly/Yearly), Status (Trial/Subscribe/...)
             $comp = $conn->real_escape_string($data[0] ?? '');
             $addr = $conn->real_escape_string($data[1] ?? '');
             $pic  = $conn->real_escape_string($data[2] ?? '');
@@ -29,7 +28,11 @@ if (isset($_POST['import_clients'])) {
             if(!empty($comp)) {
                 $sql = "INSERT INTO clients (company_name, address, pic_name, pic_phone, subscription_type, status) 
                         VALUES ('$comp', '$addr', '$pic', '$phone', '$sub', '$stat')";
-                if($conn->query($sql)) $success++;
+                try {
+                    if($conn->query($sql)) $success++;
+                } catch (Exception $e) {
+                    // Skip duplicate or error row
+                }
             }
         }
         fclose($handle);
@@ -39,24 +42,32 @@ if (isset($_POST['import_clients'])) {
     }
 }
 
-// --- 2. LOGIKA DELETE (ADMIN ONLY) ---
+// --- 2. LOGIKA DELETE (ADMIN ONLY & ERROR HANDLING) ---
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     if ($my_role == 'admin') {
         $del_id = intval($_GET['id']);
         
-        // Coba Hapus
-        $sqlDel = "DELETE FROM clients WHERE id = $del_id";
-        
-        if ($conn->query($sqlDel)) {
-            echo "<script>alert('Client berhasil dihapus!'); window.location='clients.php';</script>";
-        } else {
-            // Jika gagal (biasanya karena Constraint Foreign Key ada Transaksi)
-            echo "<script>alert('Gagal menghapus! Client ini mungkin memiliki data Quotation/Invoice yang terhubung.'); window.location='clients.php';</script>";
+        // [PERBAIKAN] Menggunakan Try-Catch untuk menangani Foreign Key Constraint
+        try {
+            $sqlDel = "DELETE FROM clients WHERE id = $del_id";
+            if ($conn->query($sqlDel)) {
+                echo "<script>alert('Client berhasil dihapus!'); window.location='clients.php';</script>";
+            }
+        } catch (mysqli_sql_exception $e) {
+            // Cek Kode Error 1451 (Foreign Key Constraint Fails)
+            if ($e->getCode() == 1451) {
+                echo "<script>
+                    alert('GAGAL MENGHAPUS: Client ini masih memiliki data transaksi (Quotation/Invoice) yang aktif. Silakan hapus data transaksinya terlebih dahulu.'); 
+                    window.location='clients.php';
+                </script>";
+            } else {
+                echo "<script>alert('Error Database: " . addslashes($e->getMessage()) . "'); window.location='clients.php';</script>";
+            }
         }
     } else {
         echo "<script>alert('Akses Ditolak! Hanya Admin yang bisa menghapus.'); window.location='clients.php';</script>";
     }
-    exit; // Stop eksekusi agar tidak load HTML bawah
+    exit; 
 }
 
 // --- 3. AMBIL DATA SALES PERSON (Untuk Dropdown) ---
@@ -67,7 +78,7 @@ $sqlSales = "SELECT u.id, u.username FROM users u
 $resSales = $conn->query($sqlSales);
 while($row = $resSales->fetch_assoc()) { $sales_people[] = $row; }
 
-// --- 4. LOGIKA SIMPAN (ADD / EDIT - Fitur Lama) ---
+// --- 4. LOGIKA SIMPAN (ADD / EDIT) ---
 if (isset($_POST['save_client'])) {
     $is_edit = !empty($_POST['client_id']);
     $id = $is_edit ? intval($_POST['client_id']) : 0;
@@ -104,23 +115,25 @@ if (isset($_POST['save_client'])) {
         }
     } else { $contract_sql = $is_edit ? "" : "NULL"; }
 
-    if ($is_edit) {
-        $sql = "UPDATE clients SET 
-                company_name='$comp', address='$addr', pic_name='$pic', pic_phone='$phone',
-                subscription_type='$sub_type', status='$status', sales_person_id=$sales_id
-                $nda_sql $contract_sql
-                WHERE id=$id";
-    } else {
-        $nda_val = ($nda_sql == "NULL") ? "NULL" : "'$nda_sql'";
-        $cont_val = ($contract_sql == "NULL") ? "NULL" : "'$contract_sql'";
-        $sql = "INSERT INTO clients (company_name, address, pic_name, pic_phone, subscription_type, status, sales_person_id, nda_file, contract_file) 
-                VALUES ('$comp', '$addr', '$pic', '$phone', '$sub_type', '$status', $sales_id, $nda_val, $cont_val)";
-    }
+    try {
+        if ($is_edit) {
+            $sql = "UPDATE clients SET 
+                    company_name='$comp', address='$addr', pic_name='$pic', pic_phone='$phone',
+                    subscription_type='$sub_type', status='$status', sales_person_id=$sales_id
+                    $nda_sql $contract_sql
+                    WHERE id=$id";
+        } else {
+            $nda_val = ($nda_sql == "NULL") ? "NULL" : "'$nda_sql'";
+            $cont_val = ($contract_sql == "NULL") ? "NULL" : "'$contract_sql'";
+            $sql = "INSERT INTO clients (company_name, address, pic_name, pic_phone, subscription_type, status, sales_person_id, nda_file, contract_file) 
+                    VALUES ('$comp', '$addr', '$pic', '$phone', '$sub_type', '$status', $sales_id, $nda_val, $cont_val)";
+        }
 
-    if ($conn->query($sql)) {
-        echo "<script>alert('Data Client Berhasil Disimpan!'); window.location='clients.php';</script>";
-    } else {
-        echo "<script>alert('Error: " . $conn->error . "');</script>";
+        if ($conn->query($sql)) {
+            echo "<script>alert('Data Client Berhasil Disimpan!'); window.location='clients.php';</script>";
+        }
+    } catch (Exception $e) {
+        echo "<script>alert('Error Database: " . addslashes($e->getMessage()) . "');</script>";
     }
 }
 
@@ -302,7 +315,7 @@ $clients = $conn->query($sqlClients);
                                         </button>
                                         
                                         <?php if ($my_role == 'admin'): ?>
-                                            <a href="?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Apakah Anda yakin ingin menghapus Client ini?')" title="Delete (Admin Only)">
+                                            <a href="?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin ingin menghapus? Data tidak bisa dikembalikan.')" title="Hapus (Admin)">
                                                 <i class="bi bi-trash"></i>
                                             </a>
                                         <?php endif; ?>
