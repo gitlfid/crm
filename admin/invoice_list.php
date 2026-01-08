@@ -2,6 +2,13 @@
 // --- 1. LOAD CONFIG DULUAN (Agar Export Excel berjalan sebelum HTML) ---
 include '../config/functions.php';
 
+// Pastikan sesi dimulai jika belum (untuk cek role)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$user_role = isset($_SESSION['role']) ? $_SESSION['role'] : '';
+
 // --- 2. INIT FILTER VARIABLES ---
 $search       = isset($_REQUEST['search']) ? $_REQUEST['search'] : '';
 $f_client     = isset($_REQUEST['client_id']) ? $_REQUEST['client_id'] : '';
@@ -243,12 +250,30 @@ if (isset($_POST['upload_tax_invoice'])) {
     }
 }
 
-// --- LOGIKA ACTION: UPDATE STATUS & CANCEL ---
+// --- LOGIKA ACTION: UPDATE STATUS & CANCEL & DELETE (ADMIN) ---
 if (isset($_GET['action']) && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     $act = $_GET['action'];
     
-    // [BARU] Revert to Draft Logic
+    // [BARU] Hapus Permanen (Admin Only)
+    if ($act == 'delete') {
+        if ($user_role == 'admin') {
+            // Hapus child records dulu untuk menjaga integritas database
+            $conn->query("DELETE FROM invoice_items WHERE invoice_id=$id");
+            // Hapus Delivery Order terkait (via payments jika ada)
+            $conn->query("DELETE FROM delivery_orders WHERE payment_id IN (SELECT id FROM payments WHERE invoice_id=$id)");
+            $conn->query("DELETE FROM payments WHERE invoice_id=$id");
+            $conn->query("DELETE FROM invoices WHERE id=$id");
+            
+            echo "<script>alert('Invoice berhasil dihapus permanen.'); window.location='invoice_list.php';</script>";
+            exit;
+        } else {
+            echo "<script>alert('Akses Ditolak. Hanya Admin yang bisa menghapus.'); window.location='invoice_list.php';</script>";
+            exit;
+        }
+    }
+
+    // Revert to Draft Logic
     if ($act == 'draft') {
         $conn->query("UPDATE invoices SET status='draft' WHERE id=$id");
     }
@@ -504,6 +529,12 @@ $res = $conn->query($sql);
                                                 <li><button class="dropdown-item text-success" onclick="openPayModal(<?= $row['id'] ?>, '<?= $row['invoice_no'] ?>', <?= $grandTotal ?>)"><i class="bi bi-check-circle me-2"></i> Mark Paid</button></li>
                                                 <li><a class="dropdown-item text-danger" href="?action=cancel&id=<?= $row['id'] ?>" onclick="return confirm('Batalkan Invoice?')"><i class="bi bi-x-circle me-2"></i> Cancel</a></li>
                                             <?php endif; ?>
+
+                                            <?php if($user_role == 'admin'): ?>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger fw-bold" href="?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('PERINGATAN: Menghapus Invoice akan menghapus Payment dan DO terkait secara permanen. Lanjutkan?')"><i class="bi bi-trash-fill me-2"></i> Delete (Admin)</a></li>
+                                            <?php endif; ?>
+
                                         </ul>
                                     </div>
                                 </td>
