@@ -272,7 +272,8 @@ $sql = "SELECT i.*, c.company_name, q.quotation_no, q.currency,
         COALESCE(
             (SELECT SUM(qty * unit_price) FROM invoice_items WHERE invoice_id = i.id),
             (SELECT SUM(qty * unit_price) FROM quotation_items WHERE quotation_id = i.quotation_id)
-        ) as sub_total
+        ) as sub_total,
+        (SELECT COUNT(*) FROM delivery_orders do JOIN payments pay ON do.payment_id = pay.id WHERE pay.invoice_id = i.id) as do_count
         FROM invoices i 
         JOIN quotations q ON i.quotation_id=q.id 
         JOIN clients c ON q.client_id=c.id 
@@ -416,7 +417,9 @@ $res = $conn->query($sql);
                                 $vat = $subTotal * $tax_rate;
                                 $grandTotal = $subTotal + $vat;
                                 
-                                // LOGIKA TAMPILAN ANGKA
+                                // LOGIKA TAMPILAN ANGKA:
+                                // USD: Pakai 2 Desimal (42,160.93)
+                                // IDR: Bulat (42.161)
                                 $fmt = function($n) use ($is_usd) {
                                     if ($is_usd) return number_format($n, 2, '.', ',');
                                     return number_format($n, 0, ',', '.');
@@ -429,6 +432,9 @@ $res = $conn->query($sql);
                                 $hasNote = !empty($row['general_notes']);
                                 $noteClass = $hasNote ? 'has-note' : '';
                                 $noteTooltip = $hasNote ? 'Lihat Catatan' : 'Buat Catatan';
+                                
+                                // Cek apakah DO sudah pernah dibuat untuk invoice ini
+                                $doCount = intval($row['do_count']);
                             ?>
                             <tr>
                                 <td class="ps-4 fw-bold text-dark font-monospace">
@@ -460,6 +466,11 @@ $res = $conn->query($sql);
 
                                 <td class="text-center">
                                     <span class="badge bg-<?= $bg ?> badge-status rounded-pill"><?= strtoupper($st) ?></span>
+                                    <?php if($st == 'paid' && $doCount > 0): ?>
+                                        <div class="mt-1">
+                                            <span class="badge bg-light text-dark border" style="font-size: 0.6rem;"><i class="bi bi-truck me-1"></i> DO Created</span>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
                                 
                                 <td class="text-end pe-4">
@@ -471,6 +482,11 @@ $res = $conn->query($sql);
                                             
                                             <?php if($hasTax): ?>
                                             <li><a href="../uploads/<?= $row['tax_invoice_file'] ?>" target="_blank" class="dropdown-item"><i class="bi bi-eye me-2"></i> View Tax</a></li>
+                                            <?php endif; ?>
+
+                                            <?php if($st == 'paid'): ?>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item fw-bold text-dark" href="delivery_order_form.php?from_invoice_id=<?= $row['id'] ?>"><i class="bi bi-truck me-2 text-warning"></i> Create DO</a></li>
                                             <?php endif; ?>
 
                                             <?php if($st != 'paid' && $st != 'cancel'): ?>
