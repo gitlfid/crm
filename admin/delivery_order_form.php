@@ -1,170 +1,175 @@
 <?php
-$page_title = "Create Delivery Order";
+$page_title = "Form Delivery Order";
 include 'includes/header.php';
 include 'includes/sidebar.php';
 include '../config/functions.php';
 
-$is_edit = false;
-$do_data = null;
-$do_items = [];
-$auto_no = generateDONumber($conn);
-$payment_id = 0;
+// Inisialisasi Variabel
+$do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
+$from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// MODE EDIT
-if (isset($_GET['edit_id'])) {
-    $is_edit = true;
-    $do_id = intval($_GET['edit_id']);
-    $do_data = $conn->query("SELECT * FROM delivery_orders WHERE id=$do_id")->fetch_assoc();
-    $payment_id = $do_data['payment_id'];
-    $auto_no = $do_data['do_number'];
+$do_number = "DO" . date('Ymd') . rand(100, 999); // Auto generate default
+$do_date = date('Y-m-d');
+$status = 'draft';
+$pic_name = '';
+$pic_phone = '';
+$payment_id = 0;
+$client_name = '';
+$client_address = '';
+$ref_info = '';
+
+// --- KASUS 1: CREATE DARI INVOICE (FITUR BARU) ---
+if ($from_inv_id > 0) {
+    // 1. Cari Payment ID dari Invoice ini (Ambil payment terakhir)
+    $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
+    $resPay = $conn->query($sqlPay);
     
-    $resItems = $conn->query("SELECT * FROM delivery_order_items WHERE delivery_order_id=$do_id");
-    while($row = $resItems->fetch_assoc()) $do_items[] = $row;
-} 
-// MODE CREATE (FROM PAYMENT)
-elseif (isset($_GET['payment_id'])) {
-    $payment_id = intval($_GET['payment_id']);
-} else {
-    echo "<script>window.location='delivery_order_list.php';</script>"; exit;
+    if ($resPay->num_rows > 0) {
+        $payRow = $resPay->fetch_assoc();
+        $payment_id = $payRow['id'];
+
+        // 2. Ambil Data Client & Invoice
+        $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
+                    FROM invoices i
+                    JOIN quotations q ON i.quotation_id = q.id
+                    JOIN clients c ON q.client_id = c.id
+                    WHERE i.id = $from_inv_id";
+        $info = $conn->query($sqlInfo)->fetch_assoc();
+        
+        if ($info) {
+            $client_name = $info['company_name'];
+            $client_address = $info['address'];
+            $pic_name = $info['pic_name'];
+            $pic_phone = $info['pic_phone'];
+            $ref_info = "Ref: Invoice #" . $info['invoice_no'];
+        }
+    } else {
+        echo "<script>alert('Error: Invoice ini belum memiliki data pembayaran (Payment). Buat Payment terlebih dahulu.'); window.location='invoice_list.php';</script>";
+        exit;
+    }
 }
 
-// AMBIL DATA SUMBER (PAYMENT -> INVOICE -> QUOTATION)
-// Menambahkan i.payment_method ke dalam query select
-$sqlSrc = "SELECT p.id as pay_id, c.company_name, c.address, c.pic_name, c.pic_phone,
-           q.id as quote_id, i.payment_method as inv_payment_method
-           FROM payments p
-           JOIN invoices i ON p.invoice_id = i.id
-           JOIN quotations q ON i.quotation_id = q.id
-           JOIN clients c ON q.client_id = c.id
-           WHERE p.id = $payment_id";
-$src = $conn->query($sqlSrc)->fetch_assoc();
+// --- KASUS 2: EDIT EXISTING DO ---
+if ($do_id > 0) {
+    $sqlData = "SELECT d.*, c.company_name, c.address, i.invoice_no 
+                FROM delivery_orders d
+                JOIN payments p ON d.payment_id = p.id
+                JOIN invoices i ON p.invoice_id = i.id
+                JOIN quotations q ON i.quotation_id = q.id
+                JOIN clients c ON q.client_id = c.id
+                WHERE d.id = $do_id";
+    $resData = $conn->query($sqlData);
+    if ($resData->num_rows > 0) {
+        $row = $resData->fetch_assoc();
+        $do_number = $row['do_number'];
+        $do_date = $row['do_date'];
+        $status = $row['status'];
+        $pic_name = $row['pic_name'];
+        $pic_phone = $row['pic_phone'];
+        $payment_id = $row['payment_id'];
+        $client_name = $row['company_name'];
+        $client_address = $row['address'];
+        $ref_info = "Ref: Invoice #" . $row['invoice_no'];
+    }
+}
 
-// AMBIL DATA ITEM DARI QUOTATION (Untuk Default Item Name)
-$quote_items = [];
-$resQItems = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = " . $src['quote_id']);
-while($row = $resQItems->fetch_assoc()) $quote_items[] = $row;
-
-// Hitung Data SIM yang sudah diupload di Payment ini (Untuk Default Unit)
-$countSim = $conn->query("SELECT COUNT(*) as t FROM payment_sim_data WHERE payment_id = $payment_id")->fetch_assoc()['t'];
-if($countSim == 0) $countSim = 1; 
-
-// PROSES SIMPAN
+// --- PROSES SIMPAN ---
 if (isset($_POST['save_do'])) {
-    $do_no = $_POST['do_number'];
-    $do_date = $_POST['do_date'];
-    $pic_name = $conn->real_escape_string($_POST['pic_name']);
-    $pic_phone = $conn->real_escape_string($_POST['pic_phone']);
-    
-    if ($is_edit) {
-        $conn->query("UPDATE delivery_orders SET do_date='$do_date', pic_name='$pic_name', pic_phone='$pic_phone' WHERE id=$do_id");
-        $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$do_id");
-        $last_id = $do_id;
+    $p_id = intval($_POST['payment_id']);
+    $d_num = $conn->real_escape_string($_POST['do_number']);
+    $d_date = $_POST['do_date'];
+    $d_stat = $_POST['status'];
+    $d_pic = $conn->real_escape_string($_POST['pic_name']);
+    $d_phone = $conn->real_escape_string($_POST['pic_phone']);
+    $user_id = $_SESSION['user_id'];
+
+    if ($do_id > 0) {
+        // Update
+        $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone' WHERE id=$do_id";
     } else {
-        $conn->query("INSERT INTO delivery_orders (do_number, payment_id, do_date, pic_name, pic_phone, created_by_user_id) 
-                      VALUES ('$do_no', $payment_id, '$do_date', '$pic_name', '$pic_phone', ".$_SESSION['user_id'].")");
-        $last_id = $conn->insert_id;
+        // Insert Baru (Pastikan payment_id masuk)
+        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by) 
+                VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone', $user_id)";
     }
 
-    // Insert Items
-    $items = $_POST['item_name'];
-    $contents = $_POST['content'];
-    $units = $_POST['unit'];
-    $modes = $_POST['charge_mode'];
-    $descs = $_POST['description'];
-
-    for ($i = 0; $i < count($items); $i++) {
-        $in = $conn->real_escape_string($items[$i]);
-        $ct = $conn->real_escape_string($contents[$i]);
-        $un = intval($units[$i]);
-        $cm = $conn->real_escape_string($modes[$i]);
-        $ds = $conn->real_escape_string($descs[$i]);
-        
-        $conn->query("INSERT INTO delivery_order_items (delivery_order_id, item_name, content, unit, charge_mode, description) 
-                      VALUES ($last_id, '$in', '$ct', $un, '$cm', '$ds')");
+    if ($conn->query($sql)) {
+        echo "<script>alert('Delivery Order Berhasil Disimpan!'); window.location='delivery_order_list.php';</script>";
+    } else {
+        echo "<script>alert('Gagal Simpan: " . $conn->error . "');</script>";
     }
-    
-    echo "<script>alert('Delivery Order Saved!'); window.location='delivery_order_list.php';</script>";
 }
 ?>
 
-<div class="page-heading"><h3><?= $is_edit ? 'Edit' : 'Create' ?> Delivery Order</h3></div>
+<div class="page-heading">
+    <h3>Form Delivery Order</h3>
+</div>
 
 <div class="page-content">
-    <form method="POST">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-light"><strong>Receiver Info</strong></div>
-                    <div class="card-body pt-3">
-                        <div class="mb-2"><label>Company</label><input type="text" class="form-control bg-light" value="<?= $src['company_name'] ?>" readonly></div>
-                        <div class="mb-2"><label>Address</label><textarea class="form-control bg-light" rows="3" readonly><?= $src['address'] ?></textarea></div>
-                        <div class="row">
-                            <div class="col-6"><label>Attn Name</label><input type="text" name="pic_name" class="form-control" value="<?= $is_edit ? $do_data['pic_name'] : $src['pic_name'] ?>"></div>
-                            <div class="col-6"><label>Phone</label><input type="text" name="pic_phone" class="form-control" value="<?= $is_edit ? $do_data['pic_phone'] : $src['pic_phone'] ?>"></div>
+    <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 text-primary fw-bold"><i class="bi bi-truck me-2"></i> Detail Pengiriman</h6>
+            <?php if(!empty($ref_info)): ?>
+                <span class="badge bg-warning text-dark"><?= $ref_info ?></span>
+            <?php endif; ?>
+        </div>
+        <div class="card-body pt-4">
+            <form method="POST">
+                <input type="hidden" name="payment_id" value="<?= $payment_id ?>">
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">DO Number</label>
+                            <input type="text" name="do_number" class="form-control font-monospace" value="<?= htmlspecialchars($do_number) ?>" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Delivery Date</label>
+                            <input type="date" name="do_date" class="form-control" value="<?= $do_date ?>" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Client (Read Only)</label>
+                            <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($client_name) ?>" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <textarea class="form-control bg-light" rows="3" readonly><?= htmlspecialchars($client_address) ?></textarea>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Receiver Name (PIC)</label>
+                            <input type="text" name="pic_name" class="form-control" value="<?= htmlspecialchars($pic_name) ?>" placeholder="Nama Penerima Barang" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Receiver Phone</label>
+                            <input type="text" name="pic_phone" class="form-control" value="<?= htmlspecialchars($pic_phone) ?>" placeholder="Nomor HP Penerima">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="draft" <?= $status=='draft'?'selected':'' ?>>DRAFT</option>
+                                <option value="sent" <?= $status=='sent'?'selected':'' ?>>SENT</option>
+                                <option value="received" <?= $status=='received'?'selected':'' ?>>RECEIVED</option>
+                            </select>
+                        </div>
+                        
+                        <div class="alert alert-info mt-4 small">
+                            <i class="bi bi-info-circle-fill me-1"></i>
+                            Item yang dikirim otomatis diambil dari Invoice terkait saat ditampilkan di list atau cetak surat jalan.
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header bg-warning text-dark"><strong>Delivery Details</strong></div>
-                    <div class="card-body pt-3">
-                        <div class="mb-3"><label>DO Number</label><input type="text" name="do_number" class="form-control fw-bold" value="<?= $auto_no ?>" readonly></div>
-                        <div class="mb-3"><label>Delivery Date</label><input type="date" name="do_date" class="form-control" value="<?= $is_edit ? $do_data['do_date'] : date('Y-m-d') ?>"></div>
-                        <div class="alert alert-info small py-2"><i class="bi bi-info-circle"></i> Total SIM Uploaded: <strong><?= $countSim ?></strong> Pcs</div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="card mt-4">
-            <div class="card-header"><strong>Items & Description</strong></div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-bordered mb-0">
-                        <thead class="bg-light">
-                            <tr>
-                                <th width="25%">Item (From Quote)</th>
-                                <th width="20%">Content (Manual)</th>
-                                <th width="10%">Unit</th>
-                                <th width="15%">Charge Mode (Inv Payment)</th>
-                                <th width="30%">Description (ICCID Range)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ($is_edit): ?>
-                                <?php foreach($do_items as $it): ?>
-                                <tr>
-                                    <td><input type="text" name="item_name[]" class="form-control bg-light" value="<?= $it['item_name'] ?>" readonly></td>
-                                    <td><input type="text" name="content[]" class="form-control" value="<?= $it['content'] ?>" placeholder="e.g 5 GB/Month"></td>
-                                    <td><input type="number" name="unit[]" class="form-control" value="<?= $it['unit'] ?>"></td>
-                                    <td><input type="text" name="charge_mode[]" class="form-control" value="<?= $it['charge_mode'] ?>"></td>
-                                    <td><textarea name="description[]" class="form-control" rows="1"><?= $it['description'] ?></textarea></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <?php foreach($quote_items as $qItem): ?>
-                                <tr>
-                                    <td><input type="text" name="item_name[]" class="form-control bg-light" value="<?= $qItem['item_name'] ?>" readonly></td>
-                                    <td><input type="text" name="content[]" class="form-control" placeholder="e.g 5 GB/Month" required></td>
-                                    
-                                    <td><input type="number" name="unit[]" class="form-control" value="<?= $countSim ?>"></td>
-                                    
-                                    <td><input type="text" name="charge_mode[]" class="form-control bg-light" value="<?= $src['inv_payment_method'] ?>" readonly></td>
-                                    
-                                    <td><textarea name="description[]" class="form-control" rows="1" placeholder="Input range ICCID/Serial Number"></textarea></td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <a href="invoice_list.php" class="btn btn-light border px-4">Cancel</a>
+                    <button type="submit" name="save_do" class="btn btn-primary px-4 fw-bold">
+                        <i class="bi bi-save me-2"></i> Save Delivery Order
+                    </button>
                 </div>
-            </div>
-            <div class="card-footer text-end">
-                <button type="submit" name="save_do" class="btn btn-primary px-4">Save Delivery Order</button>
-            </div>
+            </form>
         </div>
-    </form>
+    </div>
 </div>
+
 <?php include 'includes/footer.php'; ?>
