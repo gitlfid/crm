@@ -21,10 +21,16 @@ if (isset($_POST['update_invoice'])) {
     $sqlUpdate = "UPDATE invoices SET invoice_date='$inv_date', due_date='$due_date', payment_method='$pymt_method' WHERE id=$inv_id";
     $conn->query($sqlUpdate);
 
-    // 2. Update Table Quotation (untuk PO Ref manual jika ada)
+    // 2. Update Table Quotation (Client & PO Ref)
     // Ambil quotation_id dulu
     $q_check = $conn->query("SELECT quotation_id FROM invoices WHERE id=$inv_id")->fetch_assoc();
     $q_id = $q_check['quotation_id'];
+
+    // [BARU] Update Client ID di tabel Quotation
+    if (isset($_POST['client_id'])) {
+        $new_client_id = intval($_POST['client_id']);
+        $conn->query("UPDATE quotations SET client_id=$new_client_id WHERE id=$q_id");
+    }
 
     if (isset($_POST['po_ref'])) {
         $po_ref = $conn->real_escape_string($_POST['po_ref']);
@@ -40,33 +46,26 @@ if (isset($_POST['update_invoice'])) {
 
     $items = $_POST['item_name'];
     $qtys  = $_POST['qty'];
-    $prices= $_POST['unit_price']; // Input Text (Bisa Koma/Titik)
+    $prices= $_POST['unit_price']; 
     $descs = $_POST['description'];
     $cards = isset($_POST['card_type']) ? $_POST['card_type'] : [];
 
     for ($i = 0; $i < count($items); $i++) {
         if (!empty($items[$i])) {
             $it_name = $conn->real_escape_string($items[$i]);
-            $it_qty  = floatval($qtys[$i]); // Gunakan floatval untuk qty desimal
+            $it_qty  = floatval($qtys[$i]); 
             
-            // --- LOGIKA PEMBERSIH HARGA (UNIVERSAL) ---
+            // --- LOGIKA PEMBERSIH HARGA ---
             $raw_price = $prices[$i];
-            
-            // Hapus karakter non-angka (kecuali koma dan titik)
             $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
 
             if ($curr == 'IDR') {
-                // FORMAT IDR: 1.500.000,00 -> SQL: 1500000.00
-                // Hapus titik (ribuan), ganti koma (desimal) jadi titik
                 $clean_price = str_replace('.', '', $clean_price); 
                 $clean_price = str_replace(',', '.', $clean_price); 
             } else {
-                // FORMAT USD: 1,500.00 -> SQL: 1500.00
-                // Hapus koma (ribuan), biarkan titik (desimal)
                 $clean_price = str_replace(',', '', $clean_price); 
             }
             
-            // Konversi ke float untuk database
             $it_prc = floatval($clean_price);
             // -------------------------------------------
 
@@ -82,7 +81,8 @@ if (isset($_POST['update_invoice'])) {
 }
 
 // --- AMBIL DATA UTAMA UNTUK TAMPILAN ---
-$sql = "SELECT i.*, c.company_name, c.address, c.pic_name, q.po_number_client, q.currency
+// [UPDATE] Tambah c.id as client_id untuk pre-select dropdown
+$sql = "SELECT i.*, c.id as current_client_id, c.company_name, c.address, c.pic_name, q.po_number_client, q.currency
         FROM invoices i 
         JOIN quotations q ON i.quotation_id = q.id 
         JOIN clients c ON q.client_id = c.id 
@@ -91,6 +91,9 @@ $invoice = $conn->query($sql)->fetch_assoc();
 
 if (!$invoice) die("Invoice tidak ditemukan.");
 if ($invoice['status'] != 'draft') die("Invoice ini sudah tidak bisa diedit (Status: " . strtoupper($invoice['status']) . ")");
+
+// [BARU] Ambil Daftar Semua Client untuk Dropdown
+$clients_list = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
 // Ambil Items
 $invoice_items = [];
@@ -101,7 +104,6 @@ if ($resItems->num_rows > 0) {
         $invoice_items[] = $itm;
     }
 } else {
-    // Fallback ambil dari quotation jika invoice_items masih kosong
     $q_id = $invoice['quotation_id'];
     $resQItems = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = $q_id");
     while($itm = $resQItems->fetch_assoc()) {
@@ -116,8 +118,8 @@ if ($resItems->num_rows > 0) {
         <i class="bi bi-pencil-square me-2"></i>
         <strong>Mode Edit:</strong>
         <ul class="mb-0 ps-3">
+            <li>Anda dapat mengubah <strong>Customer</strong>, Tanggal, dan Item.</li>
             <li>Unit Price mendukung format <strong>USD (1,500.50)</strong> dan <strong>IDR (1.500.000)</strong>.</li>
-            <li>Gunakan input text biasa (titik/koma sesuai mata uang).</li>
         </ul>
     </div>
 </div>
@@ -127,11 +129,23 @@ if ($resItems->num_rows > 0) {
         <div class="row">
             <div class="col-md-6">
                 <div class="card h-100">
-                    <div class="card-header bg-light"><strong>Bill To (Read Only)</strong></div>
+                    <div class="card-header bg-light"><strong>Bill To</strong></div>
                     <div class="card-body pt-3">
+                        
                         <div class="mb-3">
-                            <label>Client</label>
-                            <input type="text" class="form-control bg-light" value="<?= $invoice['company_name'] ?>" readonly>
+                            <label class="fw-bold">Client / Customer</label>
+                            <select name="client_id" class="form-select bg-white">
+                                <?php 
+                                if ($clients_list->num_rows > 0) {
+                                    $clients_list->data_seek(0); // Reset pointer
+                                    while($cl = $clients_list->fetch_assoc()): 
+                                ?>
+                                    <option value="<?= $cl['id'] ?>" <?= ($invoice['current_client_id'] == $cl['id']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($cl['company_name']) ?>
+                                    </option>
+                                <?php endwhile; } ?>
+                            </select>
+                            <div class="form-text text-muted small">Mengganti client akan mengubah alamat setelah disimpan.</div>
                         </div>
                         
                         <div class="mb-3">
@@ -140,7 +154,7 @@ if ($resItems->num_rows > 0) {
                         </div>
 
                         <div class="mb-3">
-                            <label>Address</label>
+                            <label>Current Address (Read Only)</label>
                             <textarea class="form-control bg-light" rows="3" readonly><?= $invoice['address'] ?></textarea>
                         </div>
                         <div class="mb-3">
@@ -233,7 +247,6 @@ if ($resItems->num_rows > 0) {
 <script>
     function addRow() {
         var table = document.getElementById("itemTable").getElementsByTagName('tbody')[0];
-        // Clone baris pertama untuk struktur
         var newRow = table.rows[0].cloneNode(true);
         var inputs = newRow.getElementsByTagName("input");
         for(var i=0; i<inputs.length; i++) { 
