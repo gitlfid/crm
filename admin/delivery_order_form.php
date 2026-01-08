@@ -81,15 +81,17 @@ if (isset($_POST['save_do'])) {
     $d_stat = $_POST['status'];
     $d_pic = $conn->real_escape_string($_POST['pic_name']);
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
-    $user_id = $_SESSION['user_id'];
+    
+    // Hapus variable $user_id dan kolom created_by karena kolom tidak ada di DB
+    // $user_id = $_SESSION['user_id']; 
 
     if ($do_id > 0) {
         // Update
         $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone' WHERE id=$do_id";
     } else {
-        // Insert Baru (Pastikan payment_id masuk)
-        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by) 
-                VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone', $user_id)";
+        // Insert Baru (Tanpa created_by)
+        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone) 
+                VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone')";
     }
 
     if ($conn->query($sql)) {
