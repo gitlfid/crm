@@ -4,6 +4,9 @@ include 'includes/header.php';
 include 'includes/sidebar.php';
 include '../config/functions.php';
 
+// Pastikan session role tersedia
+$my_role = isset($_SESSION['role']) ? $_SESSION['role'] : '';
+
 // --- 1. LOGIKA IMPORT CSV (EXCEL) ---
 if (isset($_POST['import_clients'])) {
     if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] == 0) {
@@ -36,7 +39,27 @@ if (isset($_POST['import_clients'])) {
     }
 }
 
-// --- 2. AMBIL DATA SALES PERSON (Untuk Dropdown) ---
+// --- 2. LOGIKA DELETE (ADMIN ONLY) ---
+if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
+    if ($my_role == 'admin') {
+        $del_id = intval($_GET['id']);
+        
+        // Coba Hapus
+        $sqlDel = "DELETE FROM clients WHERE id = $del_id";
+        
+        if ($conn->query($sqlDel)) {
+            echo "<script>alert('Client berhasil dihapus!'); window.location='clients.php';</script>";
+        } else {
+            // Jika gagal (biasanya karena Constraint Foreign Key ada Transaksi)
+            echo "<script>alert('Gagal menghapus! Client ini mungkin memiliki data Quotation/Invoice yang terhubung.'); window.location='clients.php';</script>";
+        }
+    } else {
+        echo "<script>alert('Akses Ditolak! Hanya Admin yang bisa menghapus.'); window.location='clients.php';</script>";
+    }
+    exit; // Stop eksekusi agar tidak load HTML bawah
+}
+
+// --- 3. AMBIL DATA SALES PERSON (Untuk Dropdown) ---
 $sales_people = [];
 $sqlSales = "SELECT u.id, u.username FROM users u 
              JOIN divisions d ON u.division_id = d.id 
@@ -44,24 +67,22 @@ $sqlSales = "SELECT u.id, u.username FROM users u
 $resSales = $conn->query($sqlSales);
 while($row = $resSales->fetch_assoc()) { $sales_people[] = $row; }
 
-// --- 3. LOGIKA SIMPAN (ADD / EDIT - Fitur Lama) ---
+// --- 4. LOGIKA SIMPAN (ADD / EDIT - Fitur Lama) ---
 if (isset($_POST['save_client'])) {
     $is_edit = !empty($_POST['client_id']);
     $id = $is_edit ? intval($_POST['client_id']) : 0;
 
-    // [FIX] Tambahkan operator ?? '' untuk mencegah error Undefined array key
     $comp = $conn->real_escape_string($_POST['company_name'] ?? '');
     $addr = $conn->real_escape_string($_POST['address'] ?? '');
     $pic  = $conn->real_escape_string($_POST['pic_name'] ?? '');
     $phone= $conn->real_escape_string($_POST['pic_phone'] ?? '');
     
-    // [FIX] Berikan default value agar tidak Data Truncated di database
     $sub_type = $conn->real_escape_string($_POST['subscription_type'] ?? 'Monthly');
     $status   = $conn->real_escape_string($_POST['status'] ?? 'Trial');
     
     $sales_id = !empty($_POST['sales_person_id']) ? intval($_POST['sales_person_id']) : "NULL";
 
-    // Upload Logic (Sama seperti sebelumnya)
+    // Upload Logic
     $uploadDir = __DIR__ . '/../uploads/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
 
@@ -103,7 +124,7 @@ if (isset($_POST['save_client'])) {
     }
 }
 
-// --- 4. FILTER DATA ---
+// --- 5. FILTER DATA ---
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $f_sub  = isset($_GET['subscription']) ? $_GET['subscription'] : '';
 $f_stat = isset($_GET['status']) ? $_GET['status'] : '';
@@ -127,7 +148,7 @@ if(!empty($f_sales)) {
     $where .= " AND sales_person_id = $safe_sales";
 }
 
-// --- 5. QUERY DATA UTAMA ---
+// --- 6. QUERY DATA UTAMA ---
 $sqlClients = "SELECT c.*, u.username as sales_name 
                FROM clients c 
                LEFT JOIN users u ON c.sales_person_id = u.id 
@@ -221,7 +242,7 @@ $clients = $conn->query($sqlClients);
                             <th>Status</th>
                             <th>Sales Person</th>
                             <th class="text-center">Docs</th>
-                            <th>Action</th>
+                            <th width="12%">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -275,9 +296,17 @@ $clients = $conn->query($sqlClients);
                                 </td>
 
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick='editClient(<?= json_encode($row) ?>)'>
-                                        <i class="bi bi-pencil-square"></i> Edit
-                                    </button>
+                                    <div class="d-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-primary" onclick='editClient(<?= json_encode($row) ?>)' title="Edit">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        
+                                        <?php if ($my_role == 'admin'): ?>
+                                            <a href="?action=delete&id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Apakah Anda yakin ingin menghapus Client ini?')" title="Delete (Admin Only)">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endwhile; ?>
