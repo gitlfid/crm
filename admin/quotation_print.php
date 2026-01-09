@@ -23,7 +23,7 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- DETEKSI BASE URL (AGAR GAMBAR MUNCUL DI PRINT) ---
+// --- DETEKSI BASE URL (Agar Gambar Muncul) ---
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'];
 // Naik satu level dari /admin/ ke root project
@@ -50,17 +50,25 @@ function smart_format($num, $curr = 'IDR') {
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; }
         @page { margin: 1.5cm; size: A4; }
         
-        .watermark-container { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); width: 80%; z-index: -1000; opacity: 0.08; }
+        /* HEADER & UTILS */
+        .no-print { background: #f8f9fa; padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
+        .btn-print { background: #0d6efd; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
+
+        /* LAYOUT */
+        .watermark-container { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); width: 80%; z-index: -1000; opacity: 0.08; pointer-events: none; }
         .watermark-img { width: 100%; height: auto; }
         
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
+        .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 24px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
         
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; border: 1px solid #000; }
         .info-box { width: 50%; padding: 10px; vertical-align: top; }
         .border-right { border-right: 1px solid #000; }
         .inner-table { width: 100%; font-size: 11px; }
+        .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } 
         .sep { width: 10px; text-align: center; }
         
@@ -73,7 +81,7 @@ function smart_format($num, $curr = 'IDR') {
         .remark-box { margin-top: 15px; font-size: 10px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 10px; }
         .remark-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; display: block; }
         
-        /* SIGNATURE STYLE */
+        /* SIGNATURE STYLE (UPDATED) */
         .sign-table { width: 100%; margin-top: 40px; page-break-inside: avoid; }
         .sign-cell { text-align: center; vertical-align: bottom; }
         .sign-img { 
@@ -85,9 +93,6 @@ function smart_format($num, $curr = 'IDR') {
         .sign-name { font-weight: bold; text-decoration: underline; }
         .no-sign-box { height: 100px; line-height: 100px; color: #ccc; border: 1px dashed #ccc; margin: 10px auto; width: 180px; font-size: 10px; }
         
-        /* EDITABLE HIGHLIGHT */
-        [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
-        
         @media print { 
             .no-print { display: none; }
             [contenteditable="true"]:hover { background: none; outline: none; }
@@ -96,8 +101,8 @@ function smart_format($num, $curr = 'IDR') {
 </head>
 <body>
 
-    <div class="no-print" style="text-align:center; padding:10px; background:#f8f9fa; border-bottom:1px solid #ddd;">
-        <button onclick="window.print()" style="padding:8px 15px; font-weight:bold; cursor:pointer;">🖨️ Print / Save PDF</button>
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
         <div style="margin-top:5px; color:red; font-size:11px;">* Klik angka untuk edit manual sebelum print.</div>
     </div>
 
