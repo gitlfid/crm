@@ -33,11 +33,11 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- LOGIKA MATA UANG & PEMBULATAN ---
+// --- LOGIKA MATA UANG ---
 $is_usd = ($inv['currency'] == 'USD');
 $tax_rate = $is_usd ? 0 : 0.11;
 
-// Info Bank (Default vs USD)
+// Info Bank
 if ($is_usd) {
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
@@ -50,7 +50,7 @@ if ($is_usd) {
     $payment_details = $sets['invoice_payment_info'] ?? '-';
 }
 
-// Fungsi Format (Rp tanpa desimal, USD pakai desimal)
+// Fungsi Format
 function smart_format($num, $curr) {
     if ($curr == 'IDR') {
         return number_format((float)$num, 0, ',', '.');
@@ -108,11 +108,19 @@ function smart_format($num, $curr) {
         .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
         .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
         
-        /* SIGNATURE */
+        /* --- [PERBAIKAN UKURAN TANDA TANGAN] --- */
         .sign-company { font-size: 11px; margin-bottom: 10px; }
-        .sign-img { height: 80px; display: block; margin: 10px auto; max-width: 150px; object-fit: contain; }
+        .sign-img { 
+            display: block; 
+            margin: 5px auto 15px auto; /* Jarak atas bawah */
+            width: auto;       
+            height: auto;      
+            max-width: 250px;  /* Diperlebar agar tidak kecil */
+            max-height: 120px; /* Dipertinggi agar proporsional */
+            object-fit: contain; 
+        }
         .sign-name { font-weight: bold; text-decoration: underline; }
-        .no-sign-box { height: 80px; line-height:80px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:150px; font-size: 10px; }
+        .no-sign-box { height: 100px; line-height:100px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:180px; font-size: 10px; }
 
         @media print {
             .no-print { display: none; }
@@ -213,7 +221,7 @@ function smart_format($num, $curr) {
             <?php endwhile; ?>
             
             <?php 
-                // --- LOGIKA PEMBULATAN ---
+                // --- LOGIKA PEMBULATAN (Sesuai Dashboard) ---
                 if (!$is_usd) {
                     $grandTotal = round($grandTotal, 0); 
                     $vatAmount = round($grandTotal * $tax_rate, 0); 
@@ -268,33 +276,36 @@ function smart_format($num, $curr) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    $signDisplay = 'none';
-                    $signSrc = '';
-                    $fallbackSrc = '';
-
-                    // Jika di database ada nama file
-                    if (!empty($inv['sales_sign'])) {
-                        // Priority 1: Folder Signatures (Sesuai Screenshot Anda)
-                        $signSrc = '../uploads/signatures/' . $inv['sales_sign'];
-                        
-                        // Priority 2: Folder Uploads Biasa (Backup)
-                        $fallbackSrc = '../uploads/' . $inv['sales_sign'];
-                    } 
-                    // Fallback Default jika tidak ada tanda tangan user
-                    elseif (file_exists('../assets/images/signature.png')) {
-                        $signSrc = '../assets/images/signature.png';
+                    $signPath = '';
+                    $signFile = $inv['sales_sign'];
+                    
+                    if (!empty($signFile)) {
+                        // Cek folder uploads/signatures (Prioritas)
+                        if (file_exists('../uploads/signatures/' . $signFile)) {
+                            $signPath = '../uploads/signatures/' . $signFile;
+                        } 
+                        // Cek folder uploads biasa
+                        elseif (file_exists('../uploads/' . $signFile)) {
+                            $signPath = '../uploads/' . $signFile;
+                        } 
+                        // Cek folder assets
+                        elseif (file_exists('../assets/images/' . $signFile)) {
+                            $signPath = '../assets/images/' . $signFile;
+                        }
+                    }
+                    
+                    // Fallback
+                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
+                        $signPath = '../assets/images/signature.png';
                     }
                 ?>
 
-                <?php if (!empty($signSrc)): ?>
-                    <img src="<?= $signSrc ?>" class="sign-img" 
-                         onerror="this.src='<?= $fallbackSrc ?>'; if(this.src=='<?= $fallbackSrc ?>') this.onerror=function(){this.style.display='none'; document.getElementById('no-sign-msg').style.display='block';};">
-                    
-                    <div id="no-sign-msg" class="no-sign-box" style="display:none;">
-                        (Sign File Not Found)
-                    </div>
+                <?php if (!empty($signPath)): ?>
+                    <img src="<?= $signPath ?>" class="sign-img" 
+                         onerror="this.style.display='none'; document.getElementById('no-sign-box').style.display='block';">
+                    <div id="no-sign-box" class="no-sign-box" style="display:none;">(Image Error)</div>
                 <?php else: ?>
-                    <div class="no-sign-box">(No Signature Set)</div>
+                    <div class="no-sign-box">(No Signature Found)</div>
                 <?php endif; ?>
 
                 <div class="sign-name" contenteditable="true"><?= htmlspecialchars($inv['sales_name']) ?></div>
