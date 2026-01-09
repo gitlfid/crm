@@ -121,9 +121,18 @@ if (isset($_POST['export_excel'])) {
         // Logika Pajak
         $is_usd = ($row['currency'] == 'USD');
         $tax_rate = $is_usd ? 0 : 0.11;
-        
         $vat = $calcSub * $tax_rate;
+
+        // --- [FIX] ROUNDING AGAR KONSISTEN DI EXCEL JUGA ---
+        if (!$is_usd) {
+            $calcSub = round($calcSub, 0);
+            $vat = round($vat, 0);
+        } else {
+            $calcSub = round($calcSub, 2);
+            $vat = round($vat, 2);
+        }
         $grandTotal = $calcSub + $vat;
+        // ----------------------------------------------------
         
         // Data Umum Baris
         $doNum = !empty($row['do_numbers']) ? $row['do_numbers'] : '-';
@@ -437,14 +446,24 @@ $res = $conn->query($sql);
                                 $curr = $row['currency'];
                                 $is_usd = ($curr == 'USD');
                                 
-                                // LOGIKA PAJAK: USD = 0%, IDR = 11%
+                                // LOGIKA PAJAK
                                 $tax_rate = $is_usd ? 0 : 0.11;
                                 $vat = $subTotal * $tax_rate;
+
+                                // --- [FIX] LOGIKA PEMBULATAN AGAR KONSISTEN DENGAN PDF ---
+                                // Jika IDR: Bulatkan semua komponen ke 0 desimal (Rupiah Penuh)
+                                // Jika USD: Bulatkan ke 2 desimal (Sen)
+                                if (!$is_usd) {
+                                    $subTotal = round($subTotal, 0);
+                                    $vat = round($vat, 0);
+                                } else {
+                                    $subTotal = round($subTotal, 2);
+                                    $vat = round($vat, 2);
+                                }
                                 $grandTotal = $subTotal + $vat;
+                                // -----------------------------------------------------------
                                 
-                                // LOGIKA TAMPILAN ANGKA:
-                                // USD: Pakai 2 Desimal (42,160.93)
-                                // IDR: Bulat (42.161)
+                                // LOGIKA TAMPILAN ANGKA
                                 $fmt = function($n) use ($is_usd) {
                                     if ($is_usd) return number_format($n, 2, '.', ',');
                                     return number_format($n, 0, ',', '.');
@@ -458,7 +477,6 @@ $res = $conn->query($sql);
                                 $noteClass = $hasNote ? 'has-note' : '';
                                 $noteTooltip = $hasNote ? 'Lihat Catatan' : 'Buat Catatan';
                                 
-                                // Cek apakah DO sudah pernah dibuat untuk invoice ini
                                 $doCount = intval($row['do_count']);
                             ?>
                             <tr>
