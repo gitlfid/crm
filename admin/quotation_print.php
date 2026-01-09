@@ -23,10 +23,20 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
+// --- DETEKSI BASE URL (AGAR GAMBAR MUNCUL DI PRINT) ---
+$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+$host = $_SERVER['HTTP_HOST'];
+// Naik satu level dari /admin/ ke root project
+$baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF'])); 
+
+// --- FORMAT PINTAR ---
 function smart_format($num, $curr = 'IDR') {
     $val = floatval($num);
-    $decimals = (floor($val) != $val) ? 2 : 0; 
-    return ($curr == 'IDR') ? number_format($val, $decimals, ',', '.') : number_format($val, $decimals, '.', ',');
+    if ($curr == 'IDR') {
+        return number_format($val, 0, ',', '.');
+    } else {
+        return number_format($val, 2, '.', ',');
+    }
 }
 ?>
 
@@ -37,42 +47,68 @@ function smart_format($num, $curr = 'IDR') {
     <title>Quotation <?= $quot['quotation_no'] ?></title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; color: #000; }
+        body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; }
         @page { margin: 1.5cm; size: A4; }
-        .watermark-container { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); width: 80%; z-index: -1000; text-align: center; pointer-events: none; opacity: 0.08; }
+        
+        .watermark-container { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); width: 80%; z-index: -1000; opacity: 0.08; }
         .watermark-img { width: 100%; height: auto; }
+        
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
-        .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 24px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
+        
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; border: 1px solid #000; }
         .info-box { width: 50%; padding: 10px; vertical-align: top; }
         .border-right { border-right: 1px solid #000; }
         .inner-table { width: 100%; font-size: 11px; }
-        .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } 
         .sep { width: 10px; text-align: center; }
+        
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
-        .items-table th { border: 1px solid #000; background-color: #fff; padding: 8px; text-align: center; font-weight: bold; }
+        .items-table th { border: 1px solid #000; background-color: #f2f2f2; padding: 8px; text-align: center; font-weight: bold; }
         .items-table td { border: 1px solid #000; padding: 6px 8px; vertical-align: middle; }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
+        
         .remark-box { margin-top: 15px; font-size: 10px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 10px; }
         .remark-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; display: block; }
+        
+        /* SIGNATURE STYLE */
         .sign-table { width: 100%; margin-top: 40px; page-break-inside: avoid; }
         .sign-cell { text-align: center; vertical-align: bottom; }
-        .sign-img { height: 80px; width: auto; display: block; margin: 10px auto; }
+        .sign-img { 
+            display: block; margin: 10px auto; 
+            width: auto; height: auto; 
+            max-width: 250px; max-height: 120px; 
+            object-fit: contain; 
+        }
         .sign-name { font-weight: bold; text-decoration: underline; }
+        .no-sign-box { height: 100px; line-height: 100px; color: #ccc; border: 1px dashed #ccc; margin: 10px auto; width: 180px; font-size: 10px; }
+        
+        /* EDITABLE HIGHLIGHT */
+        [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
+        
+        @media print { 
+            .no-print { display: none; }
+            [contenteditable="true"]:hover { background: none; outline: none; }
+        }
     </style>
 </head>
-<body onload="window.print()">
+<body>
 
-    <div class="watermark-container"><img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'"></div>
+    <div class="no-print" style="text-align:center; padding:10px; background:#f8f9fa; border-bottom:1px solid #ddd;">
+        <button onclick="window.print()" style="padding:8px 15px; font-weight:bold; cursor:pointer;">🖨️ Print / Save PDF</button>
+        <div style="margin-top:5px; color:red; font-size:11px;">* Klik angka untuk edit manual sebelum print.</div>
+    </div>
+
+    <div class="watermark-container">
+        <img src="<?= $baseUrl ?>/uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
+    </div>
 
     <table class="header-table">
         <tr>
             <td>
-                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo">
+                <img src="<?= $baseUrl ?>/uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">QUOTATION</div></td>
@@ -115,35 +151,16 @@ function smart_format($num, $curr = 'IDR') {
         </thead>
         <tbody>
             <?php $no = 1; while($item = $items->fetch_assoc()): ?>
-            <?php
-                // --- LOGIKA PEMBERSIH UNTUK PRINT ---
-                
-                // 1. Bersihkan Nama Item (Hapus teks dalam kurung di akhir, misal: "(Telkomsel IOT)")
-                $clean_item_name = preg_replace('/\s*\([^)]+\)$/', '', $item['item_name']);
-
-                // 2. Bersihkan Charge Mode (Jika isinya masih Card Type, ganti jadi Duration)
-                $mode = $item['card_type'];
-                
-                // Daftar kata terlarang (Credential/Card Type)
-                if (preg_match('/(Telkomsel|Indosat|XL|Tri|Smartfren|IOT|BBC|Factory|Test|PCCW|M2M|Econ)/i', $mode)) {
-                    // Jika terdeteksi kata terlarang, kita TEBAK durasinya dari nama item
-                    if (stripos($item['item_name'], 'Month') !== false || stripos($item['item_name'], 'Bulan') !== false) {
-                        $mode = 'Monthly';
-                    } elseif (stripos($item['item_name'], 'Year') !== false || stripos($item['item_name'], 'Tahun') !== false) {
-                        $mode = 'Annually';
-                    } else {
-                        $mode = 'One Time'; // Default aman jika tidak ada kata Month/Year
-                    }
-                }
-            ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
-                <td><?= htmlspecialchars($clean_item_name) ?></td>
-                <td class="text-center"><?= smart_format($item['qty'], $quot['currency']) ?></td>
-                <td class="text-right"><?= smart_format($item['unit_price'], $quot['currency']) ?></td>
-                <td><?= htmlspecialchars($item['description']) ?></td>
+                <td>
+                    <div contenteditable="true"><?= htmlspecialchars($item['item_name']) ?></div>
+                </td>
+                <td class="text-center" contenteditable="true"><?= smart_format($item['qty'], $quot['currency']) ?></td>
+                <td class="text-right" contenteditable="true"><?= smart_format($item['unit_price'], $quot['currency']) ?></td>
+                <td><div contenteditable="true"><?= htmlspecialchars($item['description']) ?></div></td>
                 
-                <td class="text-center"><?= htmlspecialchars($mode) ?></td>
+                <td class="text-center" contenteditable="true"><?= htmlspecialchars($item['card_type']) ?></td>
             </tr>
             <?php endwhile; ?>
         </tbody>
@@ -151,6 +168,7 @@ function smart_format($num, $curr = 'IDR') {
 
     <div class="remark-box">
         <span class="remark-title">REMARKS :</span>
+        <div contenteditable="true">
         <?php 
         if (!empty($quot['remarks'])) {
             echo nl2br(htmlspecialchars($quot['remarks']));
@@ -159,6 +177,7 @@ function smart_format($num, $curr = 'IDR') {
             echo "- Please send the NPWP Company if open the PO";
         }
         ?>
+        </div>
     </div>
 
     <table class="sign-table">
@@ -166,12 +185,27 @@ function smart_format($num, $curr = 'IDR') {
             <td width="60%"></td>
             <td width="40%" class="sign-cell">
                 <div style="margin-bottom: 10px;">PT. Linksfield Networks Indonesia</div>
-                <?php if (!empty($quot['sales_sign']) && file_exists('../uploads/signatures/' . $quot['sales_sign'])): ?>
-                    <img src="../uploads/signatures/<?= $quot['sales_sign'] ?>" class="sign-img">
+                
+                <?php 
+                    $signFile = trim($quot['sales_sign']);
+                    $mainSignUrl = $baseUrl . "/uploads/signatures/" . $signFile;
+                    $backupSignUrl = $baseUrl . "/uploads/" . $signFile;
+                    $defaultSignUrl = $baseUrl . "/assets/images/signature.png";
+                ?>
+
+                <?php if(!empty($signFile)): ?>
+                    <img src="<?= $mainSignUrl ?>" class="sign-img" 
+                         onerror="
+                            if (this.src == '<?= $mainSignUrl ?>') { this.src = '<?= $backupSignUrl ?>'; }
+                            else if (this.src == '<?= $backupSignUrl ?>') { this.src = '<?= $defaultSignUrl ?>'; }
+                            else { this.style.display='none'; document.getElementById('no-sign-box').style.display='block'; }
+                         ">
+                    <div id="no-sign-box" class="no-sign-box" style="display:none;">(No Signature Found)</div>
                 <?php else: ?>
-                    <div style="height: 80px;"></div>
+                    <img src="<?= $defaultSignUrl ?>" class="sign-img" onerror="this.style.display='none';">
                 <?php endif; ?>
-                <div class="sign-name"><?= htmlspecialchars($quot['sales_name']) ?></div>
+
+                <div class="sign-name" contenteditable="true"><?= htmlspecialchars($quot['sales_name']) ?></div>
             </td>
         </tr>
     </table>
