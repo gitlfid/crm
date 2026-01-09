@@ -60,6 +60,7 @@ function smart_format($num, $curr = 'IDR') {
         .info-box { width: 50%; padding: 10px; vertical-align: top; }
         .border-right { border-right: 1px solid #000; }
         .inner-table { width: 100%; font-size: 11px; }
+        .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } 
         .sep { width: 10px; text-align: center; }
         
@@ -78,7 +79,7 @@ function smart_format($num, $curr = 'IDR') {
         .sign-img { 
             display: block; margin: 10px auto; 
             width: auto; height: auto; 
-            max-width: 250px; max-height: 120px; /* Proporsional */
+            max-width: 250px; max-height: 120px; 
             object-fit: contain; 
         }
         .sign-name { font-weight: bold; text-decoration: underline; }
@@ -180,33 +181,47 @@ function smart_format($num, $curr = 'IDR') {
                 <div style="margin-bottom: 10px;">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    $signFile = trim($quot['sales_sign']);
-                    $src = '';
+                    // LOGIKA "AUTO-SEARCH" SIGNATURE
+                    // Script ini akan mengabaikan nama file dari DB jika file tidak ada,
+                    // dan akan mencari file apapun di folder signatures milik User ID ini.
+                    
+                    $signPath = '';
+                    $dbFile = $quot['sales_sign'];
+                    $userId = $quot['created_by_user_id']; // ID User Pembuat (Contoh: 7)
 
-                    // 1. CEK FILE DI SERVER DENGAN PATH ABSOLUT (__DIR__)
-                    // Ini memastikan file benar-benar ada di disk sebelum ditampilkan
-                    if (!empty($signFile)) {
-                        // Cek folder uploads/signatures/
-                        if (file_exists(__DIR__ . '/../uploads/signatures/' . $signFile)) {
-                            $src = '../uploads/signatures/' . $signFile;
-                        } 
-                        // Cek folder uploads/ (biasa)
-                        elseif (file_exists(__DIR__ . '/../uploads/' . $signFile)) {
-                            $src = '../uploads/' . $signFile;
+                    // 1. Cek file dari Database (Prioritas)
+                    if (!empty($dbFile) && file_exists('../uploads/signatures/' . $dbFile)) {
+                        $signPath = '../uploads/signatures/' . $dbFile;
+                    } 
+                    // 2. Jika Gagal, CARI PAKSA file apapun milik user ini di folder signatures
+                    // Pola pencarian: SIG_*_USERID_*.png (Sesuai format di screenshot Anda)
+                    elseif (!empty($userId)) {
+                        $files = glob('../uploads/signatures/SIG_*_' . $userId . '_*.png');
+                        if ($files && count($files) > 0) {
+                            // Ambil file terakhir yang ditemukan
+                            $signPath = $files[0]; 
                         }
                     }
-                    
-                    // 2. FALLBACK DEFAULT
-                    if (empty($src) && file_exists(__DIR__ . '/../assets/images/signature.png')) {
-                        $src = '../assets/images/signature.png';
+
+                    // 3. Fallback ke folder Uploads biasa (siapa tau nyasar)
+                    if (empty($signPath) && !empty($userId)) {
+                        $files = glob('../uploads/SIG_*_' . $userId . '_*.png');
+                        if ($files && count($files) > 0) {
+                            $signPath = $files[0];
+                        }
+                    }
+
+                    // 4. Fallback Terakhir ke Assets
+                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
+                        $signPath = '../assets/images/signature.png';
                     }
                 ?>
 
-                <?php if (!empty($src)): ?>
-                    <img src="<?= $src ?>" class="sign-img">
+                <?php if (!empty($signPath)): ?>
+                    <img src="<?= $signPath ?>" class="sign-img">
                 <?php else: ?>
                     <div class="no-sign-box">
-                        (File: <?= htmlspecialchars($signFile) ?> Not Found)
+                        <span style="font-size:9px; color:red;">(Signature Not Found)</span>
                     </div>
                 <?php endif; ?>
 
