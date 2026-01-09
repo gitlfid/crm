@@ -33,7 +33,7 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- LOGIKA MATA UANG & PEMBULATAN (FIX BUG) ---
+// --- LOGIKA MATA UANG & PEMBULATAN ---
 $is_usd = ($inv['currency'] == 'USD');
 $tax_rate = $is_usd ? 0 : 0.11;
 
@@ -138,7 +138,7 @@ function smart_format($num, $curr) {
     <table class="header-table">
         <tr>
             <td>
-                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo">
+                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">INVOICE</div></td>
@@ -186,7 +186,6 @@ function smart_format($num, $curr) {
             $no = 1; 
             $grandTotal = 0;
             
-            // Loop Items
             while($item = $items->fetch_assoc()): 
                 $qty = floatval($item['qty']);
                 $price = floatval($item['unit_price']);
@@ -213,12 +212,12 @@ function smart_format($num, $curr) {
             <?php endwhile; ?>
             
             <?php 
-                // --- LOGIKA PEMBULATAN (Kunci agar sama dengan Dashboard) ---
+                // --- LOGIKA PEMBULATAN (Agar sama dengan Dashboard) ---
                 if (!$is_usd) {
-                    $grandTotal = round($grandTotal, 0); // Bulatkan Subtotal IDR
-                    $vatAmount = round($grandTotal * $tax_rate, 0); // Bulatkan VAT IDR
+                    $grandTotal = round($grandTotal, 0); 
+                    $vatAmount = round($grandTotal * $tax_rate, 0); 
                 } else {
-                    $grandTotal = round($grandTotal, 2); // USD 2 Desimal
+                    $grandTotal = round($grandTotal, 2); 
                     $vatAmount = round($grandTotal * $tax_rate, 2);
                 }
                 $totalAll = $grandTotal + $vatAmount;
@@ -269,11 +268,21 @@ function smart_format($num, $curr) {
                 
                 <?php 
                     $signPath = '';
-                    if (!empty($inv['sales_sign']) && file_exists('../uploads/signatures/' . $inv['sales_sign'])) {
-                        // 1. Coba Tanda Tangan User Dinamis
-                        $signPath = '../uploads/signatures/' . $inv['sales_sign'];
-                    } elseif (file_exists('../assets/images/signature.png')) {
-                        // 2. Fallback ke Tanda Tangan Default (Statis)
+                    $signFile = $inv['sales_sign'];
+                    
+                    if (!empty($signFile)) {
+                        // 1. Cek di folder khusus signatures (SESUAI FILE SYSTEM ANDA)
+                        if (file_exists('../uploads/signatures/' . $signFile)) {
+                            $signPath = '../uploads/signatures/' . $signFile;
+                        } 
+                        // 2. Cek di folder uploads umum (Backup)
+                        elseif (file_exists('../uploads/' . $signFile)) {
+                            $signPath = '../uploads/' . $signFile;
+                        }
+                    }
+                    
+                    // 3. Fallback (Jika user tidak punya tanda tangan)
+                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
                         $signPath = '../assets/images/signature.png';
                     }
                 ?>
@@ -282,7 +291,7 @@ function smart_format($num, $curr) {
                     <img src="<?= $signPath ?>" class="sign-img">
                 <?php else: ?>
                     <div style="height: 80px; line-height:80px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:150px;">
-                        (No Signature)
+                        (No Signature Found)
                     </div>
                 <?php endif; ?>
 
