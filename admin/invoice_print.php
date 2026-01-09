@@ -33,7 +33,7 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- LOGIKA MATA UANG & PEMBULATAN (DISAMAKAN DENGAN DASHBOARD) ---
+// --- LOGIKA MATA UANG ---
 $is_usd = ($inv['currency'] == 'USD');
 $tax_rate = $is_usd ? 0 : 0.11;
 
@@ -108,15 +108,15 @@ function smart_format($num, $curr) {
         .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
         .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
         
-        /* --- CSS TANDA TANGAN (Proporsional & Besar) --- */
+        /* SIGNATURE CSS */
         .sign-company { font-size: 11px; margin-bottom: 10px; }
         .sign-img { 
             display: block; 
             margin: 5px auto 10px auto; 
             width: auto;       
             height: auto;      
-            max-width: 200px;  /* Lebar maksimal */
-            max-height: 100px; /* Tinggi maksimal */
+            max-width: 250px;  /* Lebar Maks */
+            max-height: 120px; /* Tinggi Maks */
             object-fit: contain; 
         }
         .sign-name { font-weight: bold; text-decoration: underline; }
@@ -221,13 +221,13 @@ function smart_format($num, $curr) {
             <?php endwhile; ?>
             
             <?php 
-                // --- LOGIKA PEMBULATAN (FIX: SAMA DENGAN DASHBOARD 0.5 KE BAWAH) ---
+                // --- LOGIKA PEMBULATAN (KONSISTEN DENGAN DASHBOARD 0.5 KE BAWAH) ---
                 if (!$is_usd) {
-                    // IDR: 0.5 ke bawah (2.5 -> 2)
+                    // IDR: Round 0.5 Down
                     $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
                 } else {
-                    // USD: Standar 2 desimal
+                    // USD: Normal 2 decimal
                     $grandTotal = round($grandTotal, 2); 
                     $vatAmount = round($grandTotal * $tax_rate, 2);
                 }
@@ -278,29 +278,36 @@ function smart_format($num, $curr) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    $signFile = $inv['sales_sign'];
-                    $primarySrc = '';
-                    $backupSrc = '';
-                    $defaultSrc = '../assets/images/signature.png';
+                    $sign_filename = $inv['sales_sign'];
+                    $src = '';
 
-                    if (!empty($signFile)) {
-                        $primarySrc = '../uploads/signatures/' . $signFile;
-                        $backupSrc  = '../uploads/' . $signFile;
+                    // LOGIKA DETEKSI PATH ABSOLUT (Sesuai Folder Structure)
+                    if (!empty($sign_filename)) {
+                        // 1. Cek di folder signatures (Prioritas sesuai screenshot)
+                        if (file_exists(__DIR__ . '/../uploads/signatures/' . $sign_filename)) {
+                            $src = '../uploads/signatures/' . $sign_filename;
+                        } 
+                        // 2. Cek di folder uploads biasa (Backup)
+                        elseif (file_exists(__DIR__ . '/../uploads/' . $sign_filename)) {
+                            $src = '../uploads/' . $sign_filename;
+                        }
+                    }
+                    
+                    // 3. Fallback ke gambar default assets
+                    if (empty($src) && file_exists(__DIR__ . '/../assets/images/signature.png')) {
+                        $src = '../assets/images/signature.png';
                     }
                 ?>
 
-                <?php if (!empty($signFile)): ?>
-                    <img src="<?= $primarySrc ?>" class="sign-img"
-                         onerror="this.src='<?= $backupSrc ?>'; 
-                                  this.onerror=function(){ 
-                                      this.src='<?= $defaultSrc ?>'; 
-                                      this.onerror=function(){ this.style.display='none'; document.getElementById('no-sign-box').style.display='block'; }
-                                  }">
+                <?php if (!empty($src)): ?>
+                    <img src="<?= $src ?>" class="sign-img">
                 <?php else: ?>
-                    <img src="<?= $defaultSrc ?>" class="sign-img" onerror="this.style.display='none'; document.getElementById('no-sign-box').style.display='block';">
+                    <div class="no-sign-box">
+                        <span style="font-size:9px; color:red;">
+                            (File: <?= htmlspecialchars($sign_filename ? $sign_filename : 'Empty') ?> Not Found)
+                        </span>
+                    </div>
                 <?php endif; ?>
-
-                <div id="no-sign-box" class="no-sign-box" style="display:none;">(No Signature)</div>
 
                 <div class="sign-name" contenteditable="true"><?= htmlspecialchars($inv['sales_name']) ?></div>
             </td>
