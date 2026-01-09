@@ -83,31 +83,37 @@ if (isset($_POST['save_quotation'])) {
     $prices= $_POST['unit_price'];
     $descs = $_POST['description'];
     
-    // INPUT DURATION TEXT (LABEL)
+    // INPUT CHARGE MODE (DURATION) - BEBAS TEKS
     $dur_texts = $_POST['duration_text']; 
 
     for ($i = 0; $i < count($items); $i++) {
         if (!empty($items[$i])) {
             $raw_name = $conn->real_escape_string($items[$i]);
             
-            // Simpan Teks Duration (misal: "2 Years", "Monthly") ke DB kolom card_type
+            // Simpan Teks Duration Bebas (misal: "2 Years (Promo)", "Monthly")
             $text_duration = isset($dur_texts[$i]) ? $conn->real_escape_string($dur_texts[$i]) : 'One Time';
             
-            // Bersihkan nama item jika ada sisa kurung credential lama (Opsional, agar bersih)
+            // Bersihkan nama item (Opsional: Hapus sisa kurung credential lama agar bersih)
             $db_item_name = preg_replace('/\s*\([^)]+\)$/', '', $raw_name);
 
-            // QTY DISIMPAN APA ADANYA (Tanpa Kali Duration)
+            // QTY DISIMPAN APA ADANYA
             $it_qty  = floatval($qtys[$i]);
             $it_dsc  = $conn->real_escape_string($descs[$i]);
             
-            // Clean Price
+            // Clean Price (Support Universal format)
+            $p = $prices[$i];
+            // Hapus simbol mata uang dan spasi
+            $p = str_replace(['Rp', '$', ' '], '', $p);
+            
             if ($curr == 'IDR') {
-               $p = str_replace(['Rp', ' ', '.'], '', $prices[$i]);
-               $it_prc = floatval(str_replace(',', '.', $p));
+               // IDR: Titik = Ribuan, Koma = Desimal
+               $p = str_replace('.', '', $p); // Hapus ribuan
+               $p = str_replace(',', '.', $p); // Ubah desimal
             } else {
-               $p = str_replace(['$', ' ', ','], '', $prices[$i]);
-               $it_prc = floatval($p);
+               // USD: Koma = Ribuan, Titik = Desimal
+               $p = str_replace(',', '', $p); // Hapus ribuan
             }
+            $it_prc = floatval($p);
             
             $conn->query("INSERT INTO quotation_items (quotation_id, item_name, qty, unit_price, description, card_type) VALUES ($quot_id, '$db_item_name', $it_qty, $it_prc, '$it_dsc', '$text_duration')");
         }
@@ -116,11 +122,21 @@ if (isset($_POST['save_quotation'])) {
 }
 ?>
 
+<datalist id="durationOptions">
+    <option value="One Time">
+    <option value="Monthly">
+    <option value="3 Months">
+    <option value="6 Months">
+    <option value="Annually (12 Mo)">
+    <option value="2 Years">
+</datalist>
+
 <div class="page-heading">
     <h3><?= $page_title ?></h3>
     <div class="alert alert-light-primary border-primary">
         <i class="bi bi-info-circle me-2"></i>
-        <strong>Info:</strong> Gunakan opsi <b>Custom...</b> pada Charge Mode untuk input durasi manual (Bulan/Tahun). Qty tetap input manual.
+        <strong>Info:</strong> Kolom <b>Charge Mode</b> sekarang bebas diisi teks (contoh: "3 Months (Promo)"). <br>
+        Gunakan titik/koma pada harga sesuai mata uang (IDR: 1.500.000 | USD: 1,500.00).
     </div>
 </div>
 
@@ -203,8 +219,8 @@ if (isset($_POST['save_quotation'])) {
                             <tr>
                                 <th width="30%">Item Name</th>
                                 <th width="10%">Qty</th>
-                                <th width="25%">Charge Mode (Duration)</th> 
-                                <th width="15%">Unit Price</th>
+                                <th width="20%">Charge Mode (Duration)</th> 
+                                <th width="20%">Unit Price</th>
                                 <th>Desc</th>
                                 <th width="5%">Action</th>
                             </tr>
@@ -213,12 +229,12 @@ if (isset($_POST['save_quotation'])) {
                             <?php if($is_edit && count($q_items) > 0): ?>
                                 <?php foreach($q_items as $itm): 
                                     $db_name = $itm['item_name'];
-                                    // Bersihkan nama item
+                                    // Bersihkan nama item (hilangkan kurung credential lama)
                                     if (preg_match('/^(.*)\s\((.*)\)$/', $db_name, $matches)) {
                                         $db_name = trim($matches[1]);
                                     }
                                     
-                                    // Text Duration (Monthly/One Time/2 Years)
+                                    // Ambil teks durasi apa adanya dari DB
                                     $duration_text_db = $itm['card_type'];
                                 ?>
                                 <tr>
@@ -227,24 +243,9 @@ if (isset($_POST['save_quotation'])) {
                                     <td><input type="number" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" min="1" required></td>
                                     
                                     <td>
-                                        <select class="form-select duration-select" onchange="updateDuration(this)">
-                                            <option value="1" data-txt="One Time" <?= $duration_text_db=='One Time'?'selected':'' ?>>One Time</option>
-                                            <option value="1" data-txt="Monthly" <?= $duration_text_db=='Monthly'?'selected':'' ?>>Monthly</option>
-                                            <option value="3" data-txt="3 Months" <?= $duration_text_db=='3 Months'?'selected':'' ?>>3 Months</option>
-                                            <option value="6" data-txt="6 Months" <?= $duration_text_db=='6 Months'?'selected':'' ?>>6 Months</option>
-                                            <option value="12" data-txt="Annually" <?= strpos($duration_text_db, 'Annually')!==false?'selected':'' ?>>Annually (12 Mo)</option>
-                                            <option value="custom" class="fw-bold text-primary">Custom...</option>
-                                        </select>
-                                        <input type="hidden" name="duration_text[]" class="duration-text-input" value="<?= $duration_text_db ?>">
-                                        
-                                        <div class="input-group duration-input-group d-none" style="flex-wrap: nowrap;">
-                                            <input type="number" class="form-control text-center duration-custom" placeholder="0" oninput="updateCustomDuration(this)" style="min-width: 60px;">
-                                            <select class="form-select duration-unit" onchange="updateCustomDuration(this)" style="max-width: 100px; background-color: #f8f9fa;">
-                                                <option value="Months">Bulan</option>
-                                                <option value="Years">Tahun</option>
-                                            </select>
-                                            <button class="btn btn-outline-secondary" type="button" onclick="resetDuration(this)"><i class="bi bi-x"></i></button>
-                                        </div>
+                                        <input type="text" name="duration_text[]" class="form-control" list="durationOptions" 
+                                               value="<?= htmlspecialchars($duration_text_db) ?>" 
+                                               placeholder="e.g. Monthly, One Time...">
                                     </td>
 
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= number_format($itm['unit_price'], ($current_curr=='IDR'?0:2), ($current_curr=='IDR'?',':'.'), ($current_curr=='IDR'?'.':',')) ?>" required></td>
@@ -256,26 +257,12 @@ if (isset($_POST['save_quotation'])) {
                                 <tr>
                                     <td><input type="text" name="item_name[]" class="form-control" required></td>
                                     <td><input type="number" name="qty[]" class="form-control text-center" value="1" min="1" required></td>
+                                    
                                     <td>
-                                        <select class="form-select duration-select" onchange="updateDuration(this)">
-                                            <option value="1" data-txt="One Time">One Time</option>
-                                            <option value="1" data-txt="Monthly">Monthly</option>
-                                            <option value="3" data-txt="3 Months">3 Months</option>
-                                            <option value="6" data-txt="6 Months">6 Months</option>
-                                            <option value="12" data-txt="Annually">Annually (12 Mo)</option>
-                                            <option value="custom" class="fw-bold text-primary">Custom...</option>
-                                        </select>
-                                        <input type="hidden" name="duration_text[]" class="duration-text-input" value="One Time">
-                                        
-                                        <div class="input-group duration-input-group d-none" style="flex-wrap: nowrap;">
-                                            <input type="number" class="form-control text-center duration-custom" placeholder="0" oninput="updateCustomDuration(this)" style="min-width: 60px;">
-                                            <select class="form-select duration-unit" onchange="updateCustomDuration(this)" style="max-width: 100px; background-color: #f8f9fa;">
-                                                <option value="Months">Bulan</option>
-                                                <option value="Years">Tahun</option>
-                                            </select>
-                                            <button class="btn btn-outline-secondary" type="button" onclick="resetDuration(this)"><i class="bi bi-x"></i></button>
-                                        </div>
+                                        <input type="text" name="duration_text[]" class="form-control" list="durationOptions" 
+                                               placeholder="e.g. Monthly" value="One Time">
                                     </td>
+                                    
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" required></td>
                                     <td><input type="text" name="description[]" class="form-control"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
@@ -312,21 +299,14 @@ if (isset($_POST['save_quotation'])) {
         var table = document.getElementById("itemTable").getElementsByTagName('tbody')[0];
         var newRow = table.rows[0].cloneNode(true);
         var inputs = newRow.getElementsByTagName("input");
-        var selects = newRow.getElementsByTagName("select");
         
         for(var i=0; i<inputs.length; i++) { 
             inputs[i].value = ""; 
             if(inputs[i].name == "qty[]") inputs[i].value = "1";
-            if(inputs[i].classList.contains("duration-text-input")) inputs[i].value = "One Time"; 
+            // Default Charge Mode untuk baris baru
+            if(inputs[i].getAttribute("list") == "durationOptions") inputs[i].value = "One Time"; 
         }
         
-        var selectElem = newRow.querySelector('.duration-select');
-        var inputGroup = newRow.querySelector('.duration-input-group');
-        if(selectElem && inputGroup) {
-            selectElem.value = "1";
-            selectElem.classList.remove('d-none');
-            inputGroup.classList.add('d-none');
-        }
         table.appendChild(newRow);
     }
 
@@ -338,54 +318,5 @@ if (isset($_POST['save_quotation'])) {
         } else {
             alert("Minimal harus ada 1 item.");
         }
-    }
-
-    function updateDuration(selectElem) {
-        let row = selectElem.closest('tr');
-        let inputGroup = row.querySelector('.duration-input-group');
-        let customInput = row.querySelector('.duration-custom');
-        let hiddenText = row.querySelector('.duration-text-input');
-
-        if(selectElem.value === 'custom') {
-            selectElem.classList.add('d-none');
-            inputGroup.classList.remove('d-none');
-            customInput.value = ""; 
-            customInput.focus();
-            hiddenText.value = ""; 
-        } else {
-            let selectedText = selectElem.options[selectElem.selectedIndex].getAttribute('data-txt');
-            hiddenText.value = selectedText;
-        }
-    }
-
-    // UPDATE: Gabungkan Angka + Satuan (Bulan/Tahun)
-    function updateCustomDuration(elem) {
-        let row = elem.closest('tr');
-        let inputNum = row.querySelector('.duration-custom');
-        let unitSel = row.querySelector('.duration-unit');
-        let hiddenText = row.querySelector('.duration-text-input');
-        
-        if(inputNum.value) {
-            // Hasil: "2 Years" atau "5 Months"
-            hiddenText.value = inputNum.value + " " + unitSel.value;
-        } else {
-            hiddenText.value = "";
-        }
-    }
-
-    function resetDuration(btn) {
-        let row = btn.closest('tr');
-        let selectElem = row.querySelector('.duration-select');
-        let inputGroup = row.querySelector('.duration-input-group');
-        let hiddenText = row.querySelector('.duration-text-input');
-        
-        // Reset Unit ke Default
-        let unitSel = row.querySelector('.duration-unit');
-        unitSel.value = "Months"; 
-
-        inputGroup.classList.add('d-none');
-        selectElem.classList.remove('d-none');
-        selectElem.value = "1"; 
-        hiddenText.value = "One Time"; 
     }
 </script>
