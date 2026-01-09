@@ -5,6 +5,7 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
+// 1. AMBIL DATA HEADER
 $sql = "SELECT q.*, 
                c.company_name, c.address as c_address, c.pic_name, c.pic_phone,
                u.username as sales_name, u.email as sales_email, u.phone as sales_phone, 
@@ -22,12 +23,6 @@ $items = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = $id");
 $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
-
-// --- DETEKSI BASE URL (Agar Gambar Muncul) ---
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-$host = $_SERVER['HTTP_HOST'];
-// Naik satu level dari /admin/ ke root project
-$baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF'])); 
 
 // --- FORMAT PINTAR ---
 function smart_format($num, $curr = 'IDR') {
@@ -50,25 +45,21 @@ function smart_format($num, $curr = 'IDR') {
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; }
         @page { margin: 1.5cm; size: A4; }
         
-        /* HEADER & UTILS */
         .no-print { background: #f8f9fa; padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
         .btn-print { background: #0d6efd; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
 
-        /* LAYOUT */
         .watermark-container { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); width: 80%; z-index: -1000; opacity: 0.08; pointer-events: none; }
         .watermark-img { width: 100%; height: auto; }
         
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
-        .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 24px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
         
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; border: 1px solid #000; }
         .info-box { width: 50%; padding: 10px; vertical-align: top; }
         .border-right { border-right: 1px solid #000; }
         .inner-table { width: 100%; font-size: 11px; }
-        .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } 
         .sep { width: 10px; text-align: center; }
         
@@ -81,13 +72,13 @@ function smart_format($num, $curr = 'IDR') {
         .remark-box { margin-top: 15px; font-size: 10px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 10px; }
         .remark-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; display: block; }
         
-        /* SIGNATURE STYLE (UPDATED) */
+        /* SIGNATURE STYLE */
         .sign-table { width: 100%; margin-top: 40px; page-break-inside: avoid; }
         .sign-cell { text-align: center; vertical-align: bottom; }
         .sign-img { 
             display: block; margin: 10px auto; 
             width: auto; height: auto; 
-            max-width: 250px; max-height: 120px; 
+            max-width: 250px; max-height: 120px; /* Proporsional */
             object-fit: contain; 
         }
         .sign-name { font-weight: bold; text-decoration: underline; }
@@ -107,13 +98,13 @@ function smart_format($num, $curr = 'IDR') {
     </div>
 
     <div class="watermark-container">
-        <img src="<?= $baseUrl ?>/uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
+        <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
     </div>
 
     <table class="header-table">
         <tr>
             <td>
-                <img src="<?= $baseUrl ?>/uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
+                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">QUOTATION</div></td>
@@ -158,13 +149,10 @@ function smart_format($num, $curr = 'IDR') {
             <?php $no = 1; while($item = $items->fetch_assoc()): ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
-                <td>
-                    <div contenteditable="true"><?= htmlspecialchars($item['item_name']) ?></div>
-                </td>
+                <td><div contenteditable="true"><?= htmlspecialchars($item['item_name']) ?></div></td>
                 <td class="text-center" contenteditable="true"><?= smart_format($item['qty'], $quot['currency']) ?></td>
                 <td class="text-right" contenteditable="true"><?= smart_format($item['unit_price'], $quot['currency']) ?></td>
                 <td><div contenteditable="true"><?= htmlspecialchars($item['description']) ?></div></td>
-                
                 <td class="text-center" contenteditable="true"><?= htmlspecialchars($item['card_type']) ?></td>
             </tr>
             <?php endwhile; ?>
@@ -193,21 +181,33 @@ function smart_format($num, $curr = 'IDR') {
                 
                 <?php 
                     $signFile = trim($quot['sales_sign']);
-                    $mainSignUrl = $baseUrl . "/uploads/signatures/" . $signFile;
-                    $backupSignUrl = $baseUrl . "/uploads/" . $signFile;
-                    $defaultSignUrl = $baseUrl . "/assets/images/signature.png";
+                    $src = '';
+
+                    // 1. CEK FILE DI SERVER DENGAN PATH ABSOLUT (__DIR__)
+                    // Ini memastikan file benar-benar ada di disk sebelum ditampilkan
+                    if (!empty($signFile)) {
+                        // Cek folder uploads/signatures/
+                        if (file_exists(__DIR__ . '/../uploads/signatures/' . $signFile)) {
+                            $src = '../uploads/signatures/' . $signFile;
+                        } 
+                        // Cek folder uploads/ (biasa)
+                        elseif (file_exists(__DIR__ . '/../uploads/' . $signFile)) {
+                            $src = '../uploads/' . $signFile;
+                        }
+                    }
+                    
+                    // 2. FALLBACK DEFAULT
+                    if (empty($src) && file_exists(__DIR__ . '/../assets/images/signature.png')) {
+                        $src = '../assets/images/signature.png';
+                    }
                 ?>
 
-                <?php if(!empty($signFile)): ?>
-                    <img src="<?= $mainSignUrl ?>" class="sign-img" 
-                         onerror="
-                            if (this.src == '<?= $mainSignUrl ?>') { this.src = '<?= $backupSignUrl ?>'; }
-                            else if (this.src == '<?= $backupSignUrl ?>') { this.src = '<?= $defaultSignUrl ?>'; }
-                            else { this.style.display='none'; document.getElementById('no-sign-box').style.display='block'; }
-                         ">
-                    <div id="no-sign-box" class="no-sign-box" style="display:none;">(No Signature Found)</div>
+                <?php if (!empty($src)): ?>
+                    <img src="<?= $src ?>" class="sign-img">
                 <?php else: ?>
-                    <img src="<?= $defaultSignUrl ?>" class="sign-img" onerror="this.style.display='none';">
+                    <div class="no-sign-box">
+                        (File: <?= htmlspecialchars($signFile) ?> Not Found)
+                    </div>
                 <?php endif; ?>
 
                 <div class="sign-name" contenteditable="true"><?= htmlspecialchars($quot['sales_name']) ?></div>
