@@ -108,23 +108,11 @@ function smart_format($num, $curr) {
         .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
         .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
         
-        /* CSS TANDA TANGAN (UKURAN BESAR & PROPORSIONAL) */
+        /* SIGNATURE */
         .sign-company { font-size: 11px; margin-bottom: 10px; }
-        .sign-img { 
-            display: block; 
-            margin: 5px auto 10px auto; 
-            max-height: 120px;  /* Tinggi maksimal diperbesar */
-            width: auto;        /* Lebar menyesuaikan (proporsional) */
-            height: auto;       /* Tinggi menyesuaikan (proporsional) */
-            max-width: 250px;   /* Batas lebar agar tidak terlalu lebar */
-            object-fit: contain; 
-        }
+        .sign-img { height: 80px; display: block; margin: 10px auto; max-width: 150px; object-fit: contain; }
         .sign-name { font-weight: bold; text-decoration: underline; }
-        .no-sign-box { 
-            height: 100px; line-height: 100px; 
-            color: #ccc; border: 1px dashed #ccc; 
-            margin: 10px auto; width: 180px; font-size: 10px; 
-        }
+        .no-sign-box { height: 80px; line-height:80px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:150px; font-size: 10px; }
 
         @media print {
             .no-print { display: none; }
@@ -145,17 +133,13 @@ function smart_format($num, $curr) {
     </div>
 
     <div class="watermark-container">
-        <?php if(file_exists('../uploads/' . $sets['company_watermark'])): ?>
-            <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img">
-        <?php endif; ?>
+        <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
     </div>
 
     <table class="header-table">
         <tr>
             <td>
-                <?php if(file_exists('../uploads/' . $sets['company_logo'])): ?>
-                    <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo">
-                <?php endif; ?>
+                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">INVOICE</div></td>
@@ -284,30 +268,33 @@ function smart_format($num, $curr) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    $signPath = '';
-                    $salesSign = $inv['sales_sign'];
+                    $signDisplay = 'none';
+                    $signSrc = '';
+                    $fallbackSrc = '';
 
-                    if (!empty($salesSign)) {
-                        // 1. Cek di folder khusus signatures (Prioritas Utama)
-                        if (file_exists('../uploads/signatures/' . $salesSign)) {
-                            $signPath = '../uploads/signatures/' . $salesSign;
-                        } 
-                        // 2. Cek di folder uploads umum (Backup)
-                        elseif (file_exists('../uploads/' . $salesSign)) {
-                            $signPath = '../uploads/' . $salesSign;
-                        }
-                    }
-                    
-                    // 3. Fallback ke gambar default jika user tidak punya tanda tangan
-                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
-                        $signPath = '../assets/images/signature.png';
+                    // Jika di database ada nama file
+                    if (!empty($inv['sales_sign'])) {
+                        // Priority 1: Folder Signatures (Sesuai Screenshot Anda)
+                        $signSrc = '../uploads/signatures/' . $inv['sales_sign'];
+                        
+                        // Priority 2: Folder Uploads Biasa (Backup)
+                        $fallbackSrc = '../uploads/' . $inv['sales_sign'];
+                    } 
+                    // Fallback Default jika tidak ada tanda tangan user
+                    elseif (file_exists('../assets/images/signature.png')) {
+                        $signSrc = '../assets/images/signature.png';
                     }
                 ?>
 
-                <?php if (!empty($signPath)): ?>
-                    <img src="<?= $signPath ?>" class="sign-img">
+                <?php if (!empty($signSrc)): ?>
+                    <img src="<?= $signSrc ?>" class="sign-img" 
+                         onerror="this.src='<?= $fallbackSrc ?>'; if(this.src=='<?= $fallbackSrc ?>') this.onerror=function(){this.style.display='none'; document.getElementById('no-sign-msg').style.display='block';};">
+                    
+                    <div id="no-sign-msg" class="no-sign-box" style="display:none;">
+                        (Sign File Not Found)
+                    </div>
                 <?php else: ?>
-                    <div class="no-sign-box">(No Signature Found)</div>
+                    <div class="no-sign-box">(No Signature Set)</div>
                 <?php endif; ?>
 
                 <div class="sign-name" contenteditable="true"><?= htmlspecialchars($inv['sales_name']) ?></div>
