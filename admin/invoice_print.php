@@ -37,7 +37,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 $is_usd = ($inv['currency'] == 'USD');
 $tax_rate = $is_usd ? 0 : 0.11;
 
-// Info Bank
+// Info Bank (Default vs USD)
 if ($is_usd) {
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
@@ -50,7 +50,7 @@ if ($is_usd) {
     $payment_details = $sets['invoice_payment_info'] ?? '-';
 }
 
-// Fungsi Format
+// Fungsi Format (Rp tanpa desimal, USD pakai desimal)
 function smart_format($num, $curr) {
     if ($curr == 'IDR') {
         return number_format((float)$num, 0, ',', '.');
@@ -108,19 +108,23 @@ function smart_format($num, $curr) {
         .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
         .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
         
-        /* --- [PERBAIKAN CSS TANDA TANGAN] --- */
+        /* CSS TANDA TANGAN (UKURAN BESAR & PROPORSIONAL) */
         .sign-company { font-size: 11px; margin-bottom: 10px; }
         .sign-img { 
             display: block; 
-            margin: 5px auto 10px auto; /* Margin atas bawah */
-            max-height: 120px; /* Diperbesar dari 80px */
-            width: auto;       /* Lebar mengikuti rasio */
-            height: auto;      /* Tinggi mengikuti rasio */
-            max-width: 250px;  /* Batas lebar agar tidak kebablasan */
-            object-fit: contain; /* Menjaga proporsi */
+            margin: 5px auto 10px auto; 
+            max-height: 120px;  /* Tinggi maksimal diperbesar */
+            width: auto;        /* Lebar menyesuaikan (proporsional) */
+            height: auto;       /* Tinggi menyesuaikan (proporsional) */
+            max-width: 250px;   /* Batas lebar agar tidak terlalu lebar */
+            object-fit: contain; 
         }
         .sign-name { font-weight: bold; text-decoration: underline; }
-        .no-sign-box { height: 100px; line-height:100px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:180px; font-size: 10px; }
+        .no-sign-box { 
+            height: 100px; line-height: 100px; 
+            color: #ccc; border: 1px dashed #ccc; 
+            margin: 10px auto; width: 180px; font-size: 10px; 
+        }
 
         @media print {
             .no-print { display: none; }
@@ -141,13 +145,17 @@ function smart_format($num, $curr) {
     </div>
 
     <div class="watermark-container">
-        <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
+        <?php if(file_exists('../uploads/' . $sets['company_watermark'])): ?>
+            <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img">
+        <?php endif; ?>
     </div>
 
     <table class="header-table">
         <tr>
             <td>
-                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
+                <?php if(file_exists('../uploads/' . $sets['company_logo'])): ?>
+                    <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo">
+                <?php endif; ?>
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">INVOICE</div></td>
@@ -277,29 +285,27 @@ function smart_format($num, $curr) {
                 
                 <?php 
                     $signPath = '';
-                    $signFile = $inv['sales_sign'];
-                    
-                    if (!empty($signFile)) {
-                        // Cek 3 Folder Kemungkinan
-                        if (file_exists('../uploads/signatures/' . $signFile)) {
-                            $signPath = '../uploads/signatures/' . $signFile;
-                        } elseif (file_exists('../uploads/' . $signFile)) {
-                            $signPath = '../uploads/' . $signFile;
-                        } elseif (file_exists('../assets/images/' . $signFile)) {
-                            $signPath = '../assets/images/' . $signFile;
+                    $salesSign = $inv['sales_sign'];
+
+                    if (!empty($salesSign)) {
+                        // 1. Cek di folder khusus signatures (Prioritas Utama)
+                        if (file_exists('../uploads/signatures/' . $salesSign)) {
+                            $signPath = '../uploads/signatures/' . $salesSign;
+                        } 
+                        // 2. Cek di folder uploads umum (Backup)
+                        elseif (file_exists('../uploads/' . $salesSign)) {
+                            $signPath = '../uploads/' . $salesSign;
                         }
                     }
                     
-                    // Fallback
+                    // 3. Fallback ke gambar default jika user tidak punya tanda tangan
                     if (empty($signPath) && file_exists('../assets/images/signature.png')) {
                         $signPath = '../assets/images/signature.png';
                     }
                 ?>
 
                 <?php if (!empty($signPath)): ?>
-                    <img src="<?= $signPath ?>" class="sign-img" 
-                         onerror="this.style.display='none'; document.getElementById('no-sign-box').style.display='block';">
-                    <div id="no-sign-box" class="no-sign-box" style="display:none;">(Image Error)</div>
+                    <img src="<?= $signPath ?>" class="sign-img">
                 <?php else: ?>
                     <div class="no-sign-box">(No Signature Found)</div>
                 <?php endif; ?>
