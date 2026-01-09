@@ -101,7 +101,7 @@ if (isset($_POST['export_excel'])) {
         $invId = $row['id'];
         $quotId = $row['quotation_id'];
 
-        // 1. Ambil Item Detail (Prioritas Invoice Items, Fallback Quotation Items)
+        // 1. Ambil Item Detail
         $itemsData = [];
         $sqlItems = "SELECT item_name, description, qty, unit_price FROM invoice_items WHERE invoice_id = $invId";
         $resItems = $conn->query($sqlItems);
@@ -111,7 +111,7 @@ if (isset($_POST['export_excel'])) {
             $resItems = $conn->query($sqlItems);
         }
 
-        // 2. Hitung Total Invoice dan Tampung Data Item
+        // 2. Hitung Total Invoice
         $calcSub = 0;
         while ($itm = $resItems->fetch_assoc()) {
             $itemsData[] = $itm;
@@ -123,10 +123,11 @@ if (isset($_POST['export_excel'])) {
         $tax_rate = $is_usd ? 0 : 0.11;
         $vat = $calcSub * $tax_rate;
 
-        // --- [FIX] ROUNDING AGAR KONSISTEN DI EXCEL JUGA ---
+        // --- [FIX] ROUNDING 0.5 KE BAWAH (EXCEL) ---
         if (!$is_usd) {
-            $calcSub = round($calcSub, 0);
-            $vat = round($vat, 0);
+            // IDR: Gunakan PHP_ROUND_HALF_DOWN agar 0.5 dibulatkan ke bawah
+            $calcSub = round($calcSub, 0, PHP_ROUND_HALF_DOWN);
+            $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
         } else {
             $calcSub = round($calcSub, 2);
             $vat = round($vat, 2);
@@ -141,10 +142,9 @@ if (isset($_POST['export_excel'])) {
         $taxStatus = (!empty($row['tax_invoice_file'])) ? 'Uploaded' : 'Pending';
         $cleanNotes = !empty($row['general_notes']) ? str_replace(array("\r", "\n"), " ", $row['general_notes']) : '-';
 
-        // 3. Tulis Baris CSV Per Item (Terpisah)
+        // 3. Tulis Baris CSV
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
-                // Format Deskripsi
                 $desc = $item['item_name'];
                 if(!empty($item['description']) && $item['description'] !== 'Exclude Tax') {
                     $desc .= ' (' . $item['description'] . ')';
@@ -156,13 +156,13 @@ if (isset($_POST['export_excel'])) {
                     $row['invoice_no'],
                     $poClient,
                     $row['quotation_no'],
-                    $desc,                  // Description Per Item
-                    $item['qty'],           // Quantity
-                    $item['unit_price'],    // Unit Price
+                    $desc,                  
+                    $item['qty'],           
+                    $item['unit_price'],    
                     $row['currency'],
-                    $calcSub,    // Sub Total (Tetap total invoice)
-                    $vat,        // VAT (Tetap total invoice)
-                    $grandTotal, // Grand Total (Tetap total invoice)
+                    $calcSub,    
+                    $vat,        
+                    $grandTotal, 
                     strtoupper($row['status']),
                     $salesPerson,
                     $doNum,
@@ -171,7 +171,6 @@ if (isset($_POST['export_excel'])) {
                 ));
             }
         } else {
-            // Fallback jika tidak ada item (kasus error data)
             fputcsv($output, array(
                 $row['invoice_date'], $row['company_name'], $row['invoice_no'], 
                 $poClient, $row['quotation_no'], 'No Items Found', 0, 0, 
@@ -259,7 +258,7 @@ if (isset($_POST['upload_tax_invoice'])) {
     }
 }
 
-// --- LOGIKA ACTION: UPDATE STATUS & CANCEL & DELETE (ADMIN) ---
+// --- LOGIKA ACTION: DELETE (ADMIN) & STATUS ---
 if (isset($_GET['action']) && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     $act = $_GET['action'];
@@ -267,9 +266,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     // [BARU] Hapus Permanen (Admin Only)
     if ($act == 'delete') {
         if ($user_role == 'admin') {
-            // Hapus child records dulu untuk menjaga integritas database
             $conn->query("DELETE FROM invoice_items WHERE invoice_id=$id");
-            // Hapus Delivery Order terkait (via payments jika ada)
             $conn->query("DELETE FROM delivery_orders WHERE payment_id IN (SELECT id FROM payments WHERE invoice_id=$id)");
             $conn->query("DELETE FROM payments WHERE invoice_id=$id");
             $conn->query("DELETE FROM invoices WHERE id=$id");
@@ -282,11 +279,9 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         }
     }
 
-    // Revert to Draft Logic
     if ($act == 'draft') {
         $conn->query("UPDATE invoices SET status='draft' WHERE id=$id");
     }
-    
     if ($act == 'sent') {
         $conn->query("UPDATE invoices SET status='sent' WHERE id=$id");
     }
@@ -450,13 +445,13 @@ $res = $conn->query($sql);
                                 $tax_rate = $is_usd ? 0 : 0.11;
                                 $vat = $subTotal * $tax_rate;
 
-                                // --- [FIX] LOGIKA PEMBULATAN AGAR KONSISTEN DENGAN PDF ---
-                                // Jika IDR: Bulatkan semua komponen ke 0 desimal (Rupiah Penuh)
-                                // Jika USD: Bulatkan ke 2 desimal (Sen)
+                                // --- [FIX] LOGIKA PEMBULATAN 0.5 KE BAWAH (DASHBOARD) ---
                                 if (!$is_usd) {
-                                    $subTotal = round($subTotal, 0);
-                                    $vat = round($vat, 0);
+                                    // IDR: 0.5 dibulatkan ke bawah (2.5 -> 2)
+                                    $subTotal = round($subTotal, 0, PHP_ROUND_HALF_DOWN);
+                                    $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
                                 } else {
+                                    // USD: Standar 2 desimal
                                     $subTotal = round($subTotal, 2);
                                     $vat = round($vat, 2);
                                 }
