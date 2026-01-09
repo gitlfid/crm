@@ -5,11 +5,11 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL DATA HEADER
+// 1. AMBIL DATA HEADER INVOICE
 $sql = "SELECT i.*, q.po_number_client, q.currency, q.remarks,
                c.company_name, c.address as c_address, c.pic_name, c.pic_phone,
                u.username as sales_name, u.email as sales_email, u.phone as sales_phone, 
-               u.signature_file as sales_sign 
+               u.signature_file as sales_sign, i.created_by_user_id 
         FROM invoices i
         JOIN quotations q ON i.quotation_id = q.id
         JOIN clients c ON q.client_id = c.id
@@ -21,13 +21,14 @@ if(!$inv) die("Invoice not found");
 // 2. AMBIL ITEM
 $sql_inv_items = "SELECT * FROM invoice_items WHERE invoice_id = $id";
 $check_items = $conn->query($sql_inv_items);
+
 if ($check_items && $check_items->num_rows > 0) {
     $items = $check_items;
 } else {
     $items = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = " . $inv['quotation_id']);
 }
 
-// 3. SETTINGS
+// 3. AMBIL SETTINGS
 $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
@@ -36,7 +37,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 $is_usd = ($inv['currency'] == 'USD');
 $tax_rate = $is_usd ? 0 : 0.11;
 
-// INFO BANK
+// Info Bank
 if ($is_usd) {
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
@@ -49,16 +50,64 @@ if ($is_usd) {
     $payment_details = $sets['invoice_payment_info'] ?? '-';
 }
 
+// Fungsi Format
 function smart_format($num, $curr) {
-    if ($curr == 'IDR') return number_format((float)$num, 0, ',', '.');
-    return number_format((float)$num, 2, '.', ',');
+    if ($curr == 'IDR') {
+        return number_format((float)$num, 0, ',', '.');
+    } else {
+        return number_format((float)$num, 2, '.', ',');
+    }
 }
 
-// --- DETEKSI BASE URL OTOMATIS (UNTUK GAMBAR) ---
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-$host = $_SERVER['HTTP_HOST'];
-// Asumsi script ada di /admin/, jadi kita naik satu level ke root untuk akses uploads
-$baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF'])); 
+// --- LOGIKA TANDA TANGAN (BASE64 FORCE LOAD) ---
+// Ini akan bypass masalah permission URL dan nama file yang tidak update
+function getSignatureImage($filename, $userId) {
+    $root = dirname(__DIR__); // Root folder project
+    $found_path = '';
+
+    // Prioritas 1: Cek Nama File Persis dari Database (di folder signatures)
+    if (!empty($filename) && file_exists($root . '/uploads/signatures/' . $filename)) {
+        $found_path = $root . '/uploads/signatures/' . $filename;
+    }
+    // Prioritas 2: Cek Nama File Persis (di folder uploads biasa)
+    elseif (!empty($filename) && file_exists($root . '/uploads/' . $filename)) {
+        $found_path = $root . '/uploads/' . $filename;
+    }
+    // Prioritas 3: SCAN OTOMATIS (Jika nama file di DB salah/kosong)
+    // Mencari file yang berawalan SIG_CANVAS_{USER_ID}_ atau SIG_{USER_ID}_
+    else {
+        $scan_dirs = [$root . '/uploads/signatures/', $root . '/uploads/'];
+        foreach ($scan_dirs as $dir) {
+            if (is_dir($dir)) {
+                $files = scandir($dir);
+                foreach ($files as $f) {
+                    // Cari file milik user ini (mengandung ID user)
+                    if (strpos($f, "SIG_CANVAS_{$userId}_") === 0 || strpos($f, "SIG_{$userId}_") === 0) {
+                        $found_path = $dir . $f;
+                        break 2; // Ketemu! Stop looping.
+                    }
+                }
+            }
+        }
+    }
+
+    // Prioritas 4: Fallback Default
+    if (empty($found_path) && file_exists($root . '/assets/images/signature.png')) {
+        $found_path = $root . '/assets/images/signature.png';
+    }
+
+    // Jika ketemu, convert ke Base64 agar browser PASTI bisa render
+    if (!empty($found_path)) {
+        $type = pathinfo($found_path, PATHINFO_EXTENSION);
+        $data = file_get_contents($found_path);
+        return 'data:image/' . $type . ';base64,' . base64_encode($data);
+    }
+
+    return null;
+}
+
+// Generate Gambar Tanda Tangan
+$signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_id']);
 ?>
 
 <!DOCTYPE html>
@@ -71,66 +120,84 @@ $baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF']));
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; }
         @page { margin: 1.5cm; size: A4; }
 
-        /* UTILITAS */
+        /* HEADER & UTILS */
         .no-print { background: #f8f9fa; padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
         .btn-print { background: #0d6efd; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
-
-        /* LAYOUT UTAMA */
-        .watermark-container { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); width: 80%; z-index: -1000; opacity: 0.08; pointer-events: none; }
+        
+        /* WATERMARK */
+        .watermark-container { 
+            position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); 
+            width: 80%; z-index: -1000; text-align: center; pointer-events: none; opacity: 0.08;
+        }
         .watermark-img { width: 100%; height: auto; }
+
+        /* HEADER TABLE */
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
+        .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 24px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
-        
-        /* TABEL INFO */
+
+        /* INFO BOXES */
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; border: 1px solid #000; }
         .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 160px; }
         .inner-table { width: 100%; font-size: 11px; }
-        .lbl { width: 90px; font-weight: bold; } .sep { width: 10px; text-align: center; }
+        .inner-table td { padding-bottom: 3px; vertical-align: top; }
+        .lbl { width: 90px; font-weight: bold; } 
+        .sep { width: 10px; text-align: center; }
 
-        /* TABEL ITEM */
+        /* ITEMS TABLE */
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
-        .items-table th { border: 1px solid #000; background-color: #f2f2f2; padding: 8px; text-align: center; }
+        .items-table th { border: 1px solid #000; background-color: #f2f2f2; padding: 8px; text-align: center; font-weight: bold; }
         .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; }
-        .text-right { text-align: right; } .text-center { text-align: center; }
-        .summary-row td { border: none; border-right: none; }
-        .summary-row .label-cell { background-color: #fff; font-weight: bold; text-align: right; border: 1px solid #000; }
-        .summary-row .value-cell { text-align: right; font-weight: bold; border: 1px solid #000; }
+        
+        /* EDITABLE HIGHLIGHT */
+        [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
 
-        /* FOOTER & SIGNATURE */
+        /* FOOTER */
         .footer-layout { width: 100%; margin-top: 20px; page-break-inside: avoid; }
         .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
         .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
         
-        /* CSS TANDA TANGAN FINAL */
+        /* CSS TANDA TANGAN (PROPORSIONAL & BESAR) */
+        .sign-company { font-size: 11px; margin-bottom: 10px; }
         .sign-img { 
-            display: block; margin: 5px auto 10px auto;
-            width: auto; height: auto;
-            max-width: 250px; max-height: 120px;
+            display: block; 
+            margin: 5px auto 15px auto;
+            width: auto;        /* Lebar otomatis */
+            height: auto;       /* Tinggi otomatis */
+            max-width: 250px;   /* Maksimal lebar */
+            max-height: 120px;  /* Maksimal tinggi (Cukup Besar) */
             object-fit: contain;
         }
         .sign-name { font-weight: bold; text-decoration: underline; }
-        .no-sign-box { height: 100px; line-height: 100px; color: #ccc; border: 1px dashed #ccc; margin: 10px auto; width: 180px; font-size: 10px; }
+        .no-sign-box { height: 100px; line-height:100px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:180px; font-size: 10px; }
 
-        @media print { .no-print { display: none; } }
+        @media print {
+            .no-print { display: none; }
+            [contenteditable="true"]:hover { background: none; outline: none; }
+        }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .label-cell { background-color: #fff; font-weight: bold; text-align: right; }
+        .value-cell { text-align: right; font-weight: bold; }
+        .border-none { border: none !important; }
     </style>
 </head>
 <body>
 
     <div class="no-print">
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
-        <div style="margin-top:5px; color:red; font-size:11px;">* Klik angka untuk edit manual.</div>
+        <div style="margin-top:5px; color:red; font-size:11px;">* Tips: Klik angka di tabel untuk mengedit nominal secara manual sebelum dicetak.</div>
     </div>
 
     <div class="watermark-container">
-        <img src="<?= $baseUrl ?>/uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
+        <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
     </div>
 
     <table class="header-table">
         <tr>
             <td>
-                <img src="<?= $baseUrl ?>/uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
+                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">INVOICE</div></td>
@@ -151,7 +218,7 @@ $baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF']));
                     <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['invoice_date'])) ?></td></tr>
                     <tr><td class="lbl">Due Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['due_date'])) ?></td></tr>
                     <tr><td class="lbl">Invoice No</td><td class="sep">:</td><td><strong><?= $inv['invoice_no'] ?></strong></td></tr>
-                    <tr><td class="lbl">PO. Ref</td><td class="sep">:</td><td><?= $inv['po_number_client'] ?></td></tr>
+                    <tr><td class="lbl">PO. Reference</td><td class="sep">:</td><td><?= $inv['po_number_client'] ?></td></tr>
                     <tr><td class="lbl">Currency</td><td class="sep">:</td><td><?= $inv['currency'] ?></td></tr>
                     <tr><td colspan="3" style="height:5px"></td></tr>
                     <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= $inv['sales_name'] ?></td></tr>
@@ -165,13 +232,19 @@ $baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF']));
     <table class="items-table">
         <thead>
             <tr>
-                <th width="5%">No</th><th width="35%">Description</th><th width="8%">Qty</th><th width="17%">Method</th>
-                <th width="15%">Unit Price (<?= $inv['currency'] ?>)</th><th width="20%">Total (<?= $inv['currency'] ?>)</th>
+                <th width="5%">No</th>
+                <th width="35%">Description</th>
+                <th width="8%">Qty</th>
+                <th width="17%">Payment Method</th>
+                <th width="15%">Unit Price (<?= $inv['currency'] ?>)</th>
+                <th width="20%">Total (<?= $inv['currency'] ?>)</th>
             </tr>
         </thead>
         <tbody>
             <?php 
-            $no=1; $grandTotal=0;
+            $no = 1; 
+            $grandTotal = 0;
+            
             while($item = $items->fetch_assoc()): 
                 $qty = floatval($item['qty']);
                 $price = floatval($item['unit_price']);
@@ -180,15 +253,25 @@ $baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF']));
             ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
-                <td><div contenteditable="true"><?= htmlspecialchars($item['item_name']) ?></div></td>
+                <td>
+                    <div contenteditable="true">
+                        <?= htmlspecialchars($item['item_name']) ?>
+                        <?php if(!empty($item['description']) && $item['description'] != 'Exclude Tax'): ?>
+                            <br><small class="text-muted"><?= nl2br(htmlspecialchars($item['description'])) ?></small>
+                        <?php endif; ?>
+                    </div>
+                </td>
+                
                 <td class="text-center" contenteditable="true"><?= smart_format($qty, $inv['currency']) ?></td>
                 <td class="text-center" contenteditable="true"><?= $inv['payment_method'] ?></td>
+                
                 <td class="text-right" contenteditable="true"><?= smart_format($price, $inv['currency']) ?></td>
                 <td class="text-right" contenteditable="true"><?= smart_format($lineTotal, $inv['currency']) ?></td>
             </tr>
             <?php endwhile; ?>
             
             <?php 
+                // --- LOGIKA PEMBULATAN (0.5 ke bawah untuk IDR) ---
                 if (!$is_usd) {
                     $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
@@ -200,17 +283,22 @@ $baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF']));
             ?>
             
             <tr class="summary-row">
-                <td colspan="4"></td><td class="label-cell">Sub Total</td>
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell">Sub Total</td>
                 <td class="value-cell" contenteditable="true"><?= smart_format($grandTotal, $inv['currency']) ?></td>
             </tr>
+            
             <?php if(!$is_usd): ?>
             <tr class="summary-row">
-                <td colspan="4"></td><td class="label-cell">VAT (11%)</td>
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell">VAT (11%)</td>
                 <td class="value-cell" contenteditable="true"><?= smart_format($vatAmount, $inv['currency']) ?></td>
             </tr>
             <?php endif; ?>
+
             <tr class="summary-row">
-                <td colspan="4"></td><td class="label-cell">Total</td>
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell">Total</td>
                 <td class="value-cell" contenteditable="true"><?= smart_format($totalAll, $inv['currency']) ?></td>
             </tr>
         </tbody>
@@ -220,37 +308,29 @@ $baseUrl = $protocol . "://" . $host . dirname(dirname($_SERVER['PHP_SELF']));
         <tr>
             <td class="footer-left">
                 <div style="font-style: italic; font-size: 10px; margin-bottom: 20px;">
-                    <strong>Note :</strong><br><div contenteditable="true"><?= nl2br(htmlspecialchars($sets['invoice_note_default'] ?? '')) ?></div>
+                    <strong>Note :</strong><br>
+                    <div contenteditable="true">
+                        <?= nl2br(htmlspecialchars($sets['invoice_note_default'] ?? '')) ?>
+                    </div>
                 </div>
+
                 <div style="font-size: 11px;">
-                    <span style="font-weight: bold;">Payment Method (<?= $inv['currency'] ?>)</span>
-                    <div style="white-space: pre-line;" contenteditable="true"><?= htmlspecialchars($payment_details) ?></div>
+                    <span style="font-weight: bold; margin-bottom: 5px; display: block;">Payment Method (<?= $inv['currency'] ?>)</span>
+                    <div style="line-height: 1.5; white-space: pre-line;" contenteditable="true">
+                        <?= htmlspecialchars($payment_details) ?>
+                    </div>
                 </div>
             </td>
 
             <td class="footer-right">
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
-                <?php 
-                    // JALUR GAMBAR (URL BASED)
-                    $signFile = trim($inv['sales_sign']);
-                    $mainSignUrl = $baseUrl . "/uploads/signatures/" . $signFile;
-                    $backupSignUrl = $baseUrl . "/uploads/" . $signFile;
-                    $defaultSignUrl = $baseUrl . "/assets/images/signature.png";
-                ?>
-
-                <?php if(!empty($signFile)): ?>
-                    <img id="signatureImg" src="<?= $mainSignUrl ?>" class="sign-img" alt="Signature"
-                         onerror="
-                            if (this.src == '<?= $mainSignUrl ?>') { this.src = '<?= $backupSignUrl ?>'; }
-                            else if (this.src == '<?= $backupSignUrl ?>') { this.src = '<?= $defaultSignUrl ?>'; }
-                            else { this.style.display='none'; document.getElementById('no-sign-box').style.display='block'; }
-                         ">
-                    
-                    <div id="no-sign-box" class="no-sign-box" style="display:none;">(No Signature Found)</div>
+                <?php if ($signatureBase64): ?>
+                    <img src="<?= $signatureBase64 ?>" class="sign-img" alt="Signature">
                 <?php else: ?>
-                    <img src="<?= $defaultSignUrl ?>" class="sign-img" onerror="this.style.display='none'; document.getElementById('no-sign-box-2').style.display='block';">
-                    <div id="no-sign-box-2" class="no-sign-box" style="display:none;">(No Signature Set)</div>
+                    <div class="no-sign-box">
+                        (No Signature Found)
+                    </div>
                 <?php endif; ?>
 
                 <div class="sign-name" contenteditable="true"><?= htmlspecialchars($inv['sales_name']) ?></div>
