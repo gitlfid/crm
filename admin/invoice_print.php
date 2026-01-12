@@ -33,9 +33,11 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- LOGIKA MATA UANG & BANK ---
+// --- LOGIKA MATA UANG & PEMBULATAN ---
 $is_usd = ($inv['currency'] == 'USD');
+$tax_rate = $is_usd ? 0 : 0.11;
 
+// Info Bank
 if ($is_usd) {
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
@@ -48,9 +50,7 @@ if ($is_usd) {
     $payment_details = $sets['invoice_payment_info'] ?? '-';
 }
 
-$tax_rate = $is_usd ? 0 : 0.11;
-
-// --- FUNGSI FORMAT PINTAR ---
+// Fungsi Format (Sama dengan Quotation)
 function smart_format($num, $curr) {
     $clean_num = strval($num);
     $decimals = 0;
@@ -106,8 +106,14 @@ function smart_format($num, $curr) {
         .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
         .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
 
+        /* SIGNATURE STYLE (Sama Persis dengan Quotation) */
         .sign-company { font-size: 11px; font-weight: normal; margin-bottom: 10px; }
-        .sign-img { display: block; margin: 10px auto; width: auto; height: auto; max-width: 250px; max-height: 120px; object-fit: contain; }
+        .sign-img { 
+            display: block; margin: 10px auto; 
+            width: auto; height: auto; 
+            max-width: 250px; max-height: 120px; /* Proporsional */
+            object-fit: contain; 
+        }
         .sign-name { font-weight: bold; text-decoration: underline; }
         .no-sign-box { height: 100px; line-height: 100px; color: #ccc; border: 1px dashed #ccc; margin: 10px auto; width: 180px; font-size: 10px; }
 
@@ -146,8 +152,8 @@ function smart_format($num, $curr) {
                 <table class="inner-table">
                     <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['invoice_date'])) ?></td></tr>
                     <tr><td class="lbl">Due Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['due_date'])) ?></td></tr>
-                    <tr><td class="lbl">Invoice No</td><td class="sep">:</td><td><strong><?= $inv['invoice_no'] ?></strong></td></tr>
-                    <tr><td class="lbl">PO. Ref</td><td class="sep">:</td><td><?= $inv['po_number_client'] ?></td></tr>
+                    <tr><td class="lbl">Invoice Number</td><td class="sep">:</td><td><strong><?= $inv['invoice_no'] ?></strong></td></tr>
+                    <tr><td class="lbl">PO. Reference</td><td class="sep">:</td><td><?= $inv['po_number_client'] ?></td></tr>
                     <tr><td class="lbl">Currency</td><td class="sep">:</td><td><?= $inv['currency'] ?></td></tr>
                     <tr><td colspan="3" style="height:5px"></td></tr>
                     <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= $inv['sales_name'] ?></td></tr>
@@ -179,17 +185,18 @@ function smart_format($num, $curr) {
                     <?= htmlspecialchars($item['item_name']) ?> 
                     <?php if(!empty($item['description'])): ?><br><small class="text-muted"><?= nl2br(htmlspecialchars($item['description'])) ?></small><?php endif; ?>
                 </td>
-                <td class="text-center"><?= smart_format($item['qty'], $inv['currency']) ?></td>
-                <td class="text-center"><?= $inv['payment_method'] ?></td>
-                <td class="text-right"><?= smart_format($item['unit_price'], $inv['currency']) ?></td>
-                <td class="text-right"><?= smart_format($lineTotal, $inv['currency']) ?></td>
+                <td class="text-center" contenteditable="true"><?= smart_format($item['qty'], $inv['currency']) ?></td>
+                <td class="text-center" contenteditable="true"><?= $inv['payment_method'] ?></td>
+                <td class="text-right" contenteditable="true"><?= smart_format($item['unit_price'], $inv['currency']) ?></td>
+                <td class="text-right" contenteditable="true"><?= smart_format($lineTotal, $inv['currency']) ?></td>
             </tr>
             <?php endwhile; ?>
             
             <?php 
+                // Rounding Konsisten 0.5 Ke Bawah (IDR)
                 if (!$is_usd) {
-                    $grandTotal = round($grandTotal, 0);
-                    $vatAmount = round($grandTotal * $tax_rate, 0); 
+                    $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN);
+                    $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
                 } else {
                     $grandTotal = round($grandTotal, 2);
                     $vatAmount = round($grandTotal * $tax_rate, 2);
@@ -199,17 +206,17 @@ function smart_format($num, $curr) {
             
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td><td class="label-cell">Sub Total</td>
-                <td class="value-cell"><?= smart_format($grandTotal, $inv['currency']) ?></td>
+                <td class="value-cell" contenteditable="true"><?= smart_format($grandTotal, $inv['currency']) ?></td>
             </tr>
             <?php if(!$is_usd): ?>
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td><td class="label-cell">VAT (11%)</td>
-                <td class="value-cell"><?= smart_format($vatAmount, $inv['currency']) ?></td>
+                <td class="value-cell" contenteditable="true"><?= smart_format($vatAmount, $inv['currency']) ?></td>
             </tr>
             <?php endif; ?>
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td><td class="label-cell">Total</td>
-                <td class="value-cell"><?= smart_format($totalAll, $inv['currency']) ?></td>
+                <td class="value-cell" contenteditable="true"><?= smart_format($totalAll, $inv['currency']) ?></td>
             </tr>
         </tbody>
     </table>
@@ -230,36 +237,38 @@ function smart_format($num, $curr) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
+                    // LOGIKA TANDA TANGAN (AUTO FALLBACK)
+                    // Kita siapkan 3 kemungkinan path
                     $signFile = trim($inv['sales_sign']);
-                    $src = '';
-                    $baseDir = dirname(__DIR__); // Root Server Path
-
-                    if (!empty($signFile)) {
-                        // 1. Cek di uploads/signatures/ (Prioritas)
-                        if (file_exists($baseDir . '/uploads/signatures/' . $signFile)) {
-                            $src = '../uploads/signatures/' . $signFile;
-                        } 
-                        // 2. Cek di uploads/ (Cadangan)
-                        elseif (file_exists($baseDir . '/uploads/' . $signFile)) {
-                            $src = '../uploads/' . $signFile;
-                        }
-                    }
+                    $srcSig   = "../uploads/signatures/" . $signFile;
+                    $srcUp    = "../uploads/" . $signFile;
+                    $srcDef   = "../assets/images/signature.png";
                     
-                    // 3. Fallback ke Default Asset
-                    if (empty($src) && file_exists($baseDir . '/assets/images/signature.png')) {
-                        $src = '../assets/images/signature.png';
-                    }
+                    // Kita gunakan srcSig sebagai default awal.
+                    // Jika browser gagal load, dia akan pindah ke srcUp, lalu ke srcDef.
                 ?>
 
-                <?php if (!empty($src)): ?>
-                    <img src="<?= $src ?>" class="sign-img">
+                <?php if (!empty($signFile)): ?>
+                    <img src="<?= $srcSig ?>" class="sign-img" 
+                         onerror="
+                            // Jika gagal, coba folder uploads biasa
+                            if (this.src.indexOf('signatures') > -1) { 
+                                this.src = '<?= $srcUp ?>'; 
+                            } 
+                            // Jika folder uploads juga gagal, pakai default signature
+                            else if (this.src.indexOf('uploads') > -1) { 
+                                this.src = '<?= $srcDef ?>'; 
+                            }
+                            // Jika default pun gagal, sembunyikan gambar
+                            else { 
+                                this.style.display = 'none'; 
+                            }
+                         ">
                 <?php else: ?>
-                    <div class="no-sign-box">
-                        (File Not Found: <?= htmlspecialchars($signFile) ?>)
-                    </div>
+                    <img src="<?= $srcDef ?>" class="sign-img" onerror="this.style.display='none'">
                 <?php endif; ?>
 
-                <div class="sign-name"><?= htmlspecialchars($inv['sales_name']) ?></div>
+                <div class="sign-name" contenteditable="true"><?= htmlspecialchars($inv['sales_name']) ?></div>
             </td>
         </tr>
     </table>
