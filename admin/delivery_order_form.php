@@ -8,7 +8,7 @@ include '../config/functions.php';
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// --- GENERATOR NOMOR DO PATEN ---
+// --- GENERATOR NOMOR DO PATEN (Untuk Default Saja) ---
 $prefixDO = "DO" . date('Ym'); 
 $sqlCek = "SELECT do_number FROM delivery_orders WHERE do_number LIKE '$prefixDO%' AND CHAR_LENGTH(do_number) = 12 ORDER BY do_number DESC LIMIT 1";
 $resCek = $conn->query($sqlCek);
@@ -67,7 +67,7 @@ if ($from_inv_id > 0) {
 
 // --- KASUS 2: EDIT EXISTING DO ---
 if ($do_id > 0) {
-    $sqlData = "SELECT d.*, c.company_name, c.address, i.invoice_no, i.id as inv_id 
+    $sqlData = "SELECT d.*, c.company_name, c.address as client_addr, i.invoice_no, i.id as inv_id 
                 FROM delivery_orders d 
                 JOIN payments p ON d.payment_id = p.id 
                 JOIN invoices i ON p.invoice_id = i.id
@@ -84,7 +84,11 @@ if ($do_id > 0) {
         $pic_phone = $row['pic_phone'];
         $payment_id = $row['payment_id'];
         $client_name = $row['company_name'];
-        $client_address = $row['address'];
+        
+        // Prioritas Alamat: Ambil dari DO (jika ada custom) atau dari Client Master
+        // (Asumsi kolom address ada di table delivery_orders, jika tidak fallback ke client)
+        $client_address = isset($row['address']) ? $row['address'] : $row['client_addr'];
+        
         $ref_info = "Ref: Invoice #" . $row['invoice_no'];
 
         // Cek Item Tersimpan
@@ -93,7 +97,7 @@ if ($do_id > 0) {
         
         if ($resItems->num_rows > 0) {
             while($itm = $resItems->fetch_assoc()) {
-                // Auto fix BBC -> Prepaid saat edit
+                // Auto fix tampilan saat edit
                 $mode = $itm['charge_mode'];
                 if (stripos($mode, 'BBC') !== false || empty($mode)) $mode = 'Prepaid';
 
@@ -125,18 +129,26 @@ if (isset($_POST['save_do'])) {
     $d_stat = $_POST['status'];
     $d_pic = $conn->real_escape_string($_POST['pic_name']);
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
+    $d_addr = $conn->real_escape_string($_POST['address']); // Ambil input alamat
     $user_id = $_SESSION['user_id'];
 
     if ($do_id > 0) {
-        $conn->query("UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone' WHERE id=$do_id");
+        // Update DO Header (Termasuk Nomor DO Manual & Alamat jika ada kolomnya)
+        // Note: Kita mencoba update address, jika kolom tidak ada di DB mungkin error/ignored tergantung setting.
+        // Sebaiknya pastikan tabel delivery_orders punya kolom 'address' jika ingin custom alamat.
+        $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone' WHERE id=$do_id";
+        $conn->query($sql);
         $curr_do_id = $do_id;
+        
+        // Reset Items
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
-        $conn->query("INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id) VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone', $user_id)");
+        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id) VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone', $user_id)";
+        $conn->query($sql);
         $curr_do_id = $conn->insert_id;
     }
 
-    // SIMPAN ITEM BARU DARI INPUT USER
+    // SIMPAN ITEM BARU
     $item_names = $_POST['item_name'];
     $qtys = $_POST['qty'];
     $modes = $_POST['charge_mode'];
@@ -176,8 +188,8 @@ if (isset($_POST['save_do'])) {
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="form-label fw-bold">DO Number</label>
-                            <input type="text" name="do_number" class="form-control font-monospace fw-bold bg-light" value="<?= htmlspecialchars($do_number) ?>" required readonly>
+                            <label class="form-label fw-bold">DO Number (Bisa Diedit)</label>
+                            <input type="text" name="do_number" class="form-control font-monospace fw-bold" value="<?= htmlspecialchars($do_number) ?>" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Delivery Date</label>
@@ -188,8 +200,8 @@ if (isset($_POST['save_do'])) {
                             <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($client_name) ?>" readonly>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Address</label>
-                            <textarea class="form-control bg-light" rows="3" readonly><?= htmlspecialchars($client_address) ?></textarea>
+                            <label class="form-label">Address (Bisa Diedit)</label>
+                            <textarea name="address" class="form-control" rows="3"><?= htmlspecialchars($client_address) ?></textarea>
                         </div>
                     </div>
 
