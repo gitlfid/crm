@@ -22,11 +22,9 @@ if (isset($_POST['update_invoice'])) {
     $conn->query($sqlUpdate);
 
     // 2. Update Table Quotation (Client & PO Ref)
-    // Ambil quotation_id dulu
     $q_check = $conn->query("SELECT quotation_id FROM invoices WHERE id=$inv_id")->fetch_assoc();
     $q_id = $q_check['quotation_id'];
 
-    // [BARU] Update Client ID di tabel Quotation
     if (isset($_POST['client_id'])) {
         $new_client_id = intval($_POST['client_id']);
         $conn->query("UPDATE quotations SET client_id=$new_client_id WHERE id=$q_id");
@@ -37,11 +35,11 @@ if (isset($_POST['update_invoice'])) {
         $conn->query("UPDATE quotations SET po_number_client='$po_ref' WHERE id=$q_id");
     }
 
-    // 3. Ambil Mata Uang (Penting untuk sanitasi harga)
+    // 3. Ambil Mata Uang
     $curr_check = $conn->query("SELECT currency FROM quotations WHERE id=$q_id")->fetch_assoc();
     $curr = $curr_check['currency'];
 
-    // 4. Update Items: Hapus semua item lama, insert yang baru
+    // 4. Update Items: Hapus lama, Insert baru
     $conn->query("DELETE FROM invoice_items WHERE invoice_id=$inv_id");
 
     $items = $_POST['item_name'];
@@ -53,9 +51,11 @@ if (isset($_POST['update_invoice'])) {
     for ($i = 0; $i < count($items); $i++) {
         if (!empty($items[$i])) {
             $it_name = $conn->real_escape_string($items[$i]);
+            
+            // [UPDATE] Gunakan floatval agar desimal (koma) tersimpan
             $it_qty  = floatval($qtys[$i]); 
             
-            // --- LOGIKA PEMBERSIH HARGA ---
+            // Logika Pembersih Harga
             $raw_price = $prices[$i];
             $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
 
@@ -67,8 +67,6 @@ if (isset($_POST['update_invoice'])) {
             }
             
             $it_prc = floatval($clean_price);
-            // -------------------------------------------
-
             $it_dsc  = $conn->real_escape_string($descs[$i]);
             $it_card = isset($cards[$i]) ? $conn->real_escape_string($cards[$i]) : '';
             
@@ -80,8 +78,7 @@ if (isset($_POST['update_invoice'])) {
     echo "<script>alert('Invoice Updated Successfully!'); window.location='invoice_list.php';</script>";
 }
 
-// --- AMBIL DATA UTAMA UNTUK TAMPILAN ---
-// [UPDATE] Tambah c.id as client_id untuk pre-select dropdown
+// --- AMBIL DATA UNTUK TAMPILAN ---
 $sql = "SELECT i.*, c.id as current_client_id, c.company_name, c.address, c.pic_name, q.po_number_client, q.currency
         FROM invoices i 
         JOIN quotations q ON i.quotation_id = q.id 
@@ -92,7 +89,6 @@ $invoice = $conn->query($sql)->fetch_assoc();
 if (!$invoice) die("Invoice tidak ditemukan.");
 if ($invoice['status'] != 'draft') die("Invoice ini sudah tidak bisa diedit (Status: " . strtoupper($invoice['status']) . ")");
 
-// [BARU] Ambil Daftar Semua Client untuk Dropdown
 $clients_list = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
 // Ambil Items
@@ -118,7 +114,7 @@ if ($resItems->num_rows > 0) {
         <i class="bi bi-pencil-square me-2"></i>
         <strong>Mode Edit:</strong>
         <ul class="mb-0 ps-3">
-            <li>Anda dapat mengubah <strong>Customer</strong>, Tanggal, dan Item.</li>
+            <li>Anda dapat mengubah <strong>Qty dengan Desimal</strong> (misal: 1.5).</li>
             <li>Unit Price mendukung format <strong>USD (1,500.50)</strong> dan <strong>IDR (1.500.000)</strong>.</li>
         </ul>
     </div>
@@ -131,13 +127,12 @@ if ($resItems->num_rows > 0) {
                 <div class="card h-100">
                     <div class="card-header bg-light"><strong>Bill To</strong></div>
                     <div class="card-body pt-3">
-                        
                         <div class="mb-3">
                             <label class="fw-bold">Client / Customer</label>
                             <select name="client_id" class="form-select bg-white">
                                 <?php 
                                 if ($clients_list->num_rows > 0) {
-                                    $clients_list->data_seek(0); // Reset pointer
+                                    $clients_list->data_seek(0);
                                     while($cl = $clients_list->fetch_assoc()): 
                                 ?>
                                     <option value="<?= $cl['id'] ?>" <?= ($invoice['current_client_id'] == $cl['id']) ? 'selected' : '' ?>>
@@ -145,16 +140,13 @@ if ($resItems->num_rows > 0) {
                                     </option>
                                 <?php endwhile; } ?>
                             </select>
-                            <div class="form-text text-muted small">Mengganti client akan mengubah alamat setelah disimpan.</div>
                         </div>
-                        
                         <div class="mb-3">
-                            <label class="fw-bold">PO Reference (Manual)</label>
+                            <label class="fw-bold">PO Reference</label>
                             <input type="text" name="po_ref" class="form-control" value="<?= htmlspecialchars($invoice['po_number_client']) ?>">
                         </div>
-
                         <div class="mb-3">
-                            <label>Current Address (Read Only)</label>
+                            <label>Address</label>
                             <textarea class="form-control bg-light" rows="3" readonly><?= $invoice['address'] ?></textarea>
                         </div>
                         <div class="mb-3">
@@ -183,14 +175,12 @@ if ($resItems->num_rows > 0) {
                                 <input type="date" name="due_date" class="form-control" value="<?= $invoice['due_date'] ?>" required>
                             </div>
                         </div>
-                        
                         <div class="mb-3">
                             <label class="fw-bold">Currency</label>
                             <input type="text" class="form-control bg-light" value="<?= $invoice['currency'] ?>" readonly>
                         </div>
-
                         <div class="mt-2">
-                            <label>Payment Method Label (Table)</label>
+                            <label>Payment Method Label</label>
                             <input type="text" name="payment_method_col" class="form-control" value="<?= htmlspecialchars($invoice['payment_method']) ?>">
                         </div>
                     </div>
@@ -222,10 +212,9 @@ if ($resItems->num_rows > 0) {
                                 <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($itm['item_name']) ?>" required></td>
                                 <td><input type="text" name="card_type[]" class="form-control" value="<?= htmlspecialchars($itm['card_type']) ?>"></td>
                                 
-                                <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" required></td>
+                                <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="<?= floatval($itm['qty']) ?>" required></td>
                                 
                                 <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $itm['unit_price'] ?>" required></td>
-                                
                                 <td><input type="text" name="description[]" class="form-control" value="<?= htmlspecialchars($itm['description']) ?>"></td>
                                 <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                             </tr>
@@ -247,11 +236,15 @@ if ($resItems->num_rows > 0) {
 <script>
     function addRow() {
         var table = document.getElementById("itemTable").getElementsByTagName('tbody')[0];
+        // Clone baris pertama untuk mempertahankan format
         var newRow = table.rows[0].cloneNode(true);
         var inputs = newRow.getElementsByTagName("input");
         for(var i=0; i<inputs.length; i++) { 
             inputs[i].value = ""; 
-            if(inputs[i].name == "qty[]") inputs[i].value="1"; 
+            if(inputs[i].name == "qty[]") {
+                inputs[i].value = "1"; 
+                inputs[i].setAttribute("step", "any"); // Pastikan baris baru juga support desimal
+            }
         }
         table.appendChild(newRow);
     }
