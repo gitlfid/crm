@@ -8,25 +8,30 @@ include '../config/functions.php';
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// --- [UPDATE] LOGIKA NOMOR DO PATEN (DO + YYYYMM + 0001) ---
+// --- [UPDATE FIX] LOGIKA PATEN DO (DO + YYYYMM + 0001) ---
+// Format Total 12 Digit: DO (2) + 202601 (6) + 0001 (4)
 $prefixDO = "DO" . date('Ym'); // Contoh: DO202601
-// Cari nomor terakhir yang berawalan bulan ini
+
+// Cek nomor terakhir KHUSUS yang formatnya 12 digit (Format Baru)
+// Filter LENGTH(do_number)=12 agar tidak tertukar dengan format lama (13 digit)
 $sqlCek = "SELECT do_number FROM delivery_orders 
            WHERE do_number LIKE '$prefixDO%' 
+           AND CHAR_LENGTH(do_number) = 12
            ORDER BY do_number DESC LIMIT 1";
 $resCek = $conn->query($sqlCek);
 
 if ($resCek && $resCek->num_rows > 0) {
-    // Jika sudah ada, ambil nomor terakhir -> ambil 4 digit belakang -> tambah 1
+    // Jika sudah ada format baru bulan ini, lanjutkan urutannya
     $rowLast = $resCek->fetch_assoc();
-    $lastNo = $rowLast['do_number']; 
-    $lastUrut = (int)substr($lastNo, -4); 
+    $lastNo = $rowLast['do_number']; // DO2026010001
+    $lastUrut = (int)substr($lastNo, -4); // Ambil 0001
     $newUrut = $lastUrut + 1;
 } else {
-    // Jika belum ada di bulan ini, mulai dari 1
+    // Jika belum ada format baru (atau cuma ada format lama), mulai dari 1
     $newUrut = 1;
 }
-// Format menjadi 4 digit (0001)
+
+// Generate Nomor
 $do_number = $prefixDO . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
 // -----------------------------------------------------------
 
@@ -39,9 +44,9 @@ $client_name = '';
 $client_address = '';
 $ref_info = '';
 
-// --- KASUS 1: CREATE DARI INVOICE (FITUR BARU) ---
+// --- KASUS 1: CREATE DARI INVOICE ---
 if ($from_inv_id > 0) {
-    // 1. Cari Payment ID dari Invoice ini (Ambil payment terakhir)
+    // 1. Cari Payment ID
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     
@@ -82,7 +87,7 @@ if ($do_id > 0) {
     $resData = $conn->query($sqlData);
     if ($resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
-        // [PENTING] Jika Edit, gunakan nomor lama dari database, jangan generate baru
+        // [PENTING] Jika Edit, gunakan nomor lama dari database, JANGAN generate baru
         $do_number = $row['do_number'];
         $do_date = $row['do_date'];
         $status = $row['status'];
@@ -141,8 +146,8 @@ if (isset($_POST['save_do'])) {
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label fw-bold">DO Number</label>
-                            <input type="text" name="do_number" class="form-control font-monospace fw-bold" value="<?= htmlspecialchars($do_number) ?>" required>
-                            <div class="form-text text-muted small">Nomor otomatis di-generate (Format: DO + TahunBulan + Urut).</div>
+                            <input type="text" name="do_number" class="form-control font-monospace fw-bold bg-light" value="<?= htmlspecialchars($do_number) ?>" required readonly>
+                            <div class="form-text text-muted small">Nomor otomatis (Paten): DO + TahunBulan + 4 Digit Urut.</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Delivery Date</label>
