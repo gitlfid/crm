@@ -40,7 +40,7 @@ if ($from_inv_id > 0) {
         $info = $conn->query($sqlInfo)->fetch_assoc();
         if ($info) {
             $client_name = $info['company_name'];
-            $client_address = $info['address']; // Default ambil dari client
+            $client_address = $info['address']; // Default dari Client
             $pic_name = $info['pic_name'];
             $pic_phone = $info['pic_phone'];
             $ref_info = "Ref: Invoice #" . $info['invoice_no'];
@@ -58,8 +58,8 @@ if ($from_inv_id > 0) {
 
 // KASUS 2: EDIT
 if ($do_id > 0) {
-    // Ambil d.* (termasuk d.address) dan c.address sebagai cadangan
-    $sqlData = "SELECT d.*, d.address as do_address, c.company_name, c.address as client_master_addr, i.invoice_no, i.id as inv_id 
+    // AMBIL ALAMAT KHUSUS DO (do_addr) DAN ALAMAT CLIENT (client_addr)
+    $sqlData = "SELECT d.*, d.address as do_addr, c.company_name, c.address as client_addr, i.invoice_no, i.id as inv_id 
                 FROM delivery_orders d 
                 JOIN payments p ON d.payment_id = p.id 
                 JOIN invoices i ON p.invoice_id = i.id
@@ -77,9 +77,8 @@ if ($do_id > 0) {
         $payment_id = $row['payment_id'];
         $client_name = $row['company_name'];
         
-        // LOGIKA PRIORITAS ALAMAT:
-        // Jika di tabel delivery_orders ada isinya, pakai itu. Jika tidak, pakai data master client.
-        $client_address = !empty($row['do_address']) ? $row['do_address'] : $row['client_master_addr'];
+        // PRIORITAS: Jika ada alamat edit di DO, pakai itu. Jika tidak, pakai alamat master.
+        $client_address = !empty($row['do_addr']) ? $row['do_addr'] : $row['client_addr'];
         
         $ref_info = "Ref: Invoice #" . $row['invoice_no'];
 
@@ -116,17 +115,20 @@ if (isset($_POST['save_do'])) {
     $d_stat = $_POST['status'];
     $d_pic = $conn->real_escape_string($_POST['pic_name']);
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
-    $d_addr = $conn->real_escape_string($_POST['address']); // [PENTING] Ambil input alamat
+    
+    // [FIX] Ambil Alamat dari Form
+    $d_addr = $conn->real_escape_string($_POST['address']); 
+    
     $user_id = $_SESSION['user_id'];
 
     if ($do_id > 0) {
-        // [UPDATE] Sertakan kolom address di update
+        // [FIX] UPDATE ke database kolom address
         $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone', address='$d_addr' WHERE id=$do_id";
         $conn->query($sql);
         $curr_do_id = $do_id;
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
-        // [INSERT] Sertakan kolom address di insert
+        // [FIX] INSERT ke database kolom address
         $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
                 VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone', $user_id, '$d_addr')";
         $conn->query($sql);
@@ -166,8 +168,10 @@ if (isset($_POST['save_do'])) {
                         <div class="mb-3"><label class="fw-bold">DO Number</label><input type="text" name="do_number" class="form-control fw-bold" value="<?= htmlspecialchars($do_number) ?>" required></div>
                         <div class="mb-3"><label class="fw-bold">Date</label><input type="date" name="do_date" class="form-control" value="<?= $do_date ?>" required></div>
                         <div class="mb-3"><label class="fw-bold">Client</label><input type="text" class="form-control bg-light" value="<?= htmlspecialchars($client_name) ?>" readonly></div>
-                        <div class="mb-3"><label>Address (Bisa Diedit)</label>
-                            <textarea name="address" class="form-control" rows="3"><?= htmlspecialchars($client_address) ?></textarea>
+                        
+                        <div class="mb-3">
+                            <label class="fw-bold text-primary">Address (Edit Disini)</label>
+                            <textarea name="address" class="form-control" rows="4" required><?= htmlspecialchars($client_address) ?></textarea>
                         </div>
                     </div>
                     <div class="col-md-6">
