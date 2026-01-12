@@ -8,7 +8,7 @@ include '../config/functions.php';
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// --- GENERATOR NOMOR DO (DO + YYYYMM + 0001) ---
+// --- 1. GENERATOR NOMOR DO (DO + YYYYMM + 0001) ---
 $prefixDO = "DO" . date('Ym'); 
 $sqlCek = "SELECT do_number FROM delivery_orders WHERE do_number LIKE '$prefixDO%' AND CHAR_LENGTH(do_number) = 12 ORDER BY do_number DESC LIMIT 1";
 $resCek = $conn->query($sqlCek);
@@ -19,9 +19,10 @@ if ($resCek && $resCek->num_rows > 0) {
 } else {
     $newUrut = 1;
 }
-$do_number = $prefixDO . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
+$do_number_auto = $prefixDO . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
 
 // Default Values
+$do_number = $do_number_auto;
 $do_date = date('Y-m-d');
 $status = 'draft';
 $pic_name = '';
@@ -30,10 +31,11 @@ $payment_id = 0;
 $client_name = '';
 $client_address = '';
 $ref_info = '';
-$items_list = [];
+$items_list = []; // Array penampung item
 
-// --- KASUS 1: CREATE DARI INVOICE ---
+// --- KASUS 1: CREATE BARU DARI INVOICE ---
 if ($from_inv_id > 0) {
+    // Cari Payment ID
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     
@@ -41,6 +43,7 @@ if ($from_inv_id > 0) {
         $payRow = $resPay->fetch_assoc();
         $payment_id = $payRow['id'];
 
+        // Info Client
         $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
                     FROM invoices i
                     JOIN quotations q ON i.quotation_id = q.id
@@ -56,23 +59,22 @@ if ($from_inv_id > 0) {
             $ref_info = "Ref: Invoice #" . $info['invoice_no'];
         }
 
-        // AMBIL ITEM DARI INVOICE UNTUK DIEDIT
+        // AMBIL ITEM DARI INVOICE -> PAKSA 'PREPAID'
         $sqlItems = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $from_inv_id";
         $resItems = $conn->query($sqlItems);
         while($itm = $resItems->fetch_assoc()) {
-            // [MODIFIKASI] Charge Mode Default jadi "Prepaid"
-            $itm['card_type'] = "Prepaid"; 
+            $itm['card_type'] = "Prepaid"; // [FORCE PREPAID]
             $items_list[] = $itm;
         }
     } else {
-        echo "<script>alert('Error: Invoice ini belum dibayar.'); window.location='invoice_list.php';</script>";
+        echo "<script>alert('Error: Invoice belum dibayar/Payment belum ada.'); window.location='invoice_list.php';</script>";
         exit;
     }
 }
 
 // --- KASUS 2: EDIT EXISTING DO ---
 if ($do_id > 0) {
-    $sqlData = "SELECT d.*, c.company_name, c.address, i.invoice_no 
+    $sqlData = "SELECT d.*, c.company_name, c.address, i.invoice_no, i.id as inv_id 
                 FROM delivery_orders d
                 JOIN payments p ON d.payment_id = p.id
                 JOIN invoices i ON p.invoice_id = i.id
@@ -82,7 +84,9 @@ if ($do_id > 0) {
     $resData = $conn->query($sqlData);
     if ($resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
-        $do_number = $row['do_number'];
+        
+        // Load data header
+        $do_number = $row['do_number']; // Pakai nomor lama
         $do_date = $row['do_date'];
         $status = $row['status'];
         $pic_name = $row['pic_name'];
@@ -92,22 +96,30 @@ if ($do_id > 0) {
         $client_address = $row['address'];
         $ref_info = "Ref: Invoice #" . $row['invoice_no'];
 
-        // AMBIL ITEM DARI TABLE DO ITEMS (Jika Ada)
+        // LOAD ITEM (Cek apakah sudah pernah diedit/disimpan di delivery_order_items?)
         $sqlItems = "SELECT * FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resItems = $conn->query($sqlItems);
+        
         if ($resItems->num_rows > 0) {
+            // Jika sudah ada data tersimpan, pakai data itu (apa adanya)
             while($itm = $resItems->fetch_assoc()) {
                 $items_list[] = [
                     'item_name' => $itm['item_name'],
                     'qty' => $itm['unit'],
-                    'card_type' => $itm['charge_mode'],
+                    'card_type' => $itm['charge_mode'], // Ini hasil save sebelumnya
                     'description' => $itm['description']
                 ];
             }
         } else {
-            // Fallback ambil dari Invoice lagi jika DO items kosong
-            $inv_id = $row['invoice_id'] ?? 0; // Perlu ambil invoice_id dr query di atas
-            // (Code disederhanakan: Asumsi DO sudah punya item tersimpan jika status edit)
+            // [FALLBACK] Jika belum ada item tersimpan (DO lama), ambil dari Invoice
+            // DAN PAKSA JADI PREPAID
+            $inv_id_src = $row['inv_id'];
+            $sqlItemsInv = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $inv_id_src";
+            $resItemsInv = $conn->query($sqlItemsInv);
+            while($itm = $resItemsInv->fetch_assoc()) {
+                $itm['card_type'] = "Prepaid"; // [FORCE PREPAID DISINI]
+                $items_list[] = $itm;
+            }
         }
     }
 }
@@ -123,33 +135,39 @@ if (isset($_POST['save_do'])) {
     $user_id = $_SESSION['user_id'];
 
     if ($do_id > 0) {
+        // Update Header
         $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone' WHERE id=$do_id";
         $conn->query($sql);
         $curr_do_id = $do_id;
-        // Hapus item lama untuk insert ulang
+        
+        // Hapus item lama (agar terganti dengan yang baru dari form)
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
+        // Insert Header
         $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id) 
                 VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone', $user_id)";
         $conn->query($sql);
         $curr_do_id = $conn->insert_id;
     }
 
-    // SIMPAN ITEM DO
+    // Insert Item Baru dari Form
     $item_names = $_POST['item_name'];
     $qtys = $_POST['qty'];
     $modes = $_POST['charge_mode'];
     $descs = $_POST['description'];
 
-    for ($i = 0; $i < count($item_names); $i++) {
-        if (!empty($item_names[$i])) {
-            $i_name = $conn->real_escape_string($item_names[$i]);
-            $i_qty = floatval($qtys[$i]);
-            $i_mode = $conn->real_escape_string($modes[$i]);
-            $i_desc = $conn->real_escape_string($descs[$i]);
+    if (!empty($item_names)) {
+        for ($i = 0; $i < count($item_names); $i++) {
+            if (!empty($item_names[$i])) {
+                $i_name = $conn->real_escape_string($item_names[$i]);
+                $i_qty = floatval($qtys[$i]);
+                $i_mode = $conn->real_escape_string($modes[$i]); // Ini akan menyimpan 'Prepaid' atau editan user
+                $i_desc = $conn->real_escape_string($descs[$i]);
 
-            $conn->query("INSERT INTO delivery_order_items (delivery_order_id, item_name, unit, charge_mode, description) 
-                          VALUES ($curr_do_id, '$i_name', $i_qty, '$i_mode', '$i_desc')");
+                $sqlItem = "INSERT INTO delivery_order_items (delivery_order_id, item_name, unit, charge_mode, description) 
+                            VALUES ($curr_do_id, '$i_name', $i_qty, '$i_mode', '$i_desc')";
+                $conn->query($sqlItem);
+            }
         }
     }
 
@@ -279,9 +297,9 @@ function addRow() {
     var inputs = newRow.getElementsByTagName("input");
     for(var i=0; i<inputs.length; i++) {
         inputs[i].value = "";
-        if(inputs[i].name == "charge_mode[]") inputs[i].value = "Prepaid"; // Default Prepaid
+        if(inputs[i].name == "charge_mode[]") inputs[i].value = "Prepaid"; // Default Prepaid untuk baris baru
         if(inputs[i].name == "qty[]") inputs[i].value = "1";
     }
     table.appendChild(newRow);
 }
-</script>
+</script>   
