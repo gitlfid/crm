@@ -26,7 +26,6 @@ if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
     // Ambil Data Header DO
-    // [UPDATE] ORDER BY do_number DESC (Agar urutan sesuai Nomor Surat Jalan)
     $sqlEx = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
               FROM delivery_orders d 
               JOIN payments p ON d.payment_id = p.id 
@@ -34,7 +33,7 @@ if (isset($_POST['export_excel'])) {
               JOIN quotations q ON i.quotation_id = q.id
               JOIN clients c ON q.client_id = c.id
               WHERE $where
-              ORDER BY d.do_number DESC"; 
+              ORDER BY d.do_number DESC"; // Urut No DO
     $resEx = $conn->query($sqlEx);
 
     header('Content-Type: text/csv; charset=utf-8');
@@ -46,27 +45,36 @@ if (isset($_POST['export_excel'])) {
     fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
     
     while($row = $resEx->fetch_assoc()) {
-        // --- Ambil Detail Item ---
-        $inv_id = $row['invoice_id'];
-        $quo_id = $row['quotation_id'];
-        
+        $do_id = $row['id'];
         $itemsData = [];
-        
-        // Prioritas 1: Ambil dari Invoice Items
-        $items_sql = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = $inv_id";
-        $resItems = $conn->query($items_sql);
-        
-        // Prioritas 2: Jika kosong, ambil dari Quotation Items
-        if($resItems->num_rows == 0) {
-            $items_sql = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = $quo_id";
+
+        // [UPDATE PENTING] Cek tabel delivery_order_items DULUAN (Data Hasil Edit/Save)
+        $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $do_id";
+        $resDOItems = $conn->query($sqlDOItems);
+
+        if ($resDOItems && $resDOItems->num_rows > 0) {
+            // JIKA ADA DATA TERSIMPAN (Hasil Edit Form) -> PAKAI INI
+            while($itm = $resDOItems->fetch_assoc()) {
+                $itemsData[] = $itm;
+            }
+        } else {
+            // JIKA KOSONG (Data Lama) -> FALLBACK KE INVOICE
+            $inv_id = $row['invoice_id'];
+            $quo_id = $row['quotation_id'];
+            
+            $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = $inv_id";
             $resItems = $conn->query($items_sql);
+            
+            if($resItems->num_rows == 0) {
+                $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM quotation_items WHERE quotation_id = $quo_id";
+                $resItems = $conn->query($items_sql);
+            }
+            while($itm = $resItems->fetch_assoc()) {
+                $itemsData[] = $itm;
+            }
         }
 
-        while($itm = $resItems->fetch_assoc()) {
-            $itemsData[] = $itm;
-        }
-
-        // --- TULIS KE CSV (SATU BARIS PER ITEM) ---
+        // --- TULIS KE CSV ---
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
                 fputcsv($output, array(
@@ -74,26 +82,20 @@ if (isset($_POST['export_excel'])) {
                     $row['do_date'],
                     $row['company_name'],
                     $row['address'],
-                    $item['item_name'],         // Item Sendiri
-                    floatval($item['qty']),     // Qty Sendiri
-                    $item['card_type'],         // Charge Mode Sendiri
-                    $item['description'],       // Desc Sendiri
+                    $item['item_name'],         
+                    floatval($item['qty']),     
+                    $item['charge_mode'],       // Ini akan muncul "Prepaid" jika sudah diedit
+                    $item['description'],       
                     $row['pic_name'],
                     $row['pic_phone'],
                     strtoupper($row['status'])
                 ));
             }
         } else {
-            // Fallback: Jika DO tidak ada item
             fputcsv($output, array(
-                $row['do_number'],
-                $row['do_date'],
-                $row['company_name'],
-                $row['address'],
-                '- No Item -', '', '', '', // Kolom Item Kosong
-                $row['pic_name'],
-                $row['pic_phone'],
-                strtoupper($row['status'])
+                $row['do_number'], $row['do_date'], $row['company_name'], $row['address'],
+                '- No Item -', '', '', '', 
+                $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])
             ));
         }
     }
@@ -109,7 +111,6 @@ include 'includes/sidebar.php';
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
 // QUERY DATA TAMPILAN DASHBOARD
-// [UPDATE] ORDER BY d.do_number DESC (Mengurutkan berdasarkan Nomor DO, bukan Tanggal Buat)
 $sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
         FROM delivery_orders d 
         JOIN payments p ON d.payment_id = p.id 
@@ -117,7 +118,7 @@ $sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
         JOIN quotations q ON i.quotation_id = q.id
         JOIN clients c ON q.client_id = c.id
         WHERE $where
-        ORDER BY d.do_number DESC";
+        ORDER BY d.do_number DESC"; // Urut No DO
 $res = $conn->query($sql);
 ?>
 
@@ -215,21 +216,28 @@ $res = $conn->query($sql);
                         <?php if ($res->num_rows > 0): ?>
                             <?php while($row = $res->fetch_assoc()): ?>
                             <?php
-                                // --- Ambil Detail Item untuk Tampilan HTML ---
-                                $inv_id = $row['invoice_id'];
-                                $quo_id = $row['quotation_id'];
-                                
-                                $items_sql = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = $inv_id";
-                                $resItems = $conn->query($items_sql);
-                                if($resItems->num_rows == 0) {
-                                    $items_sql = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = $quo_id";
-                                    $resItems = $conn->query($items_sql);
-                                }
-                                
-                                // Simpan dalam array untuk diloop di TD
+                                // --- [UPDATE LOGIKA TAMPILAN] ---
+                                $do_id = $row['id'];
                                 $itemsData = [];
-                                while($itm = $resItems->fetch_assoc()) {
-                                    $itemsData[] = $itm;
+
+                                // 1. Cek tabel DO Items (Prioritas Utama)
+                                $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $do_id";
+                                $resDOItems = $conn->query($sqlDOItems);
+
+                                if ($resDOItems && $resDOItems->num_rows > 0) {
+                                    while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
+                                } else {
+                                    // 2. Fallback Invoice (Data Lama)
+                                    $inv_id = $row['invoice_id'];
+                                    $quo_id = $row['quotation_id'];
+                                    
+                                    $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = $inv_id";
+                                    $resItems = $conn->query($items_sql);
+                                    if($resItems->num_rows == 0) {
+                                        $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM quotation_items WHERE quotation_id = $quo_id";
+                                        $resItems = $conn->query($items_sql);
+                                    }
+                                    while($itm = $resItems->fetch_assoc()) $itemsData[] = $itm;
                                 }
                             ?>
                             <tr>
@@ -258,7 +266,7 @@ $res = $conn->query($sql);
                                 </td>
                                 <td class="align-top text-center">
                                     <?php foreach($itemsData as $d): ?>
-                                        <div class="item-row badge bg-light text-dark border"><?= htmlspecialchars($d['card_type']) ?></div>
+                                        <div class="item-row badge bg-light text-dark border"><?= htmlspecialchars($d['charge_mode']) ?></div>
                                     <?php endforeach; ?>
                                 </td>
                                 <td class="align-top">
