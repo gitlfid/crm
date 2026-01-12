@@ -23,8 +23,10 @@ if (!empty($f_client)) {
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
-    // Ambil Data Header DO
-    $sqlEx = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
+    // [FIX QUERY] Ambil alamat DO (d.address) dan Client (c.address) dengan nama beda
+    $sqlEx = "SELECT d.*, d.address as do_address_fix, 
+                     c.company_name, c.address as client_address_fix, 
+                     p.invoice_id, i.quotation_id
               FROM delivery_orders d 
               JOIN payments p ON d.payment_id = p.id 
               JOIN invoices i ON p.invoice_id = i.id
@@ -41,48 +43,39 @@ if (isset($_POST['export_excel'])) {
     fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
     
     while($row = $resEx->fetch_assoc()) {
+        // [LOGIKA PRIORITAS ALAMAT]
+        $final_address = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
+
         $do_id = $row['id'];
         $itemsData = [];
 
-        // 1. CEK TABEL DO ITEMS (Data Hasil Edit)
-        // Gunakan alias 'charge_mode' agar konsisten
+        // Ambil Item
         $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resDOItems = $conn->query($sqlDOItems);
 
         if ($resDOItems && $resDOItems->num_rows > 0) {
-            // Jika ada data di tabel delivery_order_items, GUNAKAN ITU (Hasil Edit)
-            while($itm = $resDOItems->fetch_assoc()) {
-                $itemsData[] = $itm;
-            }
+            while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
         } else {
-            // 2. FALLBACK INVOICE (Hanya jika belum pernah diedit)
             $inv_id = $row['invoice_id'];
-            // Pastikan mengambil card_type sebagai charge_mode
             $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = $inv_id";
             $resItems = $conn->query($items_sql);
-            while($itm = $resItems->fetch_assoc()) {
-                $itemsData[] = $itm;
+            if($resItems->num_rows == 0 && isset($row['quotation_id'])) {
+                $resItems = $conn->query("SELECT item_name, qty, card_type as charge_mode, description FROM quotation_items WHERE quotation_id=".$row['quotation_id']);
             }
+            while($itm = $resItems->fetch_assoc()) $itemsData[] = $itm;
         }
 
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
                 fputcsv($output, array(
-                    $row['do_number'], 
-                    $row['do_date'], 
-                    $row['company_name'], 
-                    $row['address'],
-                    $item['item_name'], 
-                    floatval($item['qty']), 
-                    $item['charge_mode'], // Ini akan menampilkan hasil edit ("Prepaid")
-                    $item['description'],
-                    $row['pic_name'], 
-                    $row['pic_phone'], 
-                    strtoupper($row['status'])
+                    $row['do_number'], $row['do_date'], $row['company_name'], 
+                    $final_address, // Pakai alamat prioritas
+                    $item['item_name'], floatval($item['qty']), $item['charge_mode'], $item['description'],
+                    $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])
                 ));
             }
         } else {
-            fputcsv($output, array($row['do_number'], $row['do_date'], $row['company_name'], $row['address'], '- No Item -', '', '', '', $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])));
+            fputcsv($output, array($row['do_number'], $row['do_date'], $row['company_name'], $final_address, '- No Item -', '', '', '', $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])));
         }
     }
     fclose($output);
@@ -96,15 +89,17 @@ include 'includes/sidebar.php';
 
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
-// QUERY DASHBOARD
-$sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
+// [FIX QUERY DASHBOARD]
+$sql = "SELECT d.*, d.address as do_address_fix, 
+               c.company_name, c.address as client_address_fix, 
+               p.invoice_id, i.quotation_id
         FROM delivery_orders d 
         JOIN payments p ON d.payment_id = p.id 
         JOIN invoices i ON p.invoice_id = i.id
         JOIN quotations q ON i.quotation_id = q.id
         JOIN clients c ON q.client_id = c.id
         WHERE $where
-        ORDER BY d.do_number DESC"; // Urut sesuai No DO Paten
+        ORDER BY d.do_number DESC"; 
 $res = $conn->query($sql);
 ?>
 
@@ -127,8 +122,7 @@ $res = $conn->query($sql);
                 <div class="col-md-4">
                     <select name="client_id" class="form-select">
                         <option value="">- Semua Perusahaan -</option>
-                        <?php if($clients->num_rows > 0) { 
-                            while($c = $clients->fetch_assoc()): ?>
+                        <?php if($clients->num_rows > 0) { while($c = $clients->fetch_assoc()): ?>
                             <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($c['company_name']) ?>
                             </option>
@@ -137,17 +131,10 @@ $res = $conn->query($sql);
                 </div>
                 <div class="col-md-3 d-flex gap-2">
                     <button type="submit" class="btn btn-primary flex-grow-1">Filter</button>
-                    <?php if(!empty($search) || !empty($f_client)): ?>
-                        <a href="delivery_order_list.php" class="btn btn-danger"><i class="bi bi-x"></i></a>
-                    <?php endif; ?>
+                    <button type="submit" name="export_excel" class="btn btn-success text-white btn-sm">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export
+                    </button>
                 </div>
-            </form>
-            <form method="POST" class="mt-2 text-end">
-                <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-                <input type="hidden" name="client_id" value="<?= htmlspecialchars($f_client) ?>">
-                <button type="submit" name="export_excel" class="btn btn-success text-white btn-sm">
-                    <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export to Excel
-                </button>
             </form>
         </div>
     </div>
@@ -160,7 +147,7 @@ $res = $conn->query($sql);
                         <tr>
                             <th>DO Number</th>
                             <th>Date</th>
-                            <th width="20%">Client</th>
+                            <th width="20%">Client & Address</th>
                             <th width="25%">Item</th>
                             <th class="text-center">Unit</th>
                             <th class="text-center">Charge Mode</th>
@@ -173,36 +160,26 @@ $res = $conn->query($sql);
                         <?php if ($res->num_rows > 0): ?>
                             <?php while($row = $res->fetch_assoc()): ?>
                             <?php
-                                // --- UPDATE LOGIKA: CEK DO ITEMS DULU ---
+                                // [LOGIKA PENENTU ALAMAT]
+                                // Cek apakah ada alamat khusus DO? Jika ya pakai, jika tidak pakai alamat client.
+                                $displayAddress = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
+
+                                // Ambil Item
                                 $do_id = $row['id'];
                                 $itemsData = [];
-
-                                // 1. Cek Tabel DO Items (Data yang sudah diedit/disimpan)
-                                // Gunakan alias charge_mode agar konsisten
                                 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode FROM delivery_order_items WHERE delivery_order_id = $do_id";
                                 $resDOItems = $conn->query($sqlDOItems);
 
                                 if ($resDOItems && $resDOItems->num_rows > 0) {
-                                    // Jika ada data edit, GUNAKAN INI
-                                    while($itm = $resDOItems->fetch_assoc()) {
-                                        $itemsData[] = $itm;
-                                    }
+                                    while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
                                 } else {
-                                    // 2. Fallback Invoice (Jika belum pernah diedit)
                                     $inv_id = $row['invoice_id'];
-                                    // Ambil card_type sebagai charge_mode
                                     $items_sql = "SELECT item_name, qty, card_type as charge_mode FROM invoice_items WHERE invoice_id = $inv_id";
                                     $resItems = $conn->query($items_sql);
-                                    
-                                    // Jika invoice kosong, fallback ke quotation (jarang terjadi)
                                     if($resItems->num_rows == 0 && isset($row['quotation_id'])) {
-                                        $items_sql = "SELECT item_name, qty, card_type as charge_mode FROM quotation_items WHERE quotation_id = " . $row['quotation_id'];
-                                        $resItems = $conn->query($items_sql);
+                                        $resItems = $conn->query("SELECT item_name, qty, card_type as charge_mode FROM quotation_items WHERE quotation_id=".$row['quotation_id']);
                                     }
-                                    
-                                    while($itm = $resItems->fetch_assoc()) {
-                                        $itemsData[] = $itm;
-                                    }
+                                    while($itm = $resItems->fetch_assoc()) $itemsData[] = $itm;
                                 }
                             ?>
                             <tr>
@@ -210,7 +187,10 @@ $res = $conn->query($sql);
                                 <td><?= date('d M Y', strtotime($row['do_date'])) ?></td>
                                 <td>
                                     <div class="fw-bold text-primary"><?= htmlspecialchars($row['company_name']) ?></div>
-                                    <div class="small text-muted"><?= substr($row['address'], 0, 30) ?>...</div>
+                                    <div class="small text-muted" style="font-size: 0.8rem; line-height: 1.2;">
+                                        <i class="bi bi-geo-alt me-1"></i>
+                                        <?= htmlspecialchars(substr($displayAddress, 0, 100)) . (strlen($displayAddress)>100 ? '...' : '') ?>
+                                    </div>
                                 </td>
                                 <td>
                                     <?php foreach($itemsData as $d): ?>
