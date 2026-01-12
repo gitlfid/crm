@@ -48,7 +48,12 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
-        @page { margin: 1.5cm; size: A4; }
+        
+        /* SETTING HALAMAN AGAR URL HILANG (Tapi tetap wajib uncheck 'Headers and footers' di browser) */
+        @page { 
+            margin: 1cm; /* Margin standar */
+            size: A4; 
+        }
 
         /* HEADER */
         .header-table { width: 100%; margin-bottom: 30px; }
@@ -78,46 +83,47 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .text-left { text-align: left !important; }
         .text-right { text-align: right !important; }
 
-        /* --- FOOTER LAYOUT (REVISI BESAR) --- */
+        /* --- FOOTER LAYOUT --- */
         .footer-table { width: 100%; margin-top: 30px; page-break-inside: avoid; border-collapse: collapse; }
-        .footer-col { vertical-align: top; padding: 10px; }
         
-        .remarks-box { width: 34%; font-size: 10px; border-right: 1px solid #eee; }
-        .sender-box { width: 33%; text-align: center; }
-        .recipient-box { width: 33%; text-align: center; }
+        /* [FIX] Align Bottom agar Nama Sejajar */
+        .footer-col { vertical-align: bottom; padding: 10px; }
+        
+        .remarks-col { vertical-align: top; width: 34%; font-size: 10px; border-right: 1px solid #eee; padding-right: 15px; }
+        .sender-col { width: 33%; text-align: center; }
+        .recipient-col { width: 33%; text-align: center; }
 
         /* Styling Tanda Tangan */
-        .sign-title { font-weight: bold; margin-bottom: 5px; text-decoration: underline; font-size: 11px; }
+        .sign-title { font-weight: bold; margin-bottom: 10px; text-decoration: underline; font-size: 11px; display: block; }
         
-        /* [FIX 1] Area Gambar Diperbesar Maksimal (200px) */
+        /* [FIX] AREA TANDA TANGAN PROPORSIONAL */
         .sign-area { 
-            height: 200px; /* Tinggi wadah sangat besar */
+            height: 110px; /* Tinggi area tetap */
             width: 100%;
             display: flex;
-            align-items: flex-end; 
+            align-items: flex-end; /* Gambar menempel di bawah */
             justify-content: center;
             margin-bottom: 5px;
         }
 
-        /* [FIX 2] Gambar Tanda Tangan Lebih Besar & Proporsional */
+        /* [FIX] GAMBAR TIDAK GEPENG */
         .sign-img { 
-            display: block; margin: 0 auto; 
-            width: auto; 
-            height: auto;
-            max-width: 100%;   /* Melebar penuh kolom jika perlu */
-            max-height: 180px; /* Batas tinggi diperbesar */
-            object-fit: contain; /* Jaga proporsi asli (tidak gepeng) */
-            position: relative; top: 10px; 
+            max-width: 100%;   
+            max-height: 100px; /* Batas tinggi gambar */
+            width: auto;       /* Lebar otomatis menyesuaikan rasio */
+            height: auto;      /* Tinggi otomatis menyesuaikan rasio */
+            object-fit: contain; /* KUNCI: Menjaga proporsi gambar */
+            display: block;
         }
 
-        .sign-name { font-weight: bold; text-decoration: underline; font-size: 11px; margin-top: 5px; }
-        .no-sign-text { line-height: 200px; color: #ccc; font-size: 9px; }
+        .sign-name { font-weight: bold; text-decoration: underline; font-size: 11px; margin-top: 5px; display: block;}
+        .no-sign-text { color: #ccc; font-size: 9px; margin-bottom: 40px; display: block;}
         
-        /* [FIX 3] Garis Tanda Tangan Manual Turun Kebawah */
+        /* Garis Tanda Tangan Manual */
         .sign-line { 
             border-bottom: 1px solid #000; 
             width: 80%; 
-            margin: 180px auto 5px auto; /* Turun menyesuaikan tinggi sign-area */
+            margin: 0 auto;
         }
 
         /* HIDE PRINT BUTTON */
@@ -130,6 +136,9 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 
     <div class="no-print">
         <button onclick="window.print()" class="btn-print">🖨️ Print / Save PDF</button>
+        <div style="margin-top: 5px; color: red; font-size: 10px;">
+            * Untuk menghilangkan URL di bawah, Hapus Centang <b>"Headers and footers"</b> di menu Print.
+        </div>
     </div>
 
     <table class="header-table">
@@ -176,7 +185,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         <tbody>
             <?php 
             $no = 1; $totalUnit = 0;
-            // LOOP ITEM DARI INVOICE/QUOTATION (BUKAN DELIVERY_ORDER_ITEMS KOSONG)
+            // LOOP ITEM DARI INVOICE/QUOTATION
             while($item = $items->fetch_assoc()): 
                 $qty = floatval($item['qty']);
                 $totalUnit += $qty;
@@ -199,7 +208,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 
     <table class="footer-table">
         <tr>
-            <td class="footer-col remarks-box">
+            <td class="footer-col remarks-col">
                 <strong>Remarks :</strong>
                 <ul style="padding-left: 15px; margin-top: 5px;">
                     <li>Please sign and stamp this delivery order</li>
@@ -208,7 +217,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 </ul>
             </td>
 
-            <td class="footer-col sender-box">
+            <td class="footer-col sender-col">
                 <div class="sign-title">Sender</div>
                 
                 <div class="sign-area">
@@ -242,7 +251,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Niawati') ?></div>
             </td>
 
-            <td class="footer-col recipient-box">
+            <td class="footer-col recipient-col">
                 <div class="sign-title">Recipient</div>
                 
                 <div class="sign-area">
