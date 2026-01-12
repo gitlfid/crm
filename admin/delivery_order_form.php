@@ -4,37 +4,36 @@ include 'includes/header.php';
 include 'includes/sidebar.php';
 include '../config/functions.php';
 
-// Inisialisasi Variabel
+// Inisialisasi Variabel ID
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// --- [LOGIKA BARU] GENERATOR NOMOR DO URUT (DO + YYYYMM + 0001) ---
-// Format Target: 12 Karakter (DO=2, YYYYMM=6, SEQ=4)
-$prefix = "DO" . date('Ym'); // Contoh: DO202601
+// --- [LOGIKA BARU] GENERATOR NOMOR DO (DO + YYYYMM + 0001) ---
+// 1. Tentukan Prefix Bulan Ini (Contoh: DO202601)
+$prefixDO = "DO" . date('Ym'); 
 
-// Default awal jika bulan baru / belum ada data
-$next_do_number = $prefix . "0001"; 
+// 2. Cari nomor terakhir di database yang formatnya SUDAH BENAR (12 Digit)
+// Filter CHAR_LENGTH(do_number) = 12 sangat penting agar data lama yang acak tidak merusak urutan.
+$sqlCek = "SELECT do_number FROM delivery_orders 
+           WHERE do_number LIKE '$prefixDO%' 
+           AND CHAR_LENGTH(do_number) = 12 
+           ORDER BY do_number DESC LIMIT 1";
+$resCek = $conn->query($sqlCek);
 
-// Cek nomor terakhir di database KHUSUS yang formatnya 12 digit
-// Kita pakai CHAR_LENGTH(do_number) = 12 agar data lama yang acak (13 digit) TIDAK dihitung
-$sqlCheck = "SELECT do_number FROM delivery_orders 
-             WHERE do_number LIKE '$prefix%' 
-             AND CHAR_LENGTH(do_number) = 12 
-             ORDER BY do_number DESC LIMIT 1";
-$resCheck = $conn->query($sqlCheck);
-
-if ($resCheck && $resCheck->num_rows > 0) {
-    // Jika sudah ada DO dengan format baru bulan ini, ambil urutan terakhir + 1
-    $rowLast = $resCheck->fetch_assoc();
-    $lastNo = $rowLast['do_number']; // Misal: DO2026010001
-    $lastSeq = (int)substr($lastNo, -4); // Ambil 0001 -> jadi angka 1
-    $newSeq = $lastSeq + 1; // Jadi 2
-    $next_do_number = $prefix . str_pad($newSeq, 4, "0", STR_PAD_LEFT); // DO2026010002
+if ($resCek && $resCek->num_rows > 0) {
+    // Jika sudah ada (0001), ambil digit terakhir dan tambah 1
+    $rowLast = $resCek->fetch_assoc();
+    $lastNo = $rowLast['do_number']; 
+    $lastUrut = (int)substr($lastNo, -4); // Ambil 4 angka belakang
+    $newUrut = $lastUrut + 1;
+} else {
+    // Jika belum ada data bulan ini, mulai dari 1
+    $newUrut = 1;
 }
 
-// Set ke variabel utama
-$do_number = $next_do_number;
-// ------------------------------------------------------------------
+// 3. Gabungkan menjadi format final (Contoh: DO2026010001)
+$do_number = $prefixDO . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
+// -------------------------------------------------------------
 
 $do_date = date('Y-m-d');
 $status = 'draft';
@@ -45,9 +44,9 @@ $client_name = '';
 $client_address = '';
 $ref_info = '';
 
-// --- KASUS 1: CREATE DARI INVOICE ---
+// --- KASUS 1: CREATE DARI INVOICE (AUTO FILL) ---
 if ($from_inv_id > 0) {
-    // 1. Cari Payment ID dari Invoice ini (Ambil payment terakhir)
+    // Cari Payment ID dari Invoice ini
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     
@@ -55,7 +54,7 @@ if ($from_inv_id > 0) {
         $payRow = $resPay->fetch_assoc();
         $payment_id = $payRow['id'];
 
-        // 2. Ambil Data Client & Invoice
+        // Ambil Data Client & Invoice
         $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
                     FROM invoices i
                     JOIN quotations q ON i.quotation_id = q.id
@@ -89,7 +88,7 @@ if ($do_id > 0) {
     if ($resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
         
-        // [PENTING] Kalau mode Edit, pakai nomor asli dari DB, JANGAN generate baru
+        // [PENTING] Jika sedang Edit, GUNAKAN NOMOR LAMA, jangan generate baru!
         $do_number = $row['do_number'];
         
         $do_date = $row['do_date'];
@@ -113,10 +112,10 @@ if (isset($_POST['save_do'])) {
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
     
     if ($do_id > 0) {
-        // Update
+        // Update Existing
         $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone' WHERE id=$do_id";
     } else {
-        // Insert Baru
+        // Insert New
         $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone) 
                 VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone')";
     }
@@ -150,7 +149,7 @@ if (isset($_POST['save_do'])) {
                         <div class="mb-3">
                             <label class="form-label fw-bold">DO Number</label>
                             <input type="text" name="do_number" class="form-control font-monospace fw-bold bg-light" value="<?= htmlspecialchars($do_number) ?>" required readonly>
-                            <div class="form-text text-muted small">Nomor otomatis: DO + TahunBulan + 000X (Reset tiap bulan).</div>
+                            <div class="form-text text-muted small">Nomor otomatis (Paten): DO + TahunBulan + 000X (Reset tiap bulan).</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Delivery Date</label>
