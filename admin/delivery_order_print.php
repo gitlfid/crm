@@ -5,7 +5,7 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL HEADER
+// AMBIL HEADER DO
 $sql = "SELECT d.*, 
                c.company_name, c.address, c.pic_name, c.pic_phone,
                u.id as sender_id, u.username as sender_name, u.signature_file as sender_sign,
@@ -21,16 +21,15 @@ $sql = "SELECT d.*,
 $do = $conn->query($sql)->fetch_assoc();
 if(!$do) die("DO not found");
 
-// 2. AMBIL ITEM (LOGIKA AMAN: AMBIL DARI INVOICE)
+// AMBIL ITEM DARI INVOICE (SUMBER ASLI)
 $inv_id = $do['invoice_id'];
 $quo_id = $do['quotation_id'];
 
-$sql_items = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = '$inv_id'";
+$sql_items = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = '$inv_id'";
 $items = $conn->query($sql_items);
 
-// Fallback ke Quotation
 if ($items->num_rows == 0) {
-    $sql_items = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = '$quo_id'";
+    $sql_items = "SELECT item_name, qty, description FROM quotation_items WHERE quotation_id = '$quo_id'";
     $items = $conn->query($sql_items);
 }
 
@@ -43,59 +42,38 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>DO <?= $do['do_number'] ?></title>
+    <title>Delivery Order <?= $do['do_number'] ?></title>
     <style>
         * { box-sizing: border-box; }
-        
-        /* 1. FORCE BLACK TEXT & PAGE SETTINGS */
-        body { 
-            font-family: Arial, sans-serif; 
-            font-size: 11px; 
-            margin: 0; 
-            padding: 0; 
-            color: #000 !important; /* Paksa Hitam Pekat */
-            -webkit-print-color-adjust: exact !important; /* Paksa Cetak Warna (Chrome/Edge) */
-            print-color-adjust: exact !important; /* Paksa Cetak Warna (Firefox) */
-        }
+        body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; }
         
         @page { size: A4; margin: 0.5cm; }
         
-        /* Wrapper agar tidak kepotong */
+        /* FIX AGAR TIDAK KEPOTONG: LEBAR 95% + MARGIN AUTO */
         .wrapper { width: 95%; margin: 0 auto; padding-top: 10px; }
 
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
-        .company-addr { font-size: 10px; color: #000; max-width: 350px; line-height: 1.3; } /* Teks alamat hitam */
-        .doc-title { text-align: right; font-size: 20px; font-weight: bold; text-transform: uppercase; padding-top: 20px; color: #000; }
+        .company-addr { font-size: 10px; color: #333; max-width: 350px; line-height: 1.3; }
+        .doc-title { text-align: right; font-size: 20px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
 
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; }
         .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 120px; }
-        .inner-table { width: 100%; font-size: 11px; color: #000; }
+        .inner-table { width: 100%; font-size: 11px; }
         .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } .sep { width: 10px; text-align: center; }
 
-        /* ITEMS TABLE */
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; border: 1px solid #000; }
-        
-        /* 2. FORCE HEADER COLOR (MERAH) SAAT PRINT */
-        .items-table th { 
-            border: 1px solid #000; 
-            background-color: #ff6b6b !important; /* Warna Merah Penting */
-            color: white !important; 
-            padding: 8px; 
-            font-weight: bold; 
-            text-align: center; 
-            -webkit-print-color-adjust: exact;
-        }
-        
-        .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: center; color: #000; }
+        .items-table th { border: 1px solid #000; background-color: #ff6b6b; color: white; padding: 8px; font-weight: bold; text-align: center; }
+        .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: center; }
         .text-left { text-align: left !important; }
 
         .footer-table { width: 100%; margin-top: 30px; border-collapse: collapse; page-break-inside: avoid; }
         .footer-col { vertical-align: bottom; padding: 10px; }
-        .remarks-col { vertical-align: top; width: 34%; font-size: 10px; border-right: 1px solid #eee; padding-right: 15px; color: #000; }
-        .sender-col, .recipient-col { width: 33%; text-align: center; color: #000; }
+        .remarks-col { vertical-align: top; width: 34%; font-size: 10px; border-right: 1px solid #eee; padding-right: 15px; }
+        .sender-col, .recipient-col { width: 33%; text-align: center; }
 
+        /* TANDA TANGAN PROPORSIONAL */
         .sign-area { height: 130px; display: flex; align-items: flex-end; justify-content: center; width: 100%; }
         .sign-img { max-height: 120px; max-width: 100%; object-fit: contain; }
         .sign-name { font-weight: bold; text-decoration: underline; margin-top: 5px; font-size: 11px; }
@@ -108,10 +86,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 <body>
 
     <div class="no-print">
-        <button onclick="window.print()" style="padding:5px 15px; background:blue; color:white; border:none; border-radius:4px; cursor:pointer;">🖨️ Print</button>
-        <div style="font-size:10px; color:red; margin-top:5px;">
-            * Jika Header Tabel tidak berwarna Merah, Centang <b>"Background graphics"</b> di menu Print.
-        </div>
+        <button onclick="window.print()" style="padding:5px 15px; background:blue; color:white; border:none; cursor:pointer;">🖨️ Print / PDF</button>
     </div>
 
     <div class="wrapper">
@@ -149,7 +124,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         <table class="items-table">
             <thead>
                 <tr>
-                    <th width="5%">No</th><th width="35%">Item</th><th width="10%">Unit</th><th width="20%">Charge Mode</th><th width="30%">Desc</th>
+                    <th width="5%">No</th><th width="35%">Item</th><th width="10%">Unit</th><th width="20%">Charge Mode</th><th width="30%">Description</th>
                 </tr>
             </thead>
             <tbody>
@@ -163,7 +138,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                     <td><?= $no++ ?></td>
                     <td class="text-left"><?= htmlspecialchars($itm['item_name']) ?></td>
                     <td><?= $qty ?></td>
-                    <td><?= htmlspecialchars($itm['card_type']) ?></td>
+                    <td>Prepaid</td>
                     <td class="text-left"><?= htmlspecialchars($itm['description']) ?></td>
                 </tr>
                 <?php endwhile; ?>
@@ -190,12 +165,19 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                     <div class="sign-area">
                         <?php 
                             $signFile = $do['sender_sign']; $src = '';
-                            if(!empty($signFile) && file_exists("../uploads/signatures/$signFile")) $src="../uploads/signatures/$signFile";
-                            elseif(!empty($do['sender_id'])) {
-                                $files = glob("../uploads/signatures/SIG_*_".$do['sender_id']."_*.png");
-                                if($files) $src = $files[0];
+                            $baseDir = dirname(__DIR__);
+                            
+                            // Auto Search Signature
+                            if(!empty($signFile) && file_exists($baseDir."/uploads/signatures/$signFile")) {
+                                $src="../uploads/signatures/$signFile";
+                            } elseif(!empty($do['sender_id'])) {
+                                $files = glob($baseDir."/uploads/signatures/SIG_*_".$do['sender_id']."_*.png");
+                                if($files) $src = "../uploads/signatures/" . basename($files[0]);
                             }
-                            if(!$src && file_exists("../assets/images/signature.png")) $src="../assets/images/signature.png";
+                            // Fallback
+                            if(empty($src) && file_exists($baseDir."/assets/images/signature.png")) {
+                                $src="../assets/images/signature.png";
+                            }
                         ?>
                         <?php if($src): ?><img src="<?= $src ?>" class="sign-img"><?php endif; ?>
                     </div>
