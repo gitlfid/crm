@@ -8,7 +8,28 @@ include '../config/functions.php';
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-$do_number = "DO" . date('Ymd') . rand(100, 999); // Auto generate default
+// --- [UPDATE] LOGIKA NOMOR DO PATEN (DO + YYYYMM + 0001) ---
+$prefixDO = "DO" . date('Ym'); // Contoh: DO202601
+// Cari nomor terakhir yang berawalan bulan ini
+$sqlCek = "SELECT do_number FROM delivery_orders 
+           WHERE do_number LIKE '$prefixDO%' 
+           ORDER BY do_number DESC LIMIT 1";
+$resCek = $conn->query($sqlCek);
+
+if ($resCek && $resCek->num_rows > 0) {
+    // Jika sudah ada, ambil nomor terakhir -> ambil 4 digit belakang -> tambah 1
+    $rowLast = $resCek->fetch_assoc();
+    $lastNo = $rowLast['do_number']; 
+    $lastUrut = (int)substr($lastNo, -4); 
+    $newUrut = $lastUrut + 1;
+} else {
+    // Jika belum ada di bulan ini, mulai dari 1
+    $newUrut = 1;
+}
+// Format menjadi 4 digit (0001)
+$do_number = $prefixDO . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
+// -----------------------------------------------------------
+
 $do_date = date('Y-m-d');
 $status = 'draft';
 $pic_name = '';
@@ -61,6 +82,7 @@ if ($do_id > 0) {
     $resData = $conn->query($sqlData);
     if ($resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
+        // [PENTING] Jika Edit, gunakan nomor lama dari database, jangan generate baru
         $do_number = $row['do_number'];
         $do_date = $row['do_date'];
         $status = $row['status'];
@@ -82,14 +104,11 @@ if (isset($_POST['save_do'])) {
     $d_pic = $conn->real_escape_string($_POST['pic_name']);
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
     
-    // Hapus variable $user_id dan kolom created_by karena kolom tidak ada di DB
-    // $user_id = $_SESSION['user_id']; 
-
     if ($do_id > 0) {
         // Update
         $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone' WHERE id=$do_id";
     } else {
-        // Insert Baru (Tanpa created_by)
+        // Insert Baru
         $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone) 
                 VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone')";
     }
@@ -122,7 +141,8 @@ if (isset($_POST['save_do'])) {
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="form-label fw-bold">DO Number</label>
-                            <input type="text" name="do_number" class="form-control font-monospace" value="<?= htmlspecialchars($do_number) ?>" required>
+                            <input type="text" name="do_number" class="form-control font-monospace fw-bold" value="<?= htmlspecialchars($do_number) ?>" required>
+                            <div class="form-text text-muted small">Nomor otomatis di-generate (Format: DO + TahunBulan + Urut).</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Delivery Date</label>
