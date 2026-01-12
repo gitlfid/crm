@@ -26,6 +26,7 @@ if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
     // Ambil Data Header DO
+    // [UPDATE] ORDER BY do_number DESC (Agar urutan sesuai Nomor Surat Jalan)
     $sqlEx = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
               FROM delivery_orders d 
               JOIN payments p ON d.payment_id = p.id 
@@ -33,7 +34,7 @@ if (isset($_POST['export_excel'])) {
               JOIN quotations q ON i.quotation_id = q.id
               JOIN clients c ON q.client_id = c.id
               WHERE $where
-              ORDER BY d.created_at DESC";
+              ORDER BY d.do_number DESC"; 
     $resEx = $conn->query($sqlEx);
 
     header('Content-Type: text/csv; charset=utf-8');
@@ -83,7 +84,7 @@ if (isset($_POST['export_excel'])) {
                 ));
             }
         } else {
-            // Fallback: Jika DO tidak ada item (kasus jarang/error), tetap print header DO
+            // Fallback: Jika DO tidak ada item
             fputcsv($output, array(
                 $row['do_number'],
                 $row['do_date'],
@@ -100,7 +101,7 @@ if (isset($_POST['export_excel'])) {
     exit();
 }
 
-// --- 4. LOAD TAMPILAN HTML (TIDAK BERUBAH) ---
+// --- 4. LOAD TAMPILAN HTML ---
 $page_title = "Delivery Orders";
 include 'includes/header.php';
 include 'includes/sidebar.php';
@@ -108,6 +109,7 @@ include 'includes/sidebar.php';
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
 // QUERY DATA TAMPILAN DASHBOARD
+// [UPDATE] ORDER BY d.do_number DESC (Mengurutkan berdasarkan Nomor DO, bukan Tanggal Buat)
 $sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
         FROM delivery_orders d 
         JOIN payments p ON d.payment_id = p.id 
@@ -115,7 +117,7 @@ $sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
         JOIN quotations q ON i.quotation_id = q.id
         JOIN clients c ON q.client_id = c.id
         WHERE $where
-        ORDER BY d.created_at DESC";
+        ORDER BY d.do_number DESC";
 $res = $conn->query($sql);
 ?>
 
