@@ -6,8 +6,6 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 $id = intval($_GET['id']);
 
 // 1. AMBIL DATA HEADER
-// [UPDATE] Join ke table users sekarang diarahkan ke (i.created_by_user_id) 
-// agar Sender yang muncul adalah Pembuat Invoice (Sales/Niawati), bukan Admin Gudang.
 $sql = "SELECT d.*, 
                c.company_name, c.address, c.pic_name, c.pic_phone,
                u.id as sender_id, u.username as sender_name, u.signature_file as sender_sign 
@@ -39,11 +37,13 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
         @page { margin: 1.5cm; size: A4; }
 
+        /* HEADER */
         .header-table { width: 100%; margin-bottom: 30px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
         .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 20px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
 
+        /* INFO BOXES */
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; }
         .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 120px; }
         .info-spacer { width: 4%; }
@@ -51,6 +51,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } .sep { width: 10px; text-align: center; }
 
+        /* ITEMS TABLE */
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
         .items-table th { 
             border: 1px solid #000; 
@@ -64,23 +65,47 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .text-left { text-align: left !important; }
         .text-right { text-align: right !important; }
 
-        .footer-table { width: 100%; margin-top: 30px; page-break-inside: avoid; }
-        .footer-col { vertical-align: top; padding: 5px; }
-        .remarks-box { width: 40%; font-size: 10px; border-right: 1px solid #eee; }
-        .sender-box { width: 30%; text-align: center; }
-        .recipient-box { width: 30%; text-align: center; }
+        /* --- FOOTER LAYOUT (PROPORSIONAL FIX) --- */
+        .footer-table { width: 100%; margin-top: 30px; page-break-inside: avoid; border-collapse: collapse; }
+        .footer-col { vertical-align: top; padding: 10px; }
+        
+        /* Pembagian Kolom yang Seimbang */
+        .remarks-box { width: 34%; font-size: 10px; border-right: 1px solid #eee; }
+        .sender-box { width: 33%; text-align: center; }
+        .recipient-box { width: 33%; text-align: center; }
 
-        .sign-title { font-weight: bold; margin-bottom: 10px; text-decoration: underline; font-size: 10px; }
-        .sign-img { 
-            display: block; margin: 5px auto; 
-            width: auto; height: auto; 
-            max-width: 150px; max-height: 80px; 
-            object-fit: contain; 
+        /* Styling Tanda Tangan */
+        .sign-title { font-weight: bold; margin-bottom: 5px; text-decoration: underline; font-size: 11px; }
+        
+        /* Area Gambar/Kosong dengan Tinggi Tetap agar Nama Sejajar */
+        .sign-area { 
+            height: 100px; /* Tinggi Kunci untuk kesejajaran */
+            width: 100%;
+            display: flex;
+            align-items: flex-end; /* Memaksa isi ada di bawah */
+            justify-content: center;
+            margin-bottom: 5px;
         }
-        .sign-name { font-weight: bold; text-decoration: underline; margin-top: 5px; }
-        .no-sign-box { height: 80px; line-height: 80px; color: #ccc; border: 1px dashed #ccc; margin: 5px auto; width: 120px; font-size: 9px; }
-        .sign-line { border-bottom: 1px solid #000; width: 80%; margin: 60px auto 5px auto; }
 
+        .sign-img { 
+            display: block; margin: 0 auto; 
+            max-width: 150px; 
+            max-height: 90px; /* Agar tidak melebihi sign-area */
+            object-fit: contain; 
+            position: relative; top: 10px; /* Sedikit turun agar rapi */
+        }
+
+        .sign-name { font-weight: bold; text-decoration: underline; font-size: 11px; margin-top: 5px; }
+        .no-sign-text { line-height: 100px; color: #ccc; font-size: 9px; }
+        
+        /* Garis Tanda Tangan Manual */
+        .sign-line { 
+            border-bottom: 1px solid #000; 
+            width: 80%; 
+            margin: 80px auto 5px auto; /* Margin atas menyesuaikan area kosong */
+        }
+
+        /* HIDE PRINT BUTTON */
         @media print { .no-print { display: none; } }
         .no-print { text-align: center; padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
         .btn-print { padding: 5px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
@@ -171,46 +196,44 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <td class="footer-col sender-box">
                 <div class="sign-title">Sender</div>
                 
-                <?php 
-                    // [FIX] Menggunakan Data dari Invoice Creator (Sales)
-                    $signFile = trim($do['sender_sign'] ?? ''); 
-                    $userId   = $do['sender_id'] ?? 0;
-                    
-                    $signPath = '';
-                    $baseDir = dirname(__DIR__); // Root Server Path
+                <div class="sign-area">
+                    <?php 
+                        $signFile = trim($do['sender_sign'] ?? ''); 
+                        $userId   = $do['sender_id'] ?? 0;
+                        $signPath = '';
+                        $baseDir = dirname(__DIR__); 
 
-                    // 1. Cek dari Database
-                    if (!empty($signFile) && file_exists($baseDir . '/uploads/signatures/' . $signFile)) {
-                        $signPath = '../uploads/signatures/' . $signFile;
-                    }
-                    // 2. AUTO-SEARCH: Cari file signature milik user ini
-                    elseif (!empty($userId)) {
-                        $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $userId . '_*.png');
-                        if ($files && count($files) > 0) {
-                            // Ambil nama file dari path lengkap
-                            $signPath = '../uploads/signatures/' . basename($files[0]); 
+                        // Logika Auto-Search
+                        if (!empty($signFile) && file_exists($baseDir . '/uploads/signatures/' . $signFile)) {
+                            $signPath = '../uploads/signatures/' . $signFile;
                         }
-                    }
+                        elseif (!empty($userId)) {
+                            $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $userId . '_*.png');
+                            if ($files && count($files) > 0) $signPath = '../uploads/signatures/' . basename($files[0]);
+                        }
 
-                    // 3. Fallback Default
-                    if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
-                        $signPath = '../assets/images/signature.png';
-                    }
-                ?>
+                        if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
+                            $signPath = '../assets/images/signature.png';
+                        }
+                    ?>
 
-                <?php if (!empty($signPath)): ?>
-                    <img src="<?= $signPath ?>" class="sign-img">
-                <?php else: ?>
-                    <div class="no-sign-box">(No Signature)</div>
-                <?php endif; ?>
+                    <?php if (!empty($signPath)): ?>
+                        <img src="<?= $signPath ?>" class="sign-img">
+                    <?php else: ?>
+                        <span class="no-sign-text">(No Signature)</span>
+                    <?php endif; ?>
+                </div>
 
                 <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Niawati') ?></div>
             </td>
 
             <td class="footer-col recipient-box">
                 <div class="sign-title">Recipient</div>
-                <div style="height: 55px;"></div> 
-                <div class="sign-line"></div>
+                
+                <div class="sign-area">
+                    <div class="sign-line"></div>
+                </div>
+
                 <div class="sign-name"><?= htmlspecialchars($do['pic_name'] ?? 'Client') ?></div>
             </td>
         </tr>
