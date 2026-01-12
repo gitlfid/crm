@@ -8,32 +8,33 @@ include '../config/functions.php';
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// --- [UPDATE FIX] LOGIKA PATEN DO (DO + YYYYMM + 0001) ---
-// Format Total 12 Digit: DO (2) + 202601 (6) + 0001 (4)
-$prefixDO = "DO" . date('Ym'); // Contoh: DO202601
+// --- [LOGIKA BARU] GENERATOR NOMOR DO URUT (DO + YYYYMM + 0001) ---
+// Format Target: 12 Karakter (DO=2, YYYYMM=6, SEQ=4)
+$prefix = "DO" . date('Ym'); // Contoh: DO202601
 
-// Cek nomor terakhir KHUSUS yang formatnya 12 digit (Format Baru)
-// Filter LENGTH(do_number)=12 agar tidak tertukar dengan format lama (13 digit)
-$sqlCek = "SELECT do_number FROM delivery_orders 
-           WHERE do_number LIKE '$prefixDO%' 
-           AND CHAR_LENGTH(do_number) = 12
-           ORDER BY do_number DESC LIMIT 1";
-$resCek = $conn->query($sqlCek);
+// Default awal jika bulan baru / belum ada data
+$next_do_number = $prefix . "0001"; 
 
-if ($resCek && $resCek->num_rows > 0) {
-    // Jika sudah ada format baru bulan ini, lanjutkan urutannya
-    $rowLast = $resCek->fetch_assoc();
-    $lastNo = $rowLast['do_number']; // DO2026010001
-    $lastUrut = (int)substr($lastNo, -4); // Ambil 0001
-    $newUrut = $lastUrut + 1;
-} else {
-    // Jika belum ada format baru (atau cuma ada format lama), mulai dari 1
-    $newUrut = 1;
+// Cek nomor terakhir di database KHUSUS yang formatnya 12 digit
+// Kita pakai CHAR_LENGTH(do_number) = 12 agar data lama yang acak (13 digit) TIDAK dihitung
+$sqlCheck = "SELECT do_number FROM delivery_orders 
+             WHERE do_number LIKE '$prefix%' 
+             AND CHAR_LENGTH(do_number) = 12 
+             ORDER BY do_number DESC LIMIT 1";
+$resCheck = $conn->query($sqlCheck);
+
+if ($resCheck && $resCheck->num_rows > 0) {
+    // Jika sudah ada DO dengan format baru bulan ini, ambil urutan terakhir + 1
+    $rowLast = $resCheck->fetch_assoc();
+    $lastNo = $rowLast['do_number']; // Misal: DO2026010001
+    $lastSeq = (int)substr($lastNo, -4); // Ambil 0001 -> jadi angka 1
+    $newSeq = $lastSeq + 1; // Jadi 2
+    $next_do_number = $prefix . str_pad($newSeq, 4, "0", STR_PAD_LEFT); // DO2026010002
 }
 
-// Generate Nomor
-$do_number = $prefixDO . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
-// -----------------------------------------------------------
+// Set ke variabel utama
+$do_number = $next_do_number;
+// ------------------------------------------------------------------
 
 $do_date = date('Y-m-d');
 $status = 'draft';
@@ -46,7 +47,7 @@ $ref_info = '';
 
 // --- KASUS 1: CREATE DARI INVOICE ---
 if ($from_inv_id > 0) {
-    // 1. Cari Payment ID
+    // 1. Cari Payment ID dari Invoice ini (Ambil payment terakhir)
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     
@@ -87,8 +88,10 @@ if ($do_id > 0) {
     $resData = $conn->query($sqlData);
     if ($resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
-        // [PENTING] Jika Edit, gunakan nomor lama dari database, JANGAN generate baru
+        
+        // [PENTING] Kalau mode Edit, pakai nomor asli dari DB, JANGAN generate baru
         $do_number = $row['do_number'];
+        
         $do_date = $row['do_date'];
         $status = $row['status'];
         $pic_name = $row['pic_name'];
@@ -147,7 +150,7 @@ if (isset($_POST['save_do'])) {
                         <div class="mb-3">
                             <label class="form-label fw-bold">DO Number</label>
                             <input type="text" name="do_number" class="form-control font-monospace fw-bold bg-light" value="<?= htmlspecialchars($do_number) ?>" required readonly>
-                            <div class="form-text text-muted small">Nomor otomatis (Paten): DO + TahunBulan + 4 Digit Urut.</div>
+                            <div class="form-text text-muted small">Nomor otomatis: DO + TahunBulan + 000X (Reset tiap bulan).</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold">Delivery Date</label>
