@@ -44,26 +44,41 @@ if (isset($_POST['export_excel'])) {
         $do_id = $row['id'];
         $itemsData = [];
 
-        // 1. Cek Tabel DO Items (Data Hasil Edit)
+        // 1. CEK TABEL DO ITEMS (Data Hasil Edit)
+        // Gunakan alias 'charge_mode' agar konsisten
         $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resDOItems = $conn->query($sqlDOItems);
 
         if ($resDOItems && $resDOItems->num_rows > 0) {
-            while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
+            // Jika ada data di tabel delivery_order_items, GUNAKAN ITU (Hasil Edit)
+            while($itm = $resDOItems->fetch_assoc()) {
+                $itemsData[] = $itm;
+            }
         } else {
-            // 2. Fallback Invoice (Data Lama)
+            // 2. FALLBACK INVOICE (Hanya jika belum pernah diedit)
             $inv_id = $row['invoice_id'];
+            // Pastikan mengambil card_type sebagai charge_mode
             $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = $inv_id";
             $resItems = $conn->query($items_sql);
-            while($itm = $resItems->fetch_assoc()) $itemsData[] = $itm;
+            while($itm = $resItems->fetch_assoc()) {
+                $itemsData[] = $itm;
+            }
         }
 
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
                 fputcsv($output, array(
-                    $row['do_number'], $row['do_date'], $row['company_name'], $row['address'],
-                    $item['item_name'], floatval($item['qty']), $item['charge_mode'], $item['description'],
-                    $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])
+                    $row['do_number'], 
+                    $row['do_date'], 
+                    $row['company_name'], 
+                    $row['address'],
+                    $item['item_name'], 
+                    floatval($item['qty']), 
+                    $item['charge_mode'], // Ini akan menampilkan hasil edit ("Prepaid")
+                    $item['description'],
+                    $row['pic_name'], 
+                    $row['pic_phone'], 
+                    strtoupper($row['status'])
                 ));
             }
         } else {
@@ -162,25 +177,32 @@ $res = $conn->query($sql);
                                 $do_id = $row['id'];
                                 $itemsData = [];
 
-                                // 1. Cek Tabel DO Items (Data yang sudah diedit)
+                                // 1. Cek Tabel DO Items (Data yang sudah diedit/disimpan)
+                                // Gunakan alias charge_mode agar konsisten
                                 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode FROM delivery_order_items WHERE delivery_order_id = $do_id";
                                 $resDOItems = $conn->query($sqlDOItems);
 
                                 if ($resDOItems && $resDOItems->num_rows > 0) {
-                                    while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
+                                    // Jika ada data edit, GUNAKAN INI
+                                    while($itm = $resDOItems->fetch_assoc()) {
+                                        $itemsData[] = $itm;
+                                    }
                                 } else {
-                                    // 2. Fallback Invoice (Data Lama)
+                                    // 2. Fallback Invoice (Jika belum pernah diedit)
                                     $inv_id = $row['invoice_id'];
-                                    $quo_id = $row['quotation_id'];
-                                    
+                                    // Ambil card_type sebagai charge_mode
                                     $items_sql = "SELECT item_name, qty, card_type as charge_mode FROM invoice_items WHERE invoice_id = $inv_id";
                                     $resItems = $conn->query($items_sql);
                                     
-                                    if($resItems->num_rows == 0) {
-                                        $items_sql = "SELECT item_name, qty, card_type as charge_mode FROM quotation_items WHERE quotation_id = $quo_id";
+                                    // Jika invoice kosong, fallback ke quotation (jarang terjadi)
+                                    if($resItems->num_rows == 0 && isset($row['quotation_id'])) {
+                                        $items_sql = "SELECT item_name, qty, card_type as charge_mode FROM quotation_items WHERE quotation_id = " . $row['quotation_id'];
                                         $resItems = $conn->query($items_sql);
                                     }
-                                    while($itm = $resItems->fetch_assoc()) $itemsData[] = $itm;
+                                    
+                                    while($itm = $resItems->fetch_assoc()) {
+                                        $itemsData[] = $itm;
+                                    }
                                 }
                             ?>
                             <tr>
