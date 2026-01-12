@@ -76,35 +76,35 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         /* Styling Tanda Tangan */
         .sign-title { font-weight: bold; margin-bottom: 5px; text-decoration: underline; font-size: 11px; }
         
-        /* [FIX] Area Gambar Diperbesar */
+        /* [FIX] Area Gambar Diperbesar Lagi */
         .sign-area { 
-            height: 130px; /* Diperbesar agar muat gambar besar */
+            height: 160px; /* Tinggi wadah diperbesar (sebelumnya 130px) */
             width: 100%;
             display: flex;
-            align-items: flex-end; /* Memaksa isi ada di bawah */
+            align-items: flex-end; 
             justify-content: center;
             margin-bottom: 5px;
         }
 
-        /* [FIX] Gambar Diperbesar Proporsional */
+        /* [FIX] Gambar Tanda Tangan Jauh Lebih Besar */
         .sign-img { 
             display: block; margin: 0 auto; 
             width: auto; 
             height: auto;
-            max-width: 250px;  /* Lebar maksimal diperbesar */
-            max-height: 120px; /* Tinggi maksimal diperbesar */
+            max-width: 100%;   /* Memenuhi lebar kolom jika perlu */
+            max-height: 150px; /* Tinggi maksimal diperbesar (sebelumnya 120px) */
             object-fit: contain; 
             position: relative; top: 10px; 
         }
 
         .sign-name { font-weight: bold; text-decoration: underline; font-size: 11px; margin-top: 5px; }
-        .no-sign-text { line-height: 130px; color: #ccc; font-size: 9px; }
+        .no-sign-text { line-height: 160px; color: #ccc; font-size: 9px; }
         
-        /* [FIX] Garis Tanda Tangan Manual Menyesuaikan Tinggi */
+        /* [FIX] Garis Tanda Tangan Manual (Menyesuaikan Tinggi Baru) */
         .sign-line { 
             border-bottom: 1px solid #000; 
             width: 80%; 
-            margin: 110px auto 5px auto; /* Margin atas disesuaikan dengan tinggi sign-area */
+            margin: 140px auto 5px auto; /* Turun ke bawah menyesuaikan area gambar */
         }
 
         /* HIDE PRINT BUTTON */
