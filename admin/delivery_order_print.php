@@ -1,267 +1,319 @@
 <?php
-include '../config/database.php';
-session_start();
-if (!isset($_SESSION['user_id'])) die("Access Denied");
+// --- 1. LOAD CONFIG DULUAN ---
+include '../config/functions.php';
 
-$id = intval($_GET['id']);
+// --- 2. INIT FILTER VARIABLES ---
+$search   = isset($_REQUEST['search']) ? $_REQUEST['search'] : '';
+$f_client = isset($_REQUEST['client_id']) ? $_REQUEST['client_id'] : '';
 
-// 1. AMBIL DATA HEADER (DO -> Payment -> Invoice -> Sales User)
-$sql = "SELECT d.*, 
-               c.company_name, c.address, c.pic_name, c.pic_phone,
-               u.id as sender_id, u.username as sender_name, u.signature_file as sender_sign,
-               p.invoice_id, i.quotation_id
-        FROM delivery_orders d
-        LEFT JOIN payments p ON d.payment_id = p.id
-        LEFT JOIN invoices i ON p.invoice_id = i.id
-        LEFT JOIN quotations q ON i.quotation_id = q.id
-        LEFT JOIN clients c ON q.client_id = c.id
-        LEFT JOIN users u ON i.created_by_user_id = u.id 
-        WHERE d.id = $id";
+// Bangun Query WHERE
+$where = "1=1";
 
-$do = $conn->query($sql)->fetch_assoc();
-if(!$do) die("DO not found (ID: $id)");
-
-// 2. AMBIL ITEM (LOGIKA PERBAIKAN: AMBIL DARI INVOICE ITEMS)
-$inv_id = $do['invoice_id'];
-$quo_id = $do['quotation_id'];
-
-// Coba ambil dari Invoice Items dulu
-$sql_items = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = '$inv_id'";
-$items = $conn->query($sql_items);
-
-// Jika kosong, ambil dari Quotation Items (Fallback)
-if ($items->num_rows == 0) {
-    $sql_items = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = '$quo_id'";
-    $items = $conn->query($sql_items);
+// Filter Pencarian (No DO)
+if (!empty($search)) {
+    $safe_search = $conn->real_escape_string($search);
+    $where .= " AND d.do_number LIKE '%$safe_search%'";
 }
 
-$sets = [];
-$res = $conn->query("SELECT * FROM settings");
-while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
+// Filter Client
+if (!empty($f_client)) {
+    $safe_client = intval($f_client);
+    $where .= " AND c.id = $safe_client";
+}
+
+// --- 3. LOGIKA EXPORT EXCEL (CSV - ITEM PER ROW) ---
+if (isset($_POST['export_excel'])) {
+    if (ob_get_length()) ob_end_clean();
+    
+    // Ambil Data Header DO
+    // [UPDATE] ORDER BY do_number DESC (Agar urutan sesuai Nomor Surat Jalan)
+    $sqlEx = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
+              FROM delivery_orders d 
+              JOIN payments p ON d.payment_id = p.id 
+              JOIN invoices i ON p.invoice_id = i.id
+              JOIN quotations q ON i.quotation_id = q.id
+              JOIN clients c ON q.client_id = c.id
+              WHERE $where
+              ORDER BY d.do_number DESC"; 
+    $resEx = $conn->query($sqlEx);
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename=DeliveryOrders_Detailed_' . date('Ymd_His') . '.csv');
+    
+    $output = fopen('php://output', 'w');
+    
+    // Header CSV
+    fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
+    
+    while($row = $resEx->fetch_assoc()) {
+        // --- Ambil Detail Item ---
+        $inv_id = $row['invoice_id'];
+        $quo_id = $row['quotation_id'];
+        
+        $itemsData = [];
+        
+        // Prioritas 1: Ambil dari Invoice Items
+        $items_sql = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = $inv_id";
+        $resItems = $conn->query($items_sql);
+        
+        // Prioritas 2: Jika kosong, ambil dari Quotation Items
+        if($resItems->num_rows == 0) {
+            $items_sql = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = $quo_id";
+            $resItems = $conn->query($items_sql);
+        }
+
+        while($itm = $resItems->fetch_assoc()) {
+            $itemsData[] = $itm;
+        }
+
+        // --- TULIS KE CSV (SATU BARIS PER ITEM) ---
+        if (count($itemsData) > 0) {
+            foreach ($itemsData as $item) {
+                fputcsv($output, array(
+                    $row['do_number'],
+                    $row['do_date'],
+                    $row['company_name'],
+                    $row['address'],
+                    $item['item_name'],         // Item Sendiri
+                    floatval($item['qty']),     // Qty Sendiri
+                    $item['card_type'],         // Charge Mode Sendiri
+                    $item['description'],       // Desc Sendiri
+                    $row['pic_name'],
+                    $row['pic_phone'],
+                    strtoupper($row['status'])
+                ));
+            }
+        } else {
+            // Fallback: Jika DO tidak ada item
+            fputcsv($output, array(
+                $row['do_number'],
+                $row['do_date'],
+                $row['company_name'],
+                $row['address'],
+                '- No Item -', '', '', '', // Kolom Item Kosong
+                $row['pic_name'],
+                $row['pic_phone'],
+                strtoupper($row['status'])
+            ));
+        }
+    }
+    fclose($output);
+    exit();
+}
+
+// --- 4. LOAD TAMPILAN HTML ---
+$page_title = "Delivery Orders";
+include 'includes/header.php';
+include 'includes/sidebar.php';
+
+$clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
+
+// QUERY DATA TAMPILAN DASHBOARD
+// [UPDATE] ORDER BY d.do_number DESC (Mengurutkan berdasarkan Nomor DO, bukan Tanggal Buat)
+$sql = "SELECT d.*, c.company_name, c.address, p.invoice_id, i.quotation_id
+        FROM delivery_orders d 
+        JOIN payments p ON d.payment_id = p.id 
+        JOIN invoices i ON p.invoice_id = i.id
+        JOIN quotations q ON i.quotation_id = q.id
+        JOIN clients c ON q.client_id = c.id
+        WHERE $where
+        ORDER BY d.do_number DESC";
+$res = $conn->query($sql);
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Delivery Order <?= $do['do_number'] ?></title>
-    <style>
-        * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
-        
-        /* SETTING HALAMAN AGAR URL HILANG (Tapi tetap wajib uncheck 'Headers and footers' di browser) */
-        @page { 
-            margin: 1cm; /* Margin standar */
-            size: A4; 
-        }
+<style>
+    .table-responsive { overflow: visible !important; }
+    .item-list { font-size: 0.85rem; }
+    .item-row { border-bottom: 1px dashed #eee; padding: 2px 0; }
+    .item-row:last-child { border-bottom: none; }
+</style>
 
-        /* HEADER */
-        .header-table { width: 100%; margin-bottom: 30px; }
-        .logo { max-height: 60px; margin-bottom: 5px; }
-        .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
-        .doc-title { text-align: right; font-size: 20px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
+<div class="page-heading">
+    <div class="row align-items-center">
+        <div class="col-12 col-md-6">
+            <h3>Delivery Orders</h3>
+            <p class="text-subtitle text-muted">Daftar surat jalan pengiriman barang ke client.</p>
+        </div>
+    </div>
+</div>
 
-        /* INFO BOXES */
-        .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; }
-        .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 120px; }
-        .info-spacer { width: 4%; }
-        .inner-table { width: 100%; font-size: 11px; }
-        .inner-table td { padding-bottom: 3px; vertical-align: top; }
-        .lbl { width: 80px; font-weight: bold; } .sep { width: 10px; text-align: center; }
+<div class="page-content">
+    
+    <div class="card shadow-sm mb-4">
+        <div class="card-body py-3">
+            <div class="row g-3">
+                <div class="col-lg-9">
+                    <form method="GET" class="row g-2">
+                        <div class="col-md-5">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                                <input type="text" name="search" class="form-control" placeholder="Cari No DO..." value="<?= htmlspecialchars($search) ?>">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <select name="client_id" class="form-select">
+                                <option value="">- Semua Perusahaan -</option>
+                                <?php 
+                                if($clients->num_rows > 0) {
+                                    $clients->data_seek(0);
+                                    while($c = $clients->fetch_assoc()): 
+                                ?>
+                                    <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($c['company_name']) ?>
+                                    </option>
+                                <?php endwhile; } ?>
+                            </select>
+                        </div>
 
-        /* ITEMS TABLE */
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
-        .items-table th { 
-            border: 1px solid #000; 
-            background-color: #ff6b6b; /* Warna Header DO */
-            color: white;
-            padding: 8px; 
-            text-align: center; 
-            font-weight: bold;
-        }
-        .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: center; }
-        .text-left { text-align: left !important; }
-        .text-right { text-align: right !important; }
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary w-100">Filter</button>
+                        </div>
+                    </form>
+                </div>
 
-        /* --- FOOTER LAYOUT --- */
-        .footer-table { width: 100%; margin-top: 30px; page-break-inside: avoid; border-collapse: collapse; }
-        
-        /* [FIX] Align Bottom agar Nama Sejajar */
-        .footer-col { vertical-align: bottom; padding: 10px; }
-        
-        .remarks-col { vertical-align: top; width: 34%; font-size: 10px; border-right: 1px solid #eee; padding-right: 15px; }
-        .sender-col { width: 33%; text-align: center; }
-        .recipient-col { width: 33%; text-align: center; }
-
-        /* Styling Tanda Tangan */
-        .sign-title { font-weight: bold; margin-bottom: 10px; text-decoration: underline; font-size: 11px; display: block; }
-        
-        /* [FIX] AREA TANDA TANGAN PROPORSIONAL */
-        .sign-area { 
-            height: 110px; /* Tinggi area tetap */
-            width: 100%;
-            display: flex;
-            align-items: flex-end; /* Gambar menempel di bawah */
-            justify-content: center;
-            margin-bottom: 5px;
-        }
-
-        /* [FIX] GAMBAR TIDAK GEPENG */
-        .sign-img { 
-            max-width: 100%;   
-            max-height: 100px; /* Batas tinggi gambar */
-            width: auto;       /* Lebar otomatis menyesuaikan rasio */
-            height: auto;      /* Tinggi otomatis menyesuaikan rasio */
-            object-fit: contain; /* KUNCI: Menjaga proporsi gambar */
-            display: block;
-        }
-
-        .sign-name { font-weight: bold; text-decoration: underline; font-size: 11px; margin-top: 5px; display: block;}
-        .no-sign-text { color: #ccc; font-size: 9px; margin-bottom: 40px; display: block;}
-        
-        /* Garis Tanda Tangan Manual */
-        .sign-line { 
-            border-bottom: 1px solid #000; 
-            width: 80%; 
-            margin: 0 auto;
-        }
-
-        /* HIDE PRINT BUTTON */
-        @media print { .no-print { display: none; } }
-        .no-print { text-align: center; padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
-        .btn-print { padding: 5px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
-    </style>
-</head>
-<body>
-
-    <div class="no-print">
-        <button onclick="window.print()" class="btn-print">🖨️ Print / Save PDF</button>
-        <div style="margin-top: 5px; color: red; font-size: 10px;">
-            * Untuk menghilangkan URL di bawah, Hapus Centang <b>"Headers and footers"</b> di menu Print.
+                <div class="col-lg-3 border-start d-flex align-items-center justify-content-end">
+                    <form method="POST" class="w-100">
+                        <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+                        <input type="hidden" name="client_id" value="<?= htmlspecialchars($f_client) ?>">
+                        
+                        <button type="submit" name="export_excel" class="btn btn-success w-100 text-white">
+                            <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export to Excel
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <?php if(!empty($search) || !empty($f_client)): ?>
+                <div class="mt-3 text-center border-top pt-2">
+                    <small class="text-muted">Filter aktif.</small> 
+                    <a href="delivery_order_list.php" class="text-danger text-decoration-none fw-bold ms-2">Reset Filter</a>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
-    <table class="header-table">
-        <tr>
-            <td>
-                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
-                <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?></div>
-            </td>
-            <td align="right" valign="top"><div class="doc-title">DELIVERY ORDER</div></td>
-        </tr>
-    </table>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive" style="overflow:visible;">
+                <table class="table table-hover align-middle table-sm" id="table1">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>DO Number</th>
+                            <th>Date</th>
+                            <th width="15%">Client & Address</th>
+                            <th width="20%">Item</th>
+                            <th>Unit</th>
+                            <th>Charge Mode</th>
+                            <th width="15%">Desc</th>
+                            <th>Receiver</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($res->num_rows > 0): ?>
+                            <?php while($row = $res->fetch_assoc()): ?>
+                            <?php
+                                // --- Ambil Detail Item untuk Tampilan HTML ---
+                                $inv_id = $row['invoice_id'];
+                                $quo_id = $row['quotation_id'];
+                                
+                                $items_sql = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = $inv_id";
+                                $resItems = $conn->query($items_sql);
+                                if($resItems->num_rows == 0) {
+                                    $items_sql = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = $quo_id";
+                                    $resItems = $conn->query($items_sql);
+                                }
+                                
+                                // Simpan dalam array untuk diloop di TD
+                                $itemsData = [];
+                                while($itm = $resItems->fetch_assoc()) {
+                                    $itemsData[] = $itm;
+                                }
+                            ?>
+                            <tr>
+                                <td class="align-top">
+                                    <span class="fw-bold text-dark font-monospace"><?= $row['do_number'] ?></span>
+                                </td>
+                                <td class="align-top">
+                                    <div class="small text-muted"><?= date('d M Y', strtotime($row['do_date'])) ?></div>
+                                </td>
+                                <td class="align-top">
+                                    <div class="fw-bold text-primary mb-1"><?= htmlspecialchars($row['company_name']) ?></div>
+                                    <div class="small text-muted lh-sm" style="font-size: 0.75rem;">
+                                        <i class="bi bi-geo-alt me-1"></i> <?= htmlspecialchars(substr($row['address'], 0, 50)) ?>...
+                                    </div>
+                                </td>
 
-    <table class="info-wrapper">
-        <tr>
-            <td class="info-box">
-                <table class="inner-table">
-                    <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($do['company_name'] ?? 'Unknown') ?></strong></td></tr>
-                    <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($do['address'] ?? '-')) ?></td></tr>
-                    <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_name'] ?? '-') ?></td></tr>
+                                <td class="align-top">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row fw-bold"><?= htmlspecialchars($d['item_name']) ?></div>
+                                    <?php endforeach; ?>
+                                </td>
+                                <td class="align-top text-center">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row"><?= floatval($d['qty']) ?></div>
+                                    <?php endforeach; ?>
+                                </td>
+                                <td class="align-top text-center">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row badge bg-light text-dark border"><?= htmlspecialchars($d['card_type']) ?></div>
+                                    <?php endforeach; ?>
+                                </td>
+                                <td class="align-top">
+                                    <?php foreach($itemsData as $d): ?>
+                                        <div class="item-row small text-muted"><?= htmlspecialchars($d['description']) ?></div>
+                                    <?php endforeach; ?>
+                                </td>
+
+                                <td class="align-top">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-person-circle me-2 text-secondary"></i>
+                                        <div class="lh-1">
+                                            <span class="d-block small fw-bold"><?= htmlspecialchars($row['pic_name']) ?></span>
+                                            <span class="d-block text-muted" style="font-size:0.7rem;"><?= htmlspecialchars($row['pic_phone']) ?></span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="align-top">
+                                    <?php 
+                                        $st = $row['status']; 
+                                        $bg = ($st == 'sent') ? 'success' : 'secondary';
+                                    ?>
+                                    <span class="badge bg-<?= $bg ?>"><?= strtoupper($st) ?></span>
+                                </td>
+                                <td class="align-top">
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle py-0" type="button" data-bs-toggle="dropdown">Act</button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 small">
+                                            <li><a class="dropdown-item" href="delivery_order_print.php?id=<?= $row['id'] ?>" target="_blank"><i class="bi bi-printer me-2"></i> Print</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item" href="delivery_order_form.php?edit_id=<?= $row['id'] ?>"><i class="bi bi-pencil me-2"></i> Edit</a></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
+                                    Tidak ada data Delivery Order ditemukan.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
                 </table>
-            </td>
-            <td class="info-spacer"></td>
-            <td class="info-box">
-                <table class="inner-table">
-                    <tr><td class="lbl">Delivery Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($do['do_date'])) ?></td></tr>
-                    <tr><td class="lbl">Delivery No</td><td class="sep">:</td><td><strong><?= $do['do_number'] ?></strong></td></tr>
-                    <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_name'] ?? '-') ?></td></tr>
-                    <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_phone'] ?? '-') ?></td></tr>
-                </table>
-            </td>
-        </tr>
-    </table>
+            </div>
+            
+            <?php if($res->num_rows > 15): ?>
+            <div class="card-footer bg-white border-top text-center py-3">
+                <small class="text-muted">Menampilkan hasil pencarian</small>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
 
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th width="5%">No</th>
-                <th width="35%">Item Name</th>
-                <th width="10%">Unit</th>
-                <th width="20%">Charge Mode</th>
-                <th width="30%">Description</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php 
-            $no = 1; $totalUnit = 0;
-            // LOOP ITEM DARI INVOICE/QUOTATION
-            while($item = $items->fetch_assoc()): 
-                $qty = floatval($item['qty']);
-                $totalUnit += $qty;
-            ?>
-            <tr>
-                <td><?= $no++ ?></td>
-                <td class="text-left"><?= htmlspecialchars($item['item_name'] ?? '') ?></td>
-                <td><?= $qty ?></td>
-                <td><?= htmlspecialchars($item['card_type'] ?? '') ?></td>
-                <td class="text-left"><?= nl2br(htmlspecialchars($item['description'] ?? '')) ?></td>
-            </tr>
-            <?php endwhile; ?>
-            <tr>
-                <td colspan="2" class="text-right" style="font-weight:bold;">Total Unit</td>
-                <td style="font-weight:bold;"><?= $totalUnit ?></td>
-                <td colspan="2"></td>
-            </tr>
-        </tbody>
-    </table>
-
-    <table class="footer-table">
-        <tr>
-            <td class="footer-col remarks-col">
-                <strong>Remarks :</strong>
-                <ul style="padding-left: 15px; margin-top: 5px;">
-                    <li>Please sign and stamp this delivery order</li>
-                    <li>Please send it via email and whatsapp to the number above</li>
-                    <li>Barang yang sudah dibeli tidak dapat dikembalikan</li>
-                </ul>
-            </td>
-
-            <td class="footer-col sender-col">
-                <div class="sign-title">Sender</div>
-                
-                <div class="sign-area">
-                    <?php 
-                        $signFile = trim($do['sender_sign'] ?? ''); 
-                        $userId   = $do['sender_id'] ?? 0;
-                        $signPath = '';
-                        $baseDir = dirname(__DIR__); 
-
-                        // Logika Auto-Search (Sama dengan Invoice)
-                        if (!empty($signFile) && file_exists($baseDir . '/uploads/signatures/' . $signFile)) {
-                            $signPath = '../uploads/signatures/' . $signFile;
-                        }
-                        elseif (!empty($userId)) {
-                            $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $userId . '_*.png');
-                            if ($files && count($files) > 0) $signPath = '../uploads/signatures/' . basename($files[0]);
-                        }
-
-                        if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
-                            $signPath = '../assets/images/signature.png';
-                        }
-                    ?>
-
-                    <?php if (!empty($signPath)): ?>
-                        <img src="<?= $signPath ?>" class="sign-img">
-                    <?php else: ?>
-                        <span class="no-sign-text">(No Signature)</span>
-                    <?php endif; ?>
-                </div>
-
-                <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Niawati') ?></div>
-            </td>
-
-            <td class="footer-col recipient-col">
-                <div class="sign-title">Recipient</div>
-                
-                <div class="sign-area">
-                    <div class="sign-line"></div>
-                </div>
-
-                <div class="sign-name"><?= htmlspecialchars($do['pic_name'] ?? 'Client') ?></div>
-            </td>
-        </tr>
-    </table>
-
-</body>
-</html>
+<?php include 'includes/footer.php'; ?>
