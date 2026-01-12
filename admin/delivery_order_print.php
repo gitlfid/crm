@@ -5,16 +5,18 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL DATA HEADER (LEFT JOIN AGAR AMAN)
+// 1. AMBIL DATA HEADER
+// [UPDATE] Join ke table users sekarang diarahkan ke (i.created_by_user_id) 
+// agar Sender yang muncul adalah Pembuat Invoice (Sales/Niawati), bukan Admin Gudang.
 $sql = "SELECT d.*, 
                c.company_name, c.address, c.pic_name, c.pic_phone,
-               u.username as sender_name, u.signature_file as sender_sign 
+               u.id as sender_id, u.username as sender_name, u.signature_file as sender_sign 
         FROM delivery_orders d
         LEFT JOIN payments p ON d.payment_id = p.id
         LEFT JOIN invoices i ON p.invoice_id = i.id
         LEFT JOIN quotations q ON i.quotation_id = q.id
         LEFT JOIN clients c ON q.client_id = c.id
-        LEFT JOIN users u ON d.created_by_user_id = u.id
+        LEFT JOIN users u ON i.created_by_user_id = u.id 
         WHERE d.id = $id";
 
 $do = $conn->query($sql)->fetch_assoc();
@@ -52,7 +54,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
         .items-table th { 
             border: 1px solid #000; 
-            background-color: #ff6b6b; 
+            background-color: #ff6b6b; /* Warna Header DO */
             color: white;
             padding: 8px; 
             text-align: center; 
@@ -79,7 +81,6 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .no-sign-box { height: 80px; line-height: 80px; color: #ccc; border: 1px dashed #ccc; margin: 5px auto; width: 120px; font-size: 9px; }
         .sign-line { border-bottom: 1px solid #000; width: 80%; margin: 60px auto 5px auto; }
 
-        /* HIDE PRINT BUTTON ON PRINT */
         @media print { .no-print { display: none; } }
         .no-print { text-align: center; padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
         .btn-print { padding: 5px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
@@ -171,34 +172,28 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 <div class="sign-title">Sender</div>
                 
                 <?php 
-                    // [FIX] GUNAKAN NULL COALESCING (?? '') UNTUK MENCEGAH ERROR TRIM()
+                    // [FIX] Menggunakan Data dari Invoice Creator (Sales)
                     $signFile = trim($do['sender_sign'] ?? ''); 
-                    $userId   = $do['created_by_user_id'] ?? 0;
+                    $userId   = $do['sender_id'] ?? 0;
                     
                     $signPath = '';
+                    $baseDir = dirname(__DIR__); // Root Server Path
 
                     // 1. Cek dari Database
-                    if (!empty($signFile) && file_exists('../uploads/signatures/' . $signFile)) {
+                    if (!empty($signFile) && file_exists($baseDir . '/uploads/signatures/' . $signFile)) {
                         $signPath = '../uploads/signatures/' . $signFile;
                     }
-                    // 2. AUTO-SEARCH: Cari file apapun milik user ini (SIG_*_ID_*.png)
+                    // 2. AUTO-SEARCH: Cari file signature milik user ini
                     elseif (!empty($userId)) {
-                        $files = glob('../uploads/signatures/SIG_*_' . $userId . '_*.png');
+                        $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $userId . '_*.png');
                         if ($files && count($files) > 0) {
-                            $signPath = $files[0]; 
+                            // Ambil nama file dari path lengkap
+                            $signPath = '../uploads/signatures/' . basename($files[0]); 
                         }
                     }
 
-                    // 3. Fallback ke Uploads biasa
-                    if (empty($signPath) && !empty($userId)) {
-                        $files = glob('../uploads/SIG_*_' . $userId . '_*.png');
-                        if ($files && count($files) > 0) {
-                            $signPath = $files[0];
-                        }
-                    }
-
-                    // 4. Fallback Default
-                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
+                    // 3. Fallback Default
+                    if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
                         $signPath = '../assets/images/signature.png';
                     }
                 ?>
@@ -209,7 +204,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                     <div class="no-sign-box">(No Signature)</div>
                 <?php endif; ?>
 
-                <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Admin') ?></div>
+                <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Niawati') ?></div>
             </td>
 
             <td class="footer-col recipient-box">
