@@ -5,7 +5,7 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL DATA HEADER (GUNAKAN LEFT JOIN AGAR TIDAK ERROR "NOT FOUND")
+// 1. AMBIL DATA HEADER (LEFT JOIN AGAR AMAN)
 $sql = "SELECT d.*, 
                c.company_name, c.address, c.pic_name, c.pic_phone,
                u.username as sender_name, u.signature_file as sender_sign 
@@ -37,13 +37,11 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
         @page { margin: 1.5cm; size: A4; }
 
-        /* HEADER */
         .header-table { width: 100%; margin-bottom: 30px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
         .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 20px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
 
-        /* INFO BOXES */
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; }
         .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 120px; }
         .info-spacer { width: 4%; }
@@ -51,11 +49,10 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } .sep { width: 10px; text-align: center; }
 
-        /* ITEMS TABLE */
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
         .items-table th { 
             border: 1px solid #000; 
-            background-color: #ff6b6b; /* Warna Header DO */
+            background-color: #ff6b6b; 
             color: white;
             padding: 8px; 
             text-align: center; 
@@ -65,14 +62,12 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .text-left { text-align: left !important; }
         .text-right { text-align: right !important; }
 
-        /* FOOTER LAYOUT (3 KOLOM) */
         .footer-table { width: 100%; margin-top: 30px; page-break-inside: avoid; }
         .footer-col { vertical-align: top; padding: 5px; }
         .remarks-box { width: 40%; font-size: 10px; border-right: 1px solid #eee; }
         .sender-box { width: 30%; text-align: center; }
         .recipient-box { width: 30%; text-align: center; }
 
-        /* SIGNATURE STYLES */
         .sign-title { font-weight: bold; margin-bottom: 10px; text-decoration: underline; font-size: 10px; }
         .sign-img { 
             display: block; margin: 5px auto; 
@@ -82,17 +77,25 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         }
         .sign-name { font-weight: bold; text-decoration: underline; margin-top: 5px; }
         .no-sign-box { height: 80px; line-height: 80px; color: #ccc; border: 1px dashed #ccc; margin: 5px auto; width: 120px; font-size: 9px; }
-        .sign-line { border-bottom: 1px solid #000; width: 80%; margin: 60px auto 5px auto; } /* Garis tanda tangan manual */
+        .sign-line { border-bottom: 1px solid #000; width: 80%; margin: 60px auto 5px auto; }
 
+        /* HIDE PRINT BUTTON ON PRINT */
+        @media print { .no-print { display: none; } }
+        .no-print { text-align: center; padding: 10px; background: #f8f9fa; border-bottom: 1px solid #ccc; margin-bottom: 20px; }
+        .btn-print { padding: 5px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
     </style>
 </head>
-<body onload="window.print()">
+<body>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn-print">🖨️ Print / Save PDF</button>
+    </div>
 
     <table class="header-table">
         <tr>
             <td>
-                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo">
-                <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
+                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
+                <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">DELIVERY ORDER</div></td>
         </tr>
@@ -102,7 +105,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         <tr>
             <td class="info-box">
                 <table class="inner-table">
-                    <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($do['company_name'] ?? 'Guest/Unknown') ?></strong></td></tr>
+                    <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($do['company_name'] ?? 'Unknown') ?></strong></td></tr>
                     <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($do['address'] ?? '-')) ?></td></tr>
                     <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_name'] ?? '-') ?></td></tr>
                 </table>
@@ -112,8 +115,8 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 <table class="inner-table">
                     <tr><td class="lbl">Delivery Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($do['do_date'])) ?></td></tr>
                     <tr><td class="lbl">Delivery No</td><td class="sep">:</td><td><strong><?= $do['do_number'] ?></strong></td></tr>
-                    <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= $do['pic_name'] ?? '-' ?></td></tr>
-                    <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= $do['pic_phone'] ?? '-' ?></td></tr>
+                    <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_name'] ?? '-') ?></td></tr>
+                    <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_phone'] ?? '-') ?></td></tr>
                 </table>
             </td>
         </tr>
@@ -138,11 +141,11 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             ?>
             <tr>
                 <td><?= $no++ ?></td>
-                <td class="text-left"><?= htmlspecialchars($item['item_name']) ?></td>
-                <td><?= htmlspecialchars($item['content']) ?></td>
+                <td class="text-left"><?= htmlspecialchars($item['item_name'] ?? '') ?></td>
+                <td><?= htmlspecialchars($item['content'] ?? '') ?></td>
                 <td><?= $item['unit'] ?></td>
-                <td><?= $item['charge_mode'] ?></td>
-                <td class="text-left"><?= nl2br(htmlspecialchars($item['description'])) ?></td>
+                <td><?= htmlspecialchars($item['charge_mode'] ?? '') ?></td>
+                <td class="text-left"><?= nl2br(htmlspecialchars($item['description'] ?? '')) ?></td>
             </tr>
             <?php endwhile; ?>
             <tr>
@@ -168,35 +171,45 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 <div class="sign-title">Sender</div>
                 
                 <?php 
-                    // LOGIKA AUTO-SEARCH SIGNATURE (SAMA DENGAN INVOICE)
-                    $signFile = trim($do['sender_sign']);
-                    $src = '';
-                    $baseDir = dirname(__DIR__); // Root Server Path
+                    // [FIX] GUNAKAN NULL COALESCING (?? '') UNTUK MENCEGAH ERROR TRIM()
+                    $signFile = trim($do['sender_sign'] ?? ''); 
+                    $userId   = $do['created_by_user_id'] ?? 0;
+                    
+                    $signPath = '';
 
-                    if (!empty($signFile)) {
-                        // 1. Cek uploads/signatures/
-                        if (file_exists($baseDir . '/uploads/signatures/' . $signFile)) {
-                            $src = '../uploads/signatures/' . $signFile;
-                        } 
-                        // 2. Cek uploads/
-                        elseif (file_exists($baseDir . '/uploads/' . $signFile)) {
-                            $src = '../uploads/' . $signFile;
+                    // 1. Cek dari Database
+                    if (!empty($signFile) && file_exists('../uploads/signatures/' . $signFile)) {
+                        $signPath = '../uploads/signatures/' . $signFile;
+                    }
+                    // 2. AUTO-SEARCH: Cari file apapun milik user ini (SIG_*_ID_*.png)
+                    elseif (!empty($userId)) {
+                        $files = glob('../uploads/signatures/SIG_*_' . $userId . '_*.png');
+                        if ($files && count($files) > 0) {
+                            $signPath = $files[0]; 
                         }
                     }
-                    
-                    // 3. Fallback
-                    if (empty($src) && file_exists($baseDir . '/assets/images/signature.png')) {
-                        $src = '../assets/images/signature.png';
+
+                    // 3. Fallback ke Uploads biasa
+                    if (empty($signPath) && !empty($userId)) {
+                        $files = glob('../uploads/SIG_*_' . $userId . '_*.png');
+                        if ($files && count($files) > 0) {
+                            $signPath = $files[0];
+                        }
+                    }
+
+                    // 4. Fallback Default
+                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
+                        $signPath = '../assets/images/signature.png';
                     }
                 ?>
 
-                <?php if (!empty($src)): ?>
-                    <img src="<?= $src ?>" class="sign-img">
+                <?php if (!empty($signPath)): ?>
+                    <img src="<?= $signPath ?>" class="sign-img">
                 <?php else: ?>
                     <div class="no-sign-box">(No Signature)</div>
                 <?php endif; ?>
 
-                <div class="sign-name"><?= htmlspecialchars($do['sender_name']) ?></div>
+                <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Admin') ?></div>
             </td>
 
             <td class="footer-col recipient-box">
