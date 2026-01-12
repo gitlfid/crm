@@ -9,7 +9,7 @@ $id = intval($_GET['id']);
 $sql = "SELECT i.*, q.po_number_client, q.currency, q.remarks,
                c.company_name, c.address as c_address, c.pic_name, c.pic_phone,
                u.username as sales_name, u.email as sales_email, u.phone as sales_phone, 
-               u.signature_file as sales_sign, i.created_by_user_id 
+               u.signature_file as sales_sign 
         FROM invoices i
         JOIN quotations q ON i.quotation_id = q.id
         JOIN clients c ON q.client_id = c.id
@@ -33,11 +33,10 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- LOGIKA MATA UANG & PEMBULATAN ---
+// --- LOGIKA MATA UANG (USD vs IDR) ---
 $is_usd = ($inv['currency'] == 'USD');
-$tax_rate = $is_usd ? 0 : 0.11;
 
-// Info Bank
+// A. Tentukan Payment Info
 if ($is_usd) {
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
@@ -50,64 +49,22 @@ if ($is_usd) {
     $payment_details = $sets['invoice_payment_info'] ?? '-';
 }
 
-// Fungsi Format
+// B. Tentukan Tarif Pajak
+$tax_rate = $is_usd ? 0 : 0.11;
+
+// --- FUNGSI FORMAT PINTAR ---
 function smart_format($num, $curr) {
+    $clean_num = strval($num);
+    $decimals = 0;
+    if (strpos($clean_num, '.') !== false) {
+        $decimals = strlen(substr(strrchr($clean_num, "."), 1));
+    }
     if ($curr == 'IDR') {
-        return number_format((float)$num, 0, ',', '.');
+        return number_format((float)$clean_num, $decimals, ',', '.');
     } else {
-        return number_format((float)$num, 2, '.', ',');
+        return number_format((float)$clean_num, $decimals, '.', ',');
     }
 }
-
-// --- LOGIKA TANDA TANGAN (BASE64 FORCE LOAD) ---
-// Ini akan bypass masalah permission URL dan nama file yang tidak update
-function getSignatureImage($filename, $userId) {
-    $root = dirname(__DIR__); // Root folder project
-    $found_path = '';
-
-    // Prioritas 1: Cek Nama File Persis dari Database (di folder signatures)
-    if (!empty($filename) && file_exists($root . '/uploads/signatures/' . $filename)) {
-        $found_path = $root . '/uploads/signatures/' . $filename;
-    }
-    // Prioritas 2: Cek Nama File Persis (di folder uploads biasa)
-    elseif (!empty($filename) && file_exists($root . '/uploads/' . $filename)) {
-        $found_path = $root . '/uploads/' . $filename;
-    }
-    // Prioritas 3: SCAN OTOMATIS (Jika nama file di DB salah/kosong)
-    // Mencari file yang berawalan SIG_CANVAS_{USER_ID}_ atau SIG_{USER_ID}_
-    else {
-        $scan_dirs = [$root . '/uploads/signatures/', $root . '/uploads/'];
-        foreach ($scan_dirs as $dir) {
-            if (is_dir($dir)) {
-                $files = scandir($dir);
-                foreach ($files as $f) {
-                    // Cari file milik user ini (mengandung ID user)
-                    if (strpos($f, "SIG_CANVAS_{$userId}_") === 0 || strpos($f, "SIG_{$userId}_") === 0) {
-                        $found_path = $dir . $f;
-                        break 2; // Ketemu! Stop looping.
-                    }
-                }
-            }
-        }
-    }
-
-    // Prioritas 4: Fallback Default
-    if (empty($found_path) && file_exists($root . '/assets/images/signature.png')) {
-        $found_path = $root . '/assets/images/signature.png';
-    }
-
-    // Jika ketemu, convert ke Base64 agar browser PASTI bisa render
-    if (!empty($found_path)) {
-        $type = pathinfo($found_path, PATHINFO_EXTENSION);
-        $data = file_get_contents($found_path);
-        return 'data:image/' . $type . ';base64,' . base64_encode($data);
-    }
-
-    return null;
-}
-
-// Generate Gambar Tanda Tangan
-$signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_id']);
 ?>
 
 <!DOCTYPE html>
@@ -123,7 +80,8 @@ $signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_i
         /* HEADER & UTILS */
         .no-print { background: #f8f9fa; padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
         .btn-print { background: #0d6efd; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        
+        [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
+
         /* WATERMARK */
         .watermark-container { 
             position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); 
@@ -131,7 +89,7 @@ $signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_i
         }
         .watermark-img { width: 100%; height: auto; }
 
-        /* HEADER TABLE */
+        /* HEADER */
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
         .company-addr { font-size: 10px; color: #333; max-width: 300px; line-height: 1.3; }
@@ -139,51 +97,49 @@ $signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_i
 
         /* INFO BOXES */
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; border: 1px solid #000; }
-        .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 160px; }
+        .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 150px; }
         .inner-table { width: 100%; font-size: 11px; }
         .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 90px; font-weight: bold; } 
         .sep { width: 10px; text-align: center; }
 
-        /* ITEMS TABLE */
+        /* TABLE ITEMS */
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
         .items-table th { border: 1px solid #000; background-color: #f2f2f2; padding: 8px; text-align: center; font-weight: bold; }
         .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; }
-        
-        /* EDITABLE HIGHLIGHT */
-        [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
-
-        /* FOOTER */
-        .footer-layout { width: 100%; margin-top: 20px; page-break-inside: avoid; }
-        .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
-        .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
-        
-        /* CSS TANDA TANGAN (PROPORSIONAL & BESAR) */
-        .sign-company { font-size: 11px; margin-bottom: 10px; }
-        .sign-img { 
-            display: block; 
-            margin: 5px auto 15px auto;
-            width: auto;        /* Lebar otomatis */
-            height: auto;       /* Tinggi otomatis */
-            max-width: 250px;   /* Maksimal lebar */
-            max-height: 120px;  /* Maksimal tinggi (Cukup Besar) */
-            object-fit: contain;
-        }
-        .sign-name { font-weight: bold; text-decoration: underline; }
-        .no-sign-box { height: 100px; line-height:100px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:180px; font-size: 10px; }
-
-        @media print {
-            .no-print { display: none; }
-            [contenteditable="true"]:hover { background: none; outline: none; }
-        }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
+
+        /* SUMMARY ROW */
+        .summary-row td { border: 1px solid #000; padding: 8px; }
         .label-cell { background-color: #fff; font-weight: bold; text-align: right; }
         .value-cell { text-align: right; font-weight: bold; }
         .border-none { border: none !important; }
+
+        /* FOOTER LAYOUT */
+        .footer-layout { width: 100%; margin-top: 20px; page-break-inside: avoid; }
+        .footer-left { width: 60%; vertical-align: top; padding-right: 20px; }
+        .footer-right { width: 40%; vertical-align: top; text-align: center; padding-top: 20px; }
+
+        /* SIGNATURE STYLE (SAMA DENGAN QUOTATION) */
+        .sign-company { font-size: 11px; font-weight: normal; margin-bottom: 10px; }
+        .sign-img {
+            display: block; margin: 10px auto; 
+            width: auto; height: auto; 
+            max-width: 250px; max-height: 120px; /* Diperbesar & Proporsional */
+            object-fit: contain; 
+        }
+        .sign-name { font-weight: bold; text-decoration: underline; }
+        /* Box Error jika gambar tidak ketemu */
+        .no-sign-box { 
+            height: 100px; line-height: 100px; 
+            color: #ccc; border: 1px dashed #ccc; 
+            margin: 10px auto; width: 180px; 
+            font-size: 10px; 
+        }
     </style>
 </head>
-<body>
+<body onload="window.print()">
 
     <div class="no-print">
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
@@ -197,7 +153,7 @@ $signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_i
     <table class="header-table">
         <tr>
             <td>
-                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
+                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo">
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
             <td align="right" valign="top"><div class="doc-title">INVOICE</div></td>
@@ -210,14 +166,14 @@ $signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_i
                 <table class="inner-table">
                     <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($inv['company_name']) ?></strong></td></tr>
                     <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($inv['c_address'])) ?></td></tr>
-                    <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($inv['pic_name']) ?> <br> <?= htmlspecialchars($inv['pic_phone']) ?></td></tr>
+                    <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($inv['pic_name']) ?> (<?= htmlspecialchars($inv['pic_phone']) ?>)</td></tr>
                 </table>
             </td>
             <td class="info-box">
                 <table class="inner-table">
                     <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['invoice_date'])) ?></td></tr>
                     <tr><td class="lbl">Due Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['due_date'])) ?></td></tr>
-                    <tr><td class="lbl">Invoice No</td><td class="sep">:</td><td><strong><?= $inv['invoice_no'] ?></strong></td></tr>
+                    <tr><td class="lbl">Invoice Number</td><td class="sep">:</td><td><strong><?= $inv['invoice_no'] ?></strong></td></tr>
                     <tr><td class="lbl">PO. Reference</td><td class="sep">:</td><td><?= $inv['po_number_client'] ?></td></tr>
                     <tr><td class="lbl">Currency</td><td class="sep">:</td><td><?= $inv['currency'] ?></td></tr>
                     <tr><td colspan="3" style="height:5px"></td></tr>
@@ -242,41 +198,38 @@ $signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_i
         </thead>
         <tbody>
             <?php 
-            $no = 1; 
-            $grandTotal = 0;
-            
+            $no = 1; $grandTotal = 0;
             while($item = $items->fetch_assoc()): 
-                $qty = floatval($item['qty']);
-                $price = floatval($item['unit_price']);
-                $lineTotal = $qty * $price;
+                // Kalkulasi Total per Baris
+                $lineTotal = floatval($item['qty']) * floatval($item['unit_price']);
                 $grandTotal += $lineTotal;
             ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
                 <td>
                     <div contenteditable="true">
-                        <?= htmlspecialchars($item['item_name']) ?>
+                        <?= htmlspecialchars($item['item_name']) ?> 
                         <?php if(!empty($item['description']) && $item['description'] != 'Exclude Tax'): ?>
                             <br><small class="text-muted"><?= nl2br(htmlspecialchars($item['description'])) ?></small>
                         <?php endif; ?>
                     </div>
                 </td>
                 
-                <td class="text-center" contenteditable="true"><?= smart_format($qty, $inv['currency']) ?></td>
+                <td class="text-center" contenteditable="true"><?= smart_format($item['qty'], $inv['currency']) ?></td>
                 <td class="text-center" contenteditable="true"><?= $inv['payment_method'] ?></td>
                 
-                <td class="text-right" contenteditable="true"><?= smart_format($price, $inv['currency']) ?></td>
+                <td class="text-right" contenteditable="true"><?= smart_format($item['unit_price'], $inv['currency']) ?></td>
                 <td class="text-right" contenteditable="true"><?= smart_format($lineTotal, $inv['currency']) ?></td>
             </tr>
             <?php endwhile; ?>
             
             <?php 
-                // --- LOGIKA PEMBULATAN (0.5 ke bawah untuk IDR) ---
+                // Rounding yang konsisten dengan Dashboard
                 if (!$is_usd) {
-                    $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
-                    $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
+                    $grandTotal = round($grandTotal, 0);
+                    $vatAmount = round($grandTotal * $tax_rate, 0); 
                 } else {
-                    $grandTotal = round($grandTotal, 2); 
+                    $grandTotal = round($grandTotal, 2);
                     $vatAmount = round($grandTotal * $tax_rate, 2);
                 }
                 $totalAll = $grandTotal + $vatAmount;
@@ -325,11 +278,35 @@ $signatureBase64 = getSignatureImage($inv['sales_sign'], $inv['created_by_user_i
             <td class="footer-right">
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
-                <?php if ($signatureBase64): ?>
-                    <img src="<?= $signatureBase64 ?>" class="sign-img" alt="Signature">
+                <?php 
+                    // LOGIKA TANDA TANGAN (SAMA PERSIS DENGAN QUOTATION)
+                    $signFile = trim($inv['sales_sign']);
+                    $src = '';
+
+                    // 1. CEK FILE DI SERVER DENGAN PATH ABSOLUT (__DIR__)
+                    // Ini memastikan file benar-benar ada di disk sebelum ditampilkan
+                    if (!empty($signFile)) {
+                        // Cek folder uploads/signatures/
+                        if (file_exists(__DIR__ . '/../uploads/signatures/' . $signFile)) {
+                            $src = '../uploads/signatures/' . $signFile;
+                        } 
+                        // Cek folder uploads/ (biasa)
+                        elseif (file_exists(__DIR__ . '/../uploads/' . $signFile)) {
+                            $src = '../uploads/' . $signFile;
+                        }
+                    }
+                    
+                    // 2. FALLBACK DEFAULT
+                    if (empty($src) && file_exists(__DIR__ . '/../assets/images/signature.png')) {
+                        $src = '../assets/images/signature.png';
+                    }
+                ?>
+
+                <?php if (!empty($src)): ?>
+                    <img src="<?= $src ?>" class="sign-img">
                 <?php else: ?>
                     <div class="no-sign-box">
-                        (No Signature Found)
+                        (File: <?= htmlspecialchars($signFile) ?> Not Found)
                     </div>
                 <?php endif; ?>
 
