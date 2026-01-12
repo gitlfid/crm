@@ -65,11 +65,10 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .text-left { text-align: left !important; }
         .text-right { text-align: right !important; }
 
-        /* --- FOOTER LAYOUT (PROPORSIONAL FIX) --- */
+        /* --- FOOTER LAYOUT --- */
         .footer-table { width: 100%; margin-top: 30px; page-break-inside: avoid; border-collapse: collapse; }
         .footer-col { vertical-align: top; padding: 10px; }
         
-        /* Pembagian Kolom yang Seimbang */
         .remarks-box { width: 34%; font-size: 10px; border-right: 1px solid #eee; }
         .sender-box { width: 33%; text-align: center; }
         .recipient-box { width: 33%; text-align: center; }
@@ -77,9 +76,9 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         /* Styling Tanda Tangan */
         .sign-title { font-weight: bold; margin-bottom: 5px; text-decoration: underline; font-size: 11px; }
         
-        /* Area Gambar/Kosong dengan Tinggi Tetap agar Nama Sejajar */
+        /* [FIX] Area Gambar Diperbesar */
         .sign-area { 
-            height: 100px; /* Tinggi Kunci untuk kesejajaran */
+            height: 130px; /* Diperbesar agar muat gambar besar */
             width: 100%;
             display: flex;
             align-items: flex-end; /* Memaksa isi ada di bawah */
@@ -87,22 +86,25 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             margin-bottom: 5px;
         }
 
+        /* [FIX] Gambar Diperbesar Proporsional */
         .sign-img { 
             display: block; margin: 0 auto; 
-            max-width: 150px; 
-            max-height: 90px; /* Agar tidak melebihi sign-area */
+            width: auto; 
+            height: auto;
+            max-width: 250px;  /* Lebar maksimal diperbesar */
+            max-height: 120px; /* Tinggi maksimal diperbesar */
             object-fit: contain; 
-            position: relative; top: 10px; /* Sedikit turun agar rapi */
+            position: relative; top: 10px; 
         }
 
         .sign-name { font-weight: bold; text-decoration: underline; font-size: 11px; margin-top: 5px; }
-        .no-sign-text { line-height: 100px; color: #ccc; font-size: 9px; }
+        .no-sign-text { line-height: 130px; color: #ccc; font-size: 9px; }
         
-        /* Garis Tanda Tangan Manual */
+        /* [FIX] Garis Tanda Tangan Manual Menyesuaikan Tinggi */
         .sign-line { 
             border-bottom: 1px solid #000; 
             width: 80%; 
-            margin: 80px auto 5px auto; /* Margin atas menyesuaikan area kosong */
+            margin: 110px auto 5px auto; /* Margin atas disesuaikan dengan tinggi sign-area */
         }
 
         /* HIDE PRINT BUTTON */
