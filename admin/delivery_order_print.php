@@ -5,10 +5,11 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL DATA HEADER
+// 1. AMBIL DATA HEADER (DO -> Payment -> Invoice -> Sales User)
 $sql = "SELECT d.*, 
                c.company_name, c.address, c.pic_name, c.pic_phone,
-               u.id as sender_id, u.username as sender_name, u.signature_file as sender_sign 
+               u.id as sender_id, u.username as sender_name, u.signature_file as sender_sign,
+               p.invoice_id, i.quotation_id
         FROM delivery_orders d
         LEFT JOIN payments p ON d.payment_id = p.id
         LEFT JOIN invoices i ON p.invoice_id = i.id
@@ -20,7 +21,19 @@ $sql = "SELECT d.*,
 $do = $conn->query($sql)->fetch_assoc();
 if(!$do) die("DO not found (ID: $id)");
 
-$items = $conn->query("SELECT * FROM delivery_order_items WHERE delivery_order_id = $id");
+// 2. AMBIL ITEM (LOGIKA PERBAIKAN: AMBIL DARI INVOICE ITEMS)
+$inv_id = $do['invoice_id'];
+$quo_id = $do['quotation_id'];
+
+// Coba ambil dari Invoice Items dulu
+$sql_items = "SELECT item_name, qty, card_type, description FROM invoice_items WHERE invoice_id = '$inv_id'";
+$items = $conn->query($sql_items);
+
+// Jika kosong, ambil dari Quotation Items (Fallback)
+if ($items->num_rows == 0) {
+    $sql_items = "SELECT item_name, qty, card_type, description FROM quotation_items WHERE quotation_id = '$quo_id'";
+    $items = $conn->query($sql_items);
+}
 
 $sets = [];
 $res = $conn->query("SELECT * FROM settings");
@@ -65,7 +78,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         .text-left { text-align: left !important; }
         .text-right { text-align: right !important; }
 
-        /* --- FOOTER LAYOUT --- */
+        /* --- FOOTER LAYOUT (REVISI BESAR) --- */
         .footer-table { width: 100%; margin-top: 30px; page-break-inside: avoid; border-collapse: collapse; }
         .footer-col { vertical-align: top; padding: 10px; }
         
@@ -76,9 +89,9 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         /* Styling Tanda Tangan */
         .sign-title { font-weight: bold; margin-bottom: 5px; text-decoration: underline; font-size: 11px; }
         
-        /* [FIX] Area Gambar Diperbesar Lagi */
+        /* [FIX 1] Area Gambar Diperbesar Maksimal (200px) */
         .sign-area { 
-            height: 160px; /* Tinggi wadah diperbesar (sebelumnya 130px) */
+            height: 200px; /* Tinggi wadah sangat besar */
             width: 100%;
             display: flex;
             align-items: flex-end; 
@@ -86,25 +99,25 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             margin-bottom: 5px;
         }
 
-        /* [FIX] Gambar Tanda Tangan Jauh Lebih Besar */
+        /* [FIX 2] Gambar Tanda Tangan Lebih Besar & Proporsional */
         .sign-img { 
             display: block; margin: 0 auto; 
             width: auto; 
             height: auto;
-            max-width: 100%;   /* Memenuhi lebar kolom jika perlu */
-            max-height: 150px; /* Tinggi maksimal diperbesar (sebelumnya 120px) */
-            object-fit: contain; 
+            max-width: 100%;   /* Melebar penuh kolom jika perlu */
+            max-height: 180px; /* Batas tinggi diperbesar */
+            object-fit: contain; /* Jaga proporsi asli (tidak gepeng) */
             position: relative; top: 10px; 
         }
 
         .sign-name { font-weight: bold; text-decoration: underline; font-size: 11px; margin-top: 5px; }
-        .no-sign-text { line-height: 160px; color: #ccc; font-size: 9px; }
+        .no-sign-text { line-height: 200px; color: #ccc; font-size: 9px; }
         
-        /* [FIX] Garis Tanda Tangan Manual (Menyesuaikan Tinggi Baru) */
+        /* [FIX 3] Garis Tanda Tangan Manual Turun Kebawah */
         .sign-line { 
             border-bottom: 1px solid #000; 
             width: 80%; 
-            margin: 140px auto 5px auto; /* Turun ke bawah menyesuaikan area gambar */
+            margin: 180px auto 5px auto; /* Turun menyesuaikan tinggi sign-area */
         }
 
         /* HIDE PRINT BUTTON */
@@ -154,30 +167,30 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         <thead>
             <tr>
                 <th width="5%">No</th>
-                <th width="25%">Item</th>
-                <th width="15%">Content</th>
+                <th width="35%">Item Name</th>
                 <th width="10%">Unit</th>
-                <th width="15%">Charge Mode</th>
+                <th width="20%">Charge Mode</th>
                 <th width="30%">Description</th>
             </tr>
         </thead>
         <tbody>
             <?php 
             $no = 1; $totalUnit = 0;
+            // LOOP ITEM DARI INVOICE/QUOTATION (BUKAN DELIVERY_ORDER_ITEMS KOSONG)
             while($item = $items->fetch_assoc()): 
-                $totalUnit += $item['unit'];
+                $qty = floatval($item['qty']);
+                $totalUnit += $qty;
             ?>
             <tr>
                 <td><?= $no++ ?></td>
                 <td class="text-left"><?= htmlspecialchars($item['item_name'] ?? '') ?></td>
-                <td><?= htmlspecialchars($item['content'] ?? '') ?></td>
-                <td><?= $item['unit'] ?></td>
-                <td><?= htmlspecialchars($item['charge_mode'] ?? '') ?></td>
+                <td><?= $qty ?></td>
+                <td><?= htmlspecialchars($item['card_type'] ?? '') ?></td>
                 <td class="text-left"><?= nl2br(htmlspecialchars($item['description'] ?? '')) ?></td>
             </tr>
             <?php endwhile; ?>
             <tr>
-                <td colspan="3" class="text-right" style="font-weight:bold;">Total Unit</td>
+                <td colspan="2" class="text-right" style="font-weight:bold;">Total Unit</td>
                 <td style="font-weight:bold;"><?= $totalUnit ?></td>
                 <td colspan="2"></td>
             </tr>
@@ -205,7 +218,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                         $signPath = '';
                         $baseDir = dirname(__DIR__); 
 
-                        // Logika Auto-Search
+                        // Logika Auto-Search (Sama dengan Invoice)
                         if (!empty($signFile) && file_exists($baseDir . '/uploads/signatures/' . $signFile)) {
                             $signPath = '../uploads/signatures/' . $signFile;
                         }
