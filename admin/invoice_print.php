@@ -5,8 +5,7 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL DATA HEADER (Termasuk invoice_type)
-// Note: Saya menggunakan query aman sesuai backup Anda sebelumnya
+// 1. AMBIL DATA HEADER INVOICE
 $sql = "SELECT i.*, q.po_number_client, q.currency, q.remarks,
                c.company_name, c.address as c_address, c.pic_name, c.pic_phone,
                u.username as sales_name, u.email as sales_email, u.phone as sales_phone, 
@@ -37,19 +36,19 @@ $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
 // --- [LOGIKA BARU] DOMESTIC VS INTERNATIONAL ---
-// Cek tipe invoice dari database
 $inv_type = isset($inv['invoice_type']) ? $inv['invoice_type'] : 'Domestic'; 
 $is_international = ($inv_type == 'International');
 
 // A. SETTING PAJAK
-// Domestic = 11%, International = 0%
 $tax_rate = $is_international ? 0 : 0.11;
 
-// B. SETTING PAYMENT DETAILS & NOTE
+// B. SETTING PAYMENT DETAILS & NOTE (FIX DOUBLE NOTE)
 if ($is_international) {
-    // --- SETTING INTERNATIONAL (USD) ---
+    // --- INTERNATIONAL (USD) ---
     $payment_title = "Payment Method (USD)";
-    $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
+    
+    // [FIX] Note khusus International (Menggantikan Default Note)
+    $final_note = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
     
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
@@ -59,9 +58,11 @@ if ($is_international) {
                        "Acc Name : PT Linksfield Networks Indonesia\n" .
                        "Settlement Currency : USD";
 } else {
-    // --- SETTING DOMESTIC (IDR) ---
+    // --- DOMESTIC (IDR) ---
     $payment_title = "Payment Method (IDR)";
-    $special_note_usd = ""; // Kosong jika domestic
+    
+    // [FIX] Note Domestic ambil dari Database Settings
+    $final_note = isset($sets['invoice_note_default']) ? $sets['invoice_note_default'] : '';
     
     $payment_details = "Acc Name : PT. LINKSFIELD NETWORKS INDONESIA\n" .
                        "Bank Name : BCA (Bank Central Asia)\n" .
@@ -71,7 +72,6 @@ if ($is_international) {
 }
 
 // C. HELPER FORMAT ANGKA
-// USD = Pakai desimal (1,500.50), IDR = Bulat (1.500.000)
 function format_money($num, $is_intl) {
     if ($is_intl) {
         return number_format((float)$num, 2, '.', ','); 
@@ -220,11 +220,9 @@ function format_money($num, $is_intl) {
             <?php 
                 // PERHITUNGAN TOTAL
                 if ($is_international) {
-                    // USD: PPN 0%, Desimal 2 digit
                     $vatAmount = 0;
                     $grandTotal = round($grandTotal, 2); 
                 } else {
-                    // IDR: PPN 11%, Bulat ke bawah
                     $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
                 }
@@ -259,20 +257,13 @@ function format_money($num, $is_intl) {
                 <div style="font-style: italic; font-size: 10px; margin-bottom: 20px;">
                     <strong>Note :</strong><br>
                     
-                    <?php if($is_international): ?>
-                        <div style="margin-bottom:5px; color:#000;">
-                            <?= $special_note_usd ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <div contenteditable="true">
-                        <?= nl2br(htmlspecialchars($sets['invoice_note_default'] ?? '')) ?>
+                    <div contenteditable="true" style="margin-bottom:5px; color:#000;">
+                        <?= nl2br(htmlspecialchars($final_note)) ?>
                     </div>
                 </div>
 
                 <div style="font-size: 11px;">
                     <span style="font-weight: bold; margin-bottom: 5px; display: block;"><?= $payment_title ?></span>
-                    
                     <div style="line-height: 1.5; white-space: pre-line;" contenteditable="true">
                         <?= htmlspecialchars($payment_details) ?>
                     </div>
@@ -283,25 +274,28 @@ function format_money($num, $is_intl) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    // LOGIKA SIGNATURE (Sesuai Backup)
+                    // LOGIKA SIGNATURE & NAMA NIAWATI (Sesuai Permintaan Sebelumnya)
                     $signPath = '';
-                    $dbFile = $inv['sales_sign'];
-                    $userId = $inv['created_by_user_id']; 
+                    $signerName = 'Niawati'; // Default Force Name
+                    $baseDir = dirname(__DIR__);
 
-                    if (!empty($dbFile) && file_exists('../uploads/signatures/' . $dbFile)) {
-                        $signPath = '../uploads/signatures/' . $dbFile;
-                    } 
-                    elseif (!empty($userId)) {
-                        $files = glob('../uploads/signatures/SIG_*_' . $userId . '_*.png');
-                        if ($files && count($files) > 0) $signPath = $files[0]; 
+                    // Cari User Niawati
+                    $sqlNia = "SELECT id, username, signature_file FROM users WHERE username LIKE '%Niawati%' OR email LIKE '%nia@%' LIMIT 1";
+                    $resNia = $conn->query($sqlNia);
+                    $nia = $resNia->fetch_assoc();
+
+                    if ($nia) {
+                        $signerName = $nia['username'];
+                        $niaId = $nia['id'];
+                        if (!empty($nia['signature_file']) && file_exists($baseDir . '/uploads/signatures/' . $nia['signature_file'])) {
+                            $signPath = '../uploads/signatures/' . $nia['signature_file'];
+                        } elseif (count(glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png')) > 0) {
+                            $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png');
+                            $signPath = '../uploads/signatures/' . basename($files[0]);
+                        }
                     }
 
-                    if (empty($signPath) && !empty($userId)) {
-                        $files = glob('../uploads/SIG_*_' . $userId . '_*.png');
-                        if ($files && count($files) > 0) $signPath = $files[0];
-                    }
-
-                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
+                    if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
                         $signPath = '../assets/images/signature.png';
                     }
                 ?>
@@ -309,12 +303,10 @@ function format_money($num, $is_intl) {
                 <?php if (!empty($signPath)): ?>
                     <img src="<?= $signPath ?>" class="sign-img">
                 <?php else: ?>
-                    <div class="no-sign-box">
-                        <span style="font-size:9px; color:red;">(Signature Not Found)</span>
-                    </div>
+                    <div class="no-sign-box"><span style="font-size:9px; color:red;">(Signature Not Found)</span></div>
                 <?php endif; ?>
 
-                <div class="sign-name" contenteditable="true"><?= htmlspecialchars($inv['sales_name']) ?></div>
+                <div class="sign-name" contenteditable="true"><?= htmlspecialchars($signerName) ?></div>
             </td>
         </tr>
     </table>
