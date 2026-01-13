@@ -59,7 +59,6 @@ if(!empty($f_end_date)) {
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean(); // Bersihkan buffer HTML
     
-    // [UPDATE] Tambahkan i.invoice_type ke SELECT
     $sqlEx = "SELECT 
                 i.id, 
                 i.quotation_id, 
@@ -95,7 +94,6 @@ if (isset($_POST['export_excel'])) {
     
     $output = fopen('php://output', 'w');
     
-    // [UPDATE] Header Excel: Tambah 'Type'
     fputcsv($output, array('Date', 'Client', 'Invoice No', 'Type', 'PO Client', 'Ref Quote', 'Description', 'Quantity', 'Unit Price', 'Currency', 'Sub Total', 'VAT (11%)', 'Grand Total', 'Status', 'Sales Person', 'Delivery Order No', 'Status Faktur Pajak', 'Notes'));
     
     while($row = $resEx->fetch_assoc()) {
@@ -119,18 +117,18 @@ if (isset($_POST['export_excel'])) {
             $calcSub += floatval($itm['qty']) * floatval($itm['unit_price']);
         }
         
-        // [BARU] LOGIKA PAJAK BERDASARKAN TIPE
+        // Logika Pajak
         $is_international = ($row['invoice_type'] == 'International');
         $tax_rate = $is_international ? 0 : 0.11;
         $vat = $calcSub * $tax_rate;
 
-        // [BARU] LOGIKA ROUNDING BERDASARKAN TIPE
+        // Logika Rounding Excel (Disamakan dengan List)
         if (!$is_international) {
-            // Domestic (IDR): Round 0.5 Down
             $calcSub = round($calcSub, 0, PHP_ROUND_HALF_DOWN);
             $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
         } else {
-            // International (USD): Normal 2 decimal
+            // Untuk Excel International, biasanya tetap butuh desimal untuk akurasi data
+            // Tapi jika ingin sama persis dengan list, bisa diubah jadi round($..., 0)
             $calcSub = round($calcSub, 2);
             $vat = round($vat, 2);
         }
@@ -155,7 +153,7 @@ if (isset($_POST['export_excel'])) {
                     $row['invoice_date'],
                     $row['company_name'],
                     $row['invoice_no'],
-                    $row['invoice_type'], // [BARU] Type Column
+                    $row['invoice_type'],
                     $poClient,
                     $row['quotation_no'],
                     $desc,                  
@@ -175,7 +173,7 @@ if (isset($_POST['export_excel'])) {
         } else {
             fputcsv($output, array(
                 $row['invoice_date'], $row['company_name'], $row['invoice_no'], 
-                $row['invoice_type'], // [BARU]
+                $row['invoice_type'],
                 $poClient, $row['quotation_no'], 'No Items Found', 0, 0, 
                 $row['currency'], 0, 0, 0, 
                 strtoupper($row['status']), $salesPerson, $doNum, $taxStatus, $cleanNotes
@@ -201,8 +199,7 @@ if (isset($_POST['confirm_payment'])) {
     $grand_total_system = floatval($_POST['grand_total_system']);
     $user_id = $_SESSION['user_id'];
 
-    // Validasi toleransi selisih floating point (0.01)
-    if (abs($amount_input - $grand_total_system) > 0.01) {
+    if (abs($amount_input - $grand_total_system) > 1) {
         echo "<script>alert('GAGAL: Nominal pembayaran tidak sesuai dengan Total Tagihan!'); window.location='invoice_list.php';</script>";
         exit;
     }
@@ -273,7 +270,6 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
             $conn->query("DELETE FROM delivery_orders WHERE payment_id IN (SELECT id FROM payments WHERE invoice_id=$id)");
             $conn->query("DELETE FROM payments WHERE invoice_id=$id");
             $conn->query("DELETE FROM invoices WHERE id=$id");
-            
             echo "<script>alert('Invoice berhasil dihapus permanen.'); window.location='invoice_list.php';</script>";
             exit;
         } else {
@@ -282,12 +278,8 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         }
     }
 
-    if ($act == 'draft') {
-        $conn->query("UPDATE invoices SET status='draft' WHERE id=$id");
-    }
-    if ($act == 'sent') {
-        $conn->query("UPDATE invoices SET status='sent' WHERE id=$id");
-    }
+    if ($act == 'draft') { $conn->query("UPDATE invoices SET status='draft' WHERE id=$id"); }
+    if ($act == 'sent') { $conn->query("UPDATE invoices SET status='sent' WHERE id=$id"); }
     if ($act == 'cancel') {
         $inv = $conn->query("SELECT quotation_id FROM invoices WHERE id=$id")->fetch_assoc();
         $q_id = $inv['quotation_id'];
@@ -298,7 +290,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     echo "<script>window.location='invoice_list.php';</script>";
 }
 
-// --- 5. QUERY DATA TAMPILAN UTAMA (Update SELECT) ---
+// --- 5. QUERY DATA TAMPILAN UTAMA ---
 $sql = "SELECT i.*, c.company_name, q.quotation_no, q.currency, 
         isp.general_notes, 
         COALESCE(
@@ -429,9 +421,7 @@ $res = $conn->query($sql);
                             <th class="ps-4">Invoice No</th>
                             <th>Date</th>
                             <th>Client</th>
-                            
                             <th class="text-center">Type</th>
-                            
                             <th class="text-end">Sub Total</th>
                             <th class="text-end">VAT</th>
                             <th class="text-end">Grand Total</th>
@@ -446,12 +436,11 @@ $res = $conn->query($sql);
                                 $subTotal = floatval($row['sub_total'] ?? 0);
                                 $curr = $row['currency'];
                                 
-                                // [BARU] LOGIKA PAJAK BERDASARKAN TIPE
                                 $is_international = ($row['invoice_type'] == 'International');
                                 $tax_rate = $is_international ? 0 : 0.11;
                                 $vat = $subTotal * $tax_rate;
 
-                                // [BARU] LOGIKA PEMBULATAN
+                                // LOGIKA PEMBULATAN KALKULASI
                                 if (!$is_international) {
                                     // IDR: 0.5 ke bawah
                                     $subTotal = round($subTotal, 0, PHP_ROUND_HALF_DOWN);
@@ -463,9 +452,10 @@ $res = $conn->query($sql);
                                 }
                                 $grandTotal = $subTotal + $vat;
                                 
-                                // Format Angka
+                                // [UPDATE] LOGIKA FORMAT TAMPILAN
+                                // International sekarang 0 desimal di List View, tapi format USD (koma)
                                 $fmt = function($n) use ($is_international) {
-                                    if ($is_international) return number_format($n, 2, '.', ',');
+                                    if ($is_international) return number_format($n, 0, '.', ','); 
                                     return number_format($n, 0, ',', '.');
                                 };
 
