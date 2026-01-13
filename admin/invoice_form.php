@@ -38,6 +38,10 @@ $clients = $conn->query("SELECT * FROM clients ORDER BY company_name ASC");
 // --- PROSES SIMPAN INVOICE ---
 if (isset($_POST['save_invoice'])) {
     $inv_no = $conn->real_escape_string($_POST['invoice_no']);
+    
+    // [BARU] TANGKAP INVOICE TYPE
+    $inv_type = $conn->real_escape_string($_POST['invoice_type']);
+    
     $inv_date = $_POST['invoice_date'];
     $due_date = $_POST['due_date'];
     $pymt_method = $conn->real_escape_string($_POST['payment_method_col']);
@@ -69,7 +73,9 @@ if (isset($_POST['save_invoice'])) {
             for ($i = 0; $i < count($items); $i++) {
                 if (!empty($items[$i])) {
                     $it_name = $conn->real_escape_string($items[$i]);
-                    $it_qty  = intval($qtys[$i]);
+                    // [UPDATE] Gunakan floatval agar desimal tersimpan jika ada input manual
+                    $raw_qty = str_replace(',', '.', $qtys[$i]);
+                    $it_qty  = floatval($raw_qty);
                     
                     // --- LOGIKA PEMBERSIH HARGA ---
                     $raw_price = $prices[$i];
@@ -100,8 +106,9 @@ if (isset($_POST['save_invoice'])) {
     }
 
     // --- INSERT INVOICE ---
-    $sqlInv = "INSERT INTO invoices (invoice_no, quotation_id, invoice_date, due_date, status, payment_method, created_by_user_id) 
-               VALUES ('$inv_no', $quot_id_ref, '$inv_date', '$due_date', 'draft', '$pymt_method', $my_id)";
+    // [UPDATE] Tambahkan invoice_type ke INSERT
+    $sqlInv = "INSERT INTO invoices (invoice_no, invoice_type, quotation_id, invoice_date, due_date, status, payment_method, created_by_user_id) 
+               VALUES ('$inv_no', '$inv_type', $quot_id_ref, '$inv_date', '$due_date', 'draft', '$pymt_method', $my_id)";
     
     if ($conn->query($sqlInv)) {
         $invoice_id = $conn->insert_id;
@@ -111,7 +118,9 @@ if (isset($_POST['save_invoice'])) {
             for ($i = 0; $i < count($items); $i++) {
                 if (!empty($items[$i])) {
                     $it_name = $conn->real_escape_string($items[$i]);
-                    $it_qty  = intval($qtys[$i]);
+                    // [UPDATE] Gunakan floatval agar desimal tersimpan
+                    $raw_qty = str_replace(',', '.', $qtys[$i]);
+                    $it_qty  = floatval($raw_qty);
                     
                     // --- LOGIKA PEMBERSIH HARGA ---
                     $raw_price = $prices[$i];
@@ -228,6 +237,15 @@ if (isset($_POST['save_invoice'])) {
                             <label class="fw-bold">Invoice No</label>
                             <input type="text" name="invoice_no" class="form-control fw-bold fs-5" value="<?= $auto_inv ?>" readonly>
                         </div>
+                        
+                        <div class="mb-3">
+                            <label class="fw-bold">Invoice Type</label>
+                            <select name="invoice_type" id="invoice_type" class="form-select" onchange="autoSetCurrency()">
+                                <option value="Domestic">Domestic (IDR)</option>
+                                <option value="International">International (USD)</option>
+                            </select>
+                        </div>
+
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="fw-bold">Invoice Date</label>
@@ -242,7 +260,7 @@ if (isset($_POST['save_invoice'])) {
                         <?php if($is_manual): ?>
                             <div class="mb-3">
                                 <label class="fw-bold">Currency</label>
-                                <select name="currency" class="form-select">
+                                <select name="currency" id="currency" class="form-select">
                                     <option value="IDR">IDR (Rp)</option>
                                     <option value="USD">USD ($)</option>
                                 </select>
@@ -288,7 +306,7 @@ if (isset($_POST['save_invoice'])) {
                                 <tr>
                                     <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($itm['item_name']) ?>" required></td>
                                     <td><input type="text" name="card_type[]" class="form-control" value="<?= htmlspecialchars($itm['card_type']) ?>"></td>
-                                    <td><input type="number" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" required></td>
+                                    <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" required></td>
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $itm['unit_price'] ?>" required></td>
                                     <td><input type="text" name="description[]" class="form-control" value="<?= htmlspecialchars($itm['description']) ?>"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
@@ -299,7 +317,7 @@ if (isset($_POST['save_invoice'])) {
                                 <tr>
                                     <td><input type="text" name="item_name[]" class="form-control" required></td>
                                     <td><input type="text" name="card_type[]" class="form-control" placeholder="Optional"></td>
-                                    <td><input type="number" name="qty[]" class="form-control text-center" value="1" required></td>
+                                    <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="1" required></td>
                                     <td><input type="text" name="unit_price[]" class="form-control text-end" required></td>
                                     <td><input type="text" name="description[]" class="form-control"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
@@ -320,6 +338,21 @@ if (isset($_POST['save_invoice'])) {
 <?php include 'includes/footer.php'; ?>
 
 <script>
+    // [BARU] FUNGSI AUTO SET CURRENCY BERDASARKAN TIPE
+    function autoSetCurrency() {
+        var type = document.getElementById('invoice_type').value;
+        var curr = document.getElementById('currency');
+        
+        // Hanya ubah jika elemen currency ada (manual mode)
+        if(curr) {
+            if(type === 'International') {
+                curr.value = 'USD';
+            } else {
+                curr.value = 'IDR';
+            }
+        }
+    }
+
     function fillClientInfo() {
         var select = document.getElementById("client_select");
         if(select && select.selectedIndex > 0) {
@@ -332,17 +365,14 @@ if (isset($_POST['save_invoice'])) {
         }
     }
 
-    // [UPDATE] FUNGSI AUTO DUE DATE (+5 Hari)
     function updateDueDate() {
         var invDateInput = document.getElementsByName("invoice_date")[0];
         var dueDateInput = document.getElementsByName("due_date")[0];
         
         if (invDateInput.value) {
             var date = new Date(invDateInput.value);
-            // Tambah 5 hari
             date.setDate(date.getDate() + 5);
             
-            // Format ke YYYY-MM-DD
             var yyyy = date.getFullYear();
             var mm = String(date.getMonth() + 1).padStart(2, '0');
             var dd = String(date.getDate()).padStart(2, '0');
@@ -357,7 +387,10 @@ if (isset($_POST['save_invoice'])) {
         var inputs = newRow.getElementsByTagName("input");
         for(var i=0; i<inputs.length; i++) { 
             inputs[i].value = ""; 
-            if(inputs[i].name == "qty[]") inputs[i].value="1"; 
+            if(inputs[i].name == "qty[]") {
+                inputs[i].value="1"; 
+                inputs[i].setAttribute("step", "any"); // Pastikan baris baru support desimal
+            }
         }
         table.appendChild(newRow);
     }
