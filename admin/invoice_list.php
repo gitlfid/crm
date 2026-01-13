@@ -59,12 +59,13 @@ if(!empty($f_end_date)) {
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean(); // Bersihkan buffer HTML
     
-    // [UPDATE] Ambil Header Invoice Saja (Item diambil di dalam loop)
+    // [UPDATE] Tambahkan i.invoice_type ke SELECT
     $sqlEx = "SELECT 
                 i.id, 
                 i.quotation_id, 
                 i.invoice_date,
                 i.invoice_no,
+                i.invoice_type, 
                 i.status,
                 i.tax_invoice_file,
                 c.company_name,
@@ -94,8 +95,8 @@ if (isset($_POST['export_excel'])) {
     
     $output = fopen('php://output', 'w');
     
-    // [UPDATE] Header Kolom CSV: Tambah Quantity dan Unit Price
-    fputcsv($output, array('Date', 'Client', 'Invoice No', 'PO Client', 'Ref Quote', 'Description', 'Quantity', 'Unit Price', 'Currency', 'Sub Total', 'VAT (11%)', 'Grand Total', 'Status', 'Sales Person', 'Delivery Order No', 'Status Faktur Pajak', 'Notes'));
+    // [UPDATE] Header Excel: Tambah 'Type'
+    fputcsv($output, array('Date', 'Client', 'Invoice No', 'Type', 'PO Client', 'Ref Quote', 'Description', 'Quantity', 'Unit Price', 'Currency', 'Sub Total', 'VAT (11%)', 'Grand Total', 'Status', 'Sales Person', 'Delivery Order No', 'Status Faktur Pajak', 'Notes'));
     
     while($row = $resEx->fetch_assoc()) {
         $invId = $row['id'];
@@ -118,22 +119,22 @@ if (isset($_POST['export_excel'])) {
             $calcSub += floatval($itm['qty']) * floatval($itm['unit_price']);
         }
         
-        // Logika Pajak
-        $is_usd = ($row['currency'] == 'USD');
-        $tax_rate = $is_usd ? 0 : 0.11;
+        // [BARU] LOGIKA PAJAK BERDASARKAN TIPE
+        $is_international = ($row['invoice_type'] == 'International');
+        $tax_rate = $is_international ? 0 : 0.11;
         $vat = $calcSub * $tax_rate;
 
-        // --- [FIX] ROUNDING 0.5 KE BAWAH (EXCEL) ---
-        if (!$is_usd) {
-            // IDR: Gunakan PHP_ROUND_HALF_DOWN agar 0.5 dibulatkan ke bawah
+        // [BARU] LOGIKA ROUNDING BERDASARKAN TIPE
+        if (!$is_international) {
+            // Domestic (IDR): Round 0.5 Down
             $calcSub = round($calcSub, 0, PHP_ROUND_HALF_DOWN);
             $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
         } else {
+            // International (USD): Normal 2 decimal
             $calcSub = round($calcSub, 2);
             $vat = round($vat, 2);
         }
         $grandTotal = $calcSub + $vat;
-        // ----------------------------------------------------
         
         // Data Umum Baris
         $doNum = !empty($row['do_numbers']) ? $row['do_numbers'] : '-';
@@ -154,6 +155,7 @@ if (isset($_POST['export_excel'])) {
                     $row['invoice_date'],
                     $row['company_name'],
                     $row['invoice_no'],
+                    $row['invoice_type'], // [BARU] Type Column
                     $poClient,
                     $row['quotation_no'],
                     $desc,                  
@@ -173,6 +175,7 @@ if (isset($_POST['export_excel'])) {
         } else {
             fputcsv($output, array(
                 $row['invoice_date'], $row['company_name'], $row['invoice_no'], 
+                $row['invoice_type'], // [BARU]
                 $poClient, $row['quotation_no'], 'No Items Found', 0, 0, 
                 $row['currency'], 0, 0, 0, 
                 strtoupper($row['status']), $salesPerson, $doNum, $taxStatus, $cleanNotes
@@ -198,7 +201,8 @@ if (isset($_POST['confirm_payment'])) {
     $grand_total_system = floatval($_POST['grand_total_system']);
     $user_id = $_SESSION['user_id'];
 
-    if (abs($amount_input - $grand_total_system) > 1) {
+    // Validasi toleransi selisih floating point (0.01)
+    if (abs($amount_input - $grand_total_system) > 0.01) {
         echo "<script>alert('GAGAL: Nominal pembayaran tidak sesuai dengan Total Tagihan!'); window.location='invoice_list.php';</script>";
         exit;
     }
@@ -263,7 +267,6 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     $act = $_GET['action'];
     
-    // [BARU] Hapus Permanen (Admin Only)
     if ($act == 'delete') {
         if ($user_role == 'admin') {
             $conn->query("DELETE FROM invoice_items WHERE invoice_id=$id");
@@ -295,7 +298,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     echo "<script>window.location='invoice_list.php';</script>";
 }
 
-// --- 5. QUERY DATA TAMPILAN UTAMA ---
+// --- 5. QUERY DATA TAMPILAN UTAMA (Update SELECT) ---
 $sql = "SELECT i.*, c.company_name, q.quotation_no, q.currency, 
         isp.general_notes, 
         COALESCE(
@@ -426,6 +429,9 @@ $res = $conn->query($sql);
                             <th class="ps-4">Invoice No</th>
                             <th>Date</th>
                             <th>Client</th>
+                            
+                            <th class="text-center">Type</th>
+                            
                             <th class="text-end">Sub Total</th>
                             <th class="text-end">VAT</th>
                             <th class="text-end">Grand Total</th>
@@ -439,39 +445,36 @@ $res = $conn->query($sql);
                             <?php
                                 $subTotal = floatval($row['sub_total'] ?? 0);
                                 $curr = $row['currency'];
-                                $is_usd = ($curr == 'USD');
                                 
-                                // LOGIKA PAJAK
-                                $tax_rate = $is_usd ? 0 : 0.11;
+                                // [BARU] LOGIKA PAJAK BERDASARKAN TIPE
+                                $is_international = ($row['invoice_type'] == 'International');
+                                $tax_rate = $is_international ? 0 : 0.11;
                                 $vat = $subTotal * $tax_rate;
 
-                                // --- [FIX] LOGIKA PEMBULATAN 0.5 KE BAWAH (DASHBOARD) ---
-                                if (!$is_usd) {
-                                    // IDR: 0.5 dibulatkan ke bawah (2.5 -> 2)
+                                // [BARU] LOGIKA PEMBULATAN
+                                if (!$is_international) {
+                                    // IDR: 0.5 ke bawah
                                     $subTotal = round($subTotal, 0, PHP_ROUND_HALF_DOWN);
                                     $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
                                 } else {
-                                    // USD: Standar 2 desimal
+                                    // USD: 2 desimal
                                     $subTotal = round($subTotal, 2);
                                     $vat = round($vat, 2);
                                 }
                                 $grandTotal = $subTotal + $vat;
-                                // -----------------------------------------------------------
                                 
-                                // LOGIKA TAMPILAN ANGKA
-                                $fmt = function($n) use ($is_usd) {
-                                    if ($is_usd) return number_format($n, 2, '.', ',');
+                                // Format Angka
+                                $fmt = function($n) use ($is_international) {
+                                    if ($is_international) return number_format($n, 2, '.', ',');
                                     return number_format($n, 0, ',', '.');
                                 };
 
                                 $st = $row['status'];
                                 $bg = ($st=='paid')?'success':(($st=='cancel')?'danger':(($st=='sent')?'info':'secondary'));
                                 $hasTax = !empty($row['tax_invoice_file']);
-                                
                                 $hasNote = !empty($row['general_notes']);
                                 $noteClass = $hasNote ? 'has-note' : '';
                                 $noteTooltip = $hasNote ? 'Lihat Catatan' : 'Buat Catatan';
-                                
                                 $doCount = intval($row['do_count']);
                             ?>
                             <tr>
@@ -486,6 +489,10 @@ $res = $conn->query($sql);
                                 </td>
                                 <td><?= date('d/m/Y', strtotime($row['invoice_date'])) ?></td>
                                 <td><div class="fw-bold text-truncate" style="max-width: 200px;"><?= htmlspecialchars($row['company_name']) ?></div></td>
+                                
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border"><?= $row['invoice_type'] ?></span>
+                                </td>
                                 
                                 <td class="text-end text-muted"><?= $fmt($subTotal) ?></td>
                                 <td class="text-end text-muted"><?= $fmt($vat) ?></td>
@@ -661,14 +668,12 @@ $res = $conn->query($sql);
 <script>
     let systemTotal = 0;
 
-    // --- LOGIC CATATAN ---
     function openNoteModal(invoiceNo) {
         document.getElementById('noteInvoiceNo').value = invoiceNo;
         document.getElementById('noteTitle').value = invoiceNo;
         document.getElementById('generalNotes').value = "Loading...";
         document.getElementById('saveStatus').style.display = 'none';
 
-        // Load Data via AJAX
         const formData = new FormData();
         formData.append('action', 'load');
         formData.append('invoice_no', invoiceNo);
@@ -694,7 +699,6 @@ $res = $conn->query($sql);
         formData.append('action', 'save');
         formData.append('invoice_no', inv);
         formData.append('notes', notes);
-        
         formData.append('calc_data', '[]'); 
 
         fetch('ajax_scratchpad.php', { method: 'POST', body: formData })
@@ -719,7 +723,6 @@ $res = $conn->query($sql);
         });
     }
 
-    // --- LOGIC LAIN ---
     function openPayModal(id, no, total) {
         systemTotal = parseFloat(total);
         document.getElementById('modal_inv_id').value = id;

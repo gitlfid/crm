@@ -5,7 +5,8 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL DATA HEADER INVOICE (Sesuai Backup Anda - Tanpa pic_email yang bikin error)
+// 1. AMBIL DATA HEADER (Termasuk invoice_type)
+// Note: Saya menggunakan query aman sesuai backup Anda sebelumnya
 $sql = "SELECT i.*, q.po_number_client, q.currency, q.remarks,
                c.company_name, c.address as c_address, c.pic_name, c.pic_phone,
                u.username as sales_name, u.email as sales_email, u.phone as sales_phone, 
@@ -18,22 +19,16 @@ $sql = "SELECT i.*, q.po_number_client, q.currency, q.remarks,
 $inv = $conn->query($sql)->fetch_assoc();
 if(!$inv) die("Invoice not found");
 
-// 2. AMBIL ITEM (LOGIKA PERBAIKAN: Prioritas Invoice Items > Quotation)
+// 2. AMBIL ITEM (Prioritas: Invoice Items > Quotation)
 $itemsData = [];
 $sql_inv_items = "SELECT item_name, qty, unit_price, card_type, description FROM invoice_items WHERE invoice_id = $id";
 $check_items = $conn->query($sql_inv_items);
 
 if ($check_items && $check_items->num_rows > 0) {
-    // Jika ada data hasil edit di Invoice, gunakan ini
-    while($row = $check_items->fetch_assoc()) {
-        $itemsData[] = $row;
-    }
+    while($row = $check_items->fetch_assoc()) { $itemsData[] = $row; }
 } else {
-    // Jika kosong, ambil dari Quotation (Data Awal)
     $resQ = $conn->query("SELECT item_name, qty, unit_price, card_type, description FROM quotation_items WHERE quotation_id = " . $inv['quotation_id']);
-    while($row = $resQ->fetch_assoc()) {
-        $itemsData[] = $row;
-    }
+    while($row = $resQ->fetch_assoc()) { $itemsData[] = $row; }
 }
 
 // 3. AMBIL SETTINGS
@@ -41,12 +36,21 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- LOGIKA MATA UANG & FORMAT ---
-$is_usd = ($inv['currency'] == 'USD');
-$tax_rate = $is_usd ? 0 : 0.11; // USD PPN 0%, IDR 11%
+// --- [LOGIKA BARU] DOMESTIC VS INTERNATIONAL ---
+// Cek tipe invoice dari database
+$inv_type = isset($inv['invoice_type']) ? $inv['invoice_type'] : 'Domestic'; 
+$is_international = ($inv_type == 'International');
 
-// Info Bank (Sesuai Backup)
-if ($is_usd) {
+// A. SETTING PAJAK
+// Domestic = 11%, International = 0%
+$tax_rate = $is_international ? 0 : 0.11;
+
+// B. SETTING PAYMENT DETAILS & NOTE
+if ($is_international) {
+    // --- SETTING INTERNATIONAL (USD) ---
+    $payment_title = "Payment Method (USD)";
+    $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
+    
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
                        "Bank Address : Jl. M. H. Thamrin No. 1 Kec. Menteng, Kota Jakarta Pusat, DKI Jakarta\n" .
@@ -55,14 +59,24 @@ if ($is_usd) {
                        "Acc Name : PT Linksfield Networks Indonesia\n" .
                        "Settlement Currency : USD";
 } else {
-    $payment_details = $sets['invoice_payment_info'] ?? '-';
+    // --- SETTING DOMESTIC (IDR) ---
+    $payment_title = "Payment Method (IDR)";
+    $special_note_usd = ""; // Kosong jika domestic
+    
+    $payment_details = "Acc Name : PT. LINKSFIELD NETWORKS INDONESIA\n" .
+                       "Bank Name : BCA (Bank Central Asia)\n" .
+                       "Acc No : 2060752705\n" .
+                       "SWIFT CODE : CENAIDJA\n" .
+                       "Bank Address : Jl. M. H. Thamrin No. 1 Kec. Menteng";
 }
 
-function smart_format($num, $curr) {
-    if ($curr == 'IDR') {
-        return number_format((float)$num, 0, ',', '.');
+// C. HELPER FORMAT ANGKA
+// USD = Pakai desimal (1,500.50), IDR = Bulat (1.500.000)
+function format_money($num, $is_intl) {
+    if ($is_intl) {
+        return number_format((float)$num, 2, '.', ','); 
     } else {
-        return number_format((float)$num, 2, '.', ',');
+        return number_format((float)$num, 0, ',', '.');
     }
 }
 ?>
@@ -77,16 +91,9 @@ function smart_format($num, $curr) {
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; }
         @page { margin: 1.5cm; size: A4; }
 
-        /* HEADER & UTILS (Sesuai Backup) */
         .no-print { background: #f8f9fa; padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
         .btn-print { background: #0d6efd; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
         [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
-
-        .watermark-container { 
-            position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); 
-            width: 80%; z-index: -1000; text-align: center; pointer-events: none; opacity: 0.08;
-        }
-        .watermark-img { width: 100%; height: auto; }
 
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
@@ -130,11 +137,7 @@ function smart_format($num, $curr) {
 
     <div class="no-print">
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
-        <div style="margin-top:5px; color:red; font-size:11px;">* Tips: Klik angka di tabel untuk mengedit nominal secara manual sebelum dicetak.</div>
-    </div>
-
-    <div class="watermark-container">
-        <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
+        <div style="margin-top:5px; color:red; font-size:11px;">* Mode: <strong><?= $inv_type ?></strong> (Currency: <?= $inv['currency'] ?>)</div>
     </div>
 
     <table class="header-table">
@@ -188,14 +191,12 @@ function smart_format($num, $curr) {
             $no = 1; 
             $grandTotal = 0;
             
-            // LOOP DATA ITEM
             foreach($itemsData as $item): 
-                $qty = floatval($item['qty']); // Support Desimal
+                $qty = floatval($item['qty']); 
                 $price = floatval($item['unit_price']);
                 $lineTotal = $qty * $price;
                 $grandTotal += $lineTotal;
                 
-                // Ambil Payment Method (Prioritas: Item > Header > Default)
                 $payMethod = !empty($item['card_type']) ? $item['card_type'] : $inv['payment_method'];
                 if(empty($payMethod)) $payMethod = 'Prepaid';
             ?>
@@ -211,21 +212,21 @@ function smart_format($num, $curr) {
                 </td>
                 <td class="text-center" contenteditable="true"><?= $qty ?></td> 
                 <td class="text-center" contenteditable="true"><?= htmlspecialchars($payMethod) ?></td>
-                <td class="text-right" contenteditable="true"><?= smart_format($price, $inv['currency']) ?></td>
-                <td class="text-right" contenteditable="true"><?= smart_format($lineTotal, $inv['currency']) ?></td>
+                <td class="text-right" contenteditable="true"><?= format_money($price, $is_international) ?></td>
+                <td class="text-right" contenteditable="true"><?= format_money($lineTotal, $is_international) ?></td>
             </tr>
             <?php endforeach; ?>
             
             <?php 
-                // PERHITUNGAN TOTAL & PAJAK
-                if (!$is_usd) {
-                    // IDR: Round 0.5 Down
+                // PERHITUNGAN TOTAL
+                if ($is_international) {
+                    // USD: PPN 0%, Desimal 2 digit
+                    $vatAmount = 0;
+                    $grandTotal = round($grandTotal, 2); 
+                } else {
+                    // IDR: PPN 11%, Bulat ke bawah
                     $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
-                } else {
-                    // USD: Normal 2 decimal
-                    $grandTotal = round($grandTotal, 2); 
-                    $vatAmount = round($grandTotal * $tax_rate, 2);
                 }
                 $totalAll = $grandTotal + $vatAmount;
             ?>
@@ -233,21 +234,21 @@ function smart_format($num, $curr) {
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
                 <td class="label-cell">Sub Total</td>
-                <td class="value-cell" contenteditable="true"><?= smart_format($grandTotal, $inv['currency']) ?></td>
+                <td class="value-cell" contenteditable="true"><?= format_money($grandTotal, $is_international) ?></td>
             </tr>
             
-            <?php if(!$is_usd): ?>
+            <?php if(!$is_international): ?>
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
                 <td class="label-cell">VAT (11%)</td>
-                <td class="value-cell" contenteditable="true"><?= smart_format($vatAmount, $inv['currency']) ?></td>
+                <td class="value-cell" contenteditable="true"><?= format_money($vatAmount, $is_international) ?></td>
             </tr>
             <?php endif; ?>
 
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
                 <td class="label-cell">Total</td>
-                <td class="value-cell" contenteditable="true"><?= smart_format($totalAll, $inv['currency']) ?></td>
+                <td class="value-cell" contenteditable="true"><?= format_money($totalAll, $is_international) ?></td>
             </tr>
         </tbody>
     </table>
@@ -257,13 +258,21 @@ function smart_format($num, $curr) {
             <td class="footer-left">
                 <div style="font-style: italic; font-size: 10px; margin-bottom: 20px;">
                     <strong>Note :</strong><br>
+                    
+                    <?php if($is_international): ?>
+                        <div style="margin-bottom:5px; color:#000;">
+                            <?= $special_note_usd ?>
+                        </div>
+                    <?php endif; ?>
+
                     <div contenteditable="true">
                         <?= nl2br(htmlspecialchars($sets['invoice_note_default'] ?? '')) ?>
                     </div>
                 </div>
 
                 <div style="font-size: 11px;">
-                    <span style="font-weight: bold; margin-bottom: 5px; display: block;">Payment Method (<?= $inv['currency'] ?>)</span>
+                    <span style="font-weight: bold; margin-bottom: 5px; display: block;"><?= $payment_title ?></span>
+                    
                     <div style="line-height: 1.5; white-space: pre-line;" contenteditable="true">
                         <?= htmlspecialchars($payment_details) ?>
                     </div>
@@ -274,6 +283,7 @@ function smart_format($num, $curr) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
+                    // LOGIKA SIGNATURE (Sesuai Backup)
                     $signPath = '';
                     $dbFile = $inv['sales_sign'];
                     $userId = $inv['created_by_user_id']; 
