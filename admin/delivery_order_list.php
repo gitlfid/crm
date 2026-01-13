@@ -11,7 +11,7 @@ $where = "1=1";
 
 if (!empty($search)) {
     $safe_search = $conn->real_escape_string($search);
-    $where .= " AND d.do_number LIKE '%$safe_search%'";
+    $where .= " AND (d.do_number LIKE '%$safe_search%' OR i.invoice_no LIKE '%$safe_search%')";
 }
 
 if (!empty($f_client)) {
@@ -23,10 +23,10 @@ if (!empty($f_client)) {
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
-    // [FIX QUERY] Ambil alamat DO (d.address) dan Client (c.address) dengan nama beda
+    // [UPDATE QUERY] Tambahkan i.invoice_no
     $sqlEx = "SELECT d.*, d.address as do_address_fix, 
                      c.company_name, c.address as client_address_fix, 
-                     p.invoice_id, i.quotation_id
+                     p.invoice_id, i.quotation_id, i.invoice_no
               FROM delivery_orders d 
               JOIN payments p ON d.payment_id = p.id 
               JOIN invoices i ON p.invoice_id = i.id
@@ -40,12 +40,11 @@ if (isset($_POST['export_excel'])) {
     header('Content-Disposition: attachment; filename=DeliveryOrders_' . date('Ymd_His') . '.csv');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, array('DO Number', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
+    // [UPDATE HEADER CSV] Tambah Ref Invoice
+    fputcsv($output, array('DO Number', 'Ref Invoice', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
     
     while($row = $resEx->fetch_assoc()) {
-        // [LOGIKA PRIORITAS ALAMAT]
         $final_address = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
-
         $do_id = $row['id'];
         $itemsData = [];
 
@@ -68,14 +67,16 @@ if (isset($_POST['export_excel'])) {
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
                 fputcsv($output, array(
-                    $row['do_number'], $row['do_date'], $row['company_name'], 
-                    $final_address, // Pakai alamat prioritas
+                    $row['do_number'], 
+                    $row['invoice_no'], // [UPDATE DATA CSV]
+                    $row['do_date'], $row['company_name'], 
+                    $final_address,
                     $item['item_name'], floatval($item['qty']), $item['charge_mode'], $item['description'],
                     $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])
                 ));
             }
         } else {
-            fputcsv($output, array($row['do_number'], $row['do_date'], $row['company_name'], $final_address, '- No Item -', '', '', '', $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])));
+            fputcsv($output, array($row['do_number'], $row['invoice_no'], $row['do_date'], $row['company_name'], $final_address, '- No Item -', '', '', '', $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])));
         }
     }
     fclose($output);
@@ -89,10 +90,10 @@ include 'includes/sidebar.php';
 
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
-// [FIX QUERY DASHBOARD]
+// [UPDATE QUERY DASHBOARD] Tambahkan i.invoice_no
 $sql = "SELECT d.*, d.address as do_address_fix, 
                c.company_name, c.address as client_address_fix, 
-               p.invoice_id, i.quotation_id
+               p.invoice_id, i.quotation_id, i.invoice_no
         FROM delivery_orders d 
         JOIN payments p ON d.payment_id = p.id 
         JOIN invoices i ON p.invoice_id = i.id
@@ -117,7 +118,7 @@ $res = $conn->query($sql);
         <div class="card-body py-3">
             <form method="GET" class="row g-2">
                 <div class="col-md-5">
-                    <input type="text" name="search" class="form-control" placeholder="Cari No DO..." value="<?= htmlspecialchars($search) ?>">
+                    <input type="text" name="search" class="form-control" placeholder="Cari No DO / No Invoice..." value="<?= htmlspecialchars($search) ?>">
                 </div>
                 <div class="col-md-4">
                     <select name="client_id" class="form-select">
@@ -146,7 +147,7 @@ $res = $conn->query($sql);
                     <thead class="bg-light">
                         <tr>
                             <th>DO Number</th>
-                            <th>Date</th>
+                            <th>Ref Invoice</th> <th>Date</th>
                             <th width="20%">Client & Address</th>
                             <th width="25%">Item</th>
                             <th class="text-center">Unit</th>
@@ -160,11 +161,10 @@ $res = $conn->query($sql);
                         <?php if ($res->num_rows > 0): ?>
                             <?php while($row = $res->fetch_assoc()): ?>
                             <?php
-                                // [LOGIKA PENENTU ALAMAT]
-                                // Cek apakah ada alamat khusus DO? Jika ya pakai, jika tidak pakai alamat client.
+                                // Alamat
                                 $displayAddress = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
 
-                                // Ambil Item
+                                // Item
                                 $do_id = $row['id'];
                                 $itemsData = [];
                                 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode FROM delivery_order_items WHERE delivery_order_id = $do_id";
@@ -184,6 +184,13 @@ $res = $conn->query($sql);
                             ?>
                             <tr>
                                 <td class="fw-bold font-monospace"><?= $row['do_number'] ?></td>
+                                
+                                <td>
+                                    <span class="badge bg-light text-primary border border-primary text-decoration-none">
+                                        <?= $row['invoice_no'] ?>
+                                    </span>
+                                </td>
+
                                 <td><?= date('d M Y', strtotime($row['do_date'])) ?></td>
                                 <td>
                                     <div class="fw-bold text-primary"><?= htmlspecialchars($row['company_name']) ?></div>
@@ -221,7 +228,7 @@ $res = $conn->query($sql);
                             </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="9" class="text-center py-5 text-muted">Tidak ada data.</td></tr>
+                            <tr><td colspan="10" class="text-center py-5 text-muted">Tidak ada data.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
