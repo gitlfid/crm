@@ -206,7 +206,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                     <ul style="padding-left:15px; margin-top:5px;">
                         <li>Please sign and stamp this delivery order</li>
                         <li>Please send it via email and whatsapp</li>
-                        <li>Barang yang sudah dibeli tidak dapat dikembalikan</li>
+                        <li>Items that have been purchased cannot be returned</li>
                     </ul>
                 </td>
                 <td class="footer-col sender-col">
