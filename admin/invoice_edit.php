@@ -17,17 +17,29 @@ if (isset($_POST['update_invoice'])) {
     $due_date = $_POST['due_date'];
     $pymt_method = $conn->real_escape_string($_POST['payment_method_col']);
     
-    // 1. Update Table Invoice Header
-    $sqlUpdate = "UPDATE invoices SET invoice_date='$inv_date', due_date='$due_date', payment_method='$pymt_method' WHERE id=$inv_id";
+    // [BARU] TANGKAP INVOICE TYPE
+    $inv_type = $conn->real_escape_string($_POST['invoice_type']);
+    
+    // TENTUKAN CURRENCY BERDASARKAN TYPE (Agar sinkron)
+    $new_currency = ($inv_type == 'International') ? 'USD' : 'IDR';
+
+    // 1. Update Table Invoice Header (Termasuk Type)
+    $sqlUpdate = "UPDATE invoices SET 
+                  invoice_date='$inv_date', 
+                  due_date='$due_date', 
+                  payment_method='$pymt_method', 
+                  invoice_type='$inv_type' 
+                  WHERE id=$inv_id";
     $conn->query($sqlUpdate);
 
-    // 2. Update Table Quotation (Client & PO Ref)
+    // 2. Update Table Quotation (Client, PO Ref, & Currency)
     $q_check = $conn->query("SELECT quotation_id FROM invoices WHERE id=$inv_id")->fetch_assoc();
     $q_id = $q_check['quotation_id'];
 
     if (isset($_POST['client_id'])) {
         $new_client_id = intval($_POST['client_id']);
-        $conn->query("UPDATE quotations SET client_id=$new_client_id WHERE id=$q_id");
+        // [UPDATE] Update juga Currency di Quotation agar konsisten
+        $conn->query("UPDATE quotations SET client_id=$new_client_id, currency='$new_currency' WHERE id=$q_id");
     }
 
     if (isset($_POST['po_ref'])) {
@@ -35,9 +47,8 @@ if (isset($_POST['update_invoice'])) {
         $conn->query("UPDATE quotations SET po_number_client='$po_ref' WHERE id=$q_id");
     }
 
-    // 3. Ambil Mata Uang
-    $curr_check = $conn->query("SELECT currency FROM quotations WHERE id=$q_id")->fetch_assoc();
-    $curr = $curr_check['currency'];
+    // Gunakan currency baru untuk logika pembersihan harga
+    $curr = $new_currency;
 
     // 4. Update Items: Hapus lama, Insert baru
     $conn->query("DELETE FROM invoice_items WHERE invoice_id=$inv_id");
@@ -52,10 +63,12 @@ if (isset($_POST['update_invoice'])) {
         if (!empty($items[$i])) {
             $it_name = $conn->real_escape_string($items[$i]);
             
-            // [UPDATE] Gunakan floatval agar desimal (koma) tersimpan
-            $it_qty  = floatval($qtys[$i]); 
+            // Handle Desimal Qty (Ubah koma jadi titik)
+            $raw_qty = $qtys[$i];
+            $clean_qty = str_replace(',', '.', $raw_qty);
+            $it_qty  = floatval($clean_qty); 
             
-            // Logika Pembersih Harga
+            // Handle Harga Sesuai Currency Baru
             $raw_price = $prices[$i];
             $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
 
@@ -79,6 +92,7 @@ if (isset($_POST['update_invoice'])) {
 }
 
 // --- AMBIL DATA UNTUK TAMPILAN ---
+// [BARU] Ambil invoice_type di SELECT
 $sql = "SELECT i.*, c.id as current_client_id, c.company_name, c.address, c.pic_name, q.po_number_client, q.currency
         FROM invoices i 
         JOIN quotations q ON i.quotation_id = q.id 
@@ -114,8 +128,8 @@ if ($resItems->num_rows > 0) {
         <i class="bi bi-pencil-square me-2"></i>
         <strong>Mode Edit:</strong>
         <ul class="mb-0 ps-3">
-            <li>Anda dapat mengubah <strong>Qty dengan Desimal</strong> (misal: 1.5).</li>
-            <li>Unit Price mendukung format <strong>USD (1,500.50)</strong> dan <strong>IDR (1.500.000)</strong>.</li>
+            <li>Type <strong>International</strong> akan otomatis mengubah mata uang ke <strong>USD</strong>.</li>
+            <li>Anda dapat mengubah Qty dengan desimal (misal: 1.5).</li>
         </ul>
     </div>
 </div>
@@ -165,6 +179,15 @@ if ($resItems->num_rows > 0) {
                             <label class="fw-bold">Invoice No</label>
                             <input type="text" class="form-control fw-bold fs-5 bg-light" value="<?= $invoice['invoice_no'] ?>" readonly>
                         </div>
+                        
+                        <div class="mb-3">
+                            <label class="fw-bold">Invoice Type</label>
+                            <select name="invoice_type" id="invoice_type" class="form-select" onchange="autoSetCurrency()">
+                                <option value="Domestic" <?= $invoice['invoice_type'] == 'Domestic' ? 'selected' : '' ?>>Domestic (IDR)</option>
+                                <option value="International" <?= $invoice['invoice_type'] == 'International' ? 'selected' : '' ?>>International (USD)</option>
+                            </select>
+                        </div>
+
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="fw-bold">Invoice Date</label>
@@ -175,10 +198,12 @@ if ($resItems->num_rows > 0) {
                                 <input type="date" name="due_date" class="form-control" value="<?= $invoice['due_date'] ?>" required>
                             </div>
                         </div>
+                        
                         <div class="mb-3">
-                            <label class="fw-bold">Currency</label>
-                            <input type="text" class="form-control bg-light" value="<?= $invoice['currency'] ?>" readonly>
+                            <label class="fw-bold">Currency (Auto)</label>
+                            <input type="text" id="currency_display" class="form-control bg-light" value="<?= $invoice['currency'] ?>" readonly>
                         </div>
+
                         <div class="mt-2">
                             <label>Payment Method Label</label>
                             <input type="text" name="payment_method_col" class="form-control" value="<?= htmlspecialchars($invoice['payment_method']) ?>">
@@ -199,7 +224,7 @@ if ($resItems->num_rows > 0) {
                         <thead class="bg-light">
                             <tr>
                                 <th width="30%">Item Name</th>
-                                <th width="15%">Card Type (Int)</th>
+                                <th width="15%">Card Type</th>
                                 <th width="10%">Qty</th>
                                 <th width="20%">Unit Price</th>
                                 <th>Desc</th>
@@ -234,16 +259,28 @@ if ($resItems->num_rows > 0) {
 <?php include 'includes/footer.php'; ?>
 
 <script>
+    // [BARU] FUNGSI AUTO UPDATE TAMPILAN CURRENCY
+    function autoSetCurrency() {
+        var type = document.getElementById('invoice_type').value;
+        var disp = document.getElementById('currency_display');
+        if(disp) {
+            if(type === 'International') {
+                disp.value = 'USD';
+            } else {
+                disp.value = 'IDR';
+            }
+        }
+    }
+
     function addRow() {
         var table = document.getElementById("itemTable").getElementsByTagName('tbody')[0];
-        // Clone baris pertama untuk mempertahankan format
         var newRow = table.rows[0].cloneNode(true);
         var inputs = newRow.getElementsByTagName("input");
         for(var i=0; i<inputs.length; i++) { 
             inputs[i].value = ""; 
             if(inputs[i].name == "qty[]") {
-                inputs[i].value = "1"; 
-                inputs[i].setAttribute("step", "any"); // Pastikan baris baru juga support desimal
+                inputs[i].value = "1";
+                inputs[i].setAttribute("step", "any");
             }
         }
         table.appendChild(newRow);
