@@ -35,20 +35,18 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- [LOGIKA BARU] DOMESTIC VS INTERNATIONAL ---
+// --- LOGIKA TIPE INVOICE (DOMESTIC / INTERNATIONAL) ---
 $inv_type = isset($inv['invoice_type']) ? $inv['invoice_type'] : 'Domestic'; 
 $is_international = ($inv_type == 'International');
 
 // A. SETTING PAJAK
 $tax_rate = $is_international ? 0 : 0.11;
 
-// B. SETTING PAYMENT DETAILS & NOTE (FIX DOUBLE NOTE)
+// B. SETTING PAYMENT DETAILS & NOTE
 if ($is_international) {
-    // --- INTERNATIONAL (USD) ---
+    // USD
     $payment_title = "Payment Method (USD)";
-    
-    // [FIX] Note khusus International (Menggantikan Default Note)
-    $final_note = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
+    $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
     
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
@@ -58,11 +56,13 @@ if ($is_international) {
                        "Acc Name : PT Linksfield Networks Indonesia\n" .
                        "Settlement Currency : USD";
 } else {
-    // --- DOMESTIC (IDR) ---
+    // IDR
     $payment_title = "Payment Method (IDR)";
     
-    // [FIX] Note Domestic ambil dari Database Settings
+    // Note Default dari Database
     $final_note = isset($sets['invoice_note_default']) ? $sets['invoice_note_default'] : '';
+    
+    $special_note_usd = ""; 
     
     $payment_details = "Acc Name : PT. LINKSFIELD NETWORKS INDONESIA\n" .
                        "Bank Name : BCA (Bank Central Asia)\n" .
@@ -71,7 +71,7 @@ if ($is_international) {
                        "Bank Address : Jl. M. H. Thamrin No. 1 Kec. Menteng";
 }
 
-// C. HELPER FORMAT ANGKA
+// FORMAT ANGKA
 function format_money($num, $is_intl) {
     if ($is_intl) {
         return number_format((float)$num, 2, '.', ','); 
@@ -197,8 +197,9 @@ function format_money($num, $is_intl) {
                 $lineTotal = $qty * $price;
                 $grandTotal += $lineTotal;
                 
-                $payMethod = !empty($item['card_type']) ? $item['card_type'] : $inv['payment_method'];
-                if(empty($payMethod)) $payMethod = 'Prepaid';
+                // [FIX] PRIORITASKAN PAYMENT METHOD DARI HEADER INVOICE (PREPAID)
+                // Jika Header kosong, baru ambil dari Item Card Type, jika kosong lagi baru default Prepaid.
+                $payMethod = !empty($inv['payment_method']) ? $inv['payment_method'] : (!empty($item['card_type']) ? $item['card_type'] : 'Prepaid');
             ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
@@ -256,10 +257,15 @@ function format_money($num, $is_intl) {
             <td class="footer-left">
                 <div style="font-style: italic; font-size: 10px; margin-bottom: 20px;">
                     <strong>Note :</strong><br>
-                    
-                    <div contenteditable="true" style="margin-bottom:5px; color:#000;">
-                        <?= nl2br(htmlspecialchars($final_note)) ?>
-                    </div>
+                    <?php if($is_international): ?>
+                        <div style="margin-bottom:5px; color:#000;">
+                            <?= $special_note_usd ?>
+                        </div>
+                    <?php else: ?>
+                        <div contenteditable="true" style="margin-bottom:5px; color:#000;">
+                            <?= nl2br(htmlspecialchars($final_note)) ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div style="font-size: 11px;">
@@ -274,9 +280,9 @@ function format_money($num, $is_intl) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    // LOGIKA SIGNATURE & NAMA NIAWATI (Sesuai Permintaan Sebelumnya)
+                    // LOGIKA SIGNATURE (Force Niawati jika di set)
                     $signPath = '';
-                    $signerName = 'Niawati'; // Default Force Name
+                    $signerName = 'Niawati'; 
                     $baseDir = dirname(__DIR__);
 
                     // Cari User Niawati
