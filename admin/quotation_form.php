@@ -19,17 +19,22 @@ $client_pic       = "";
 $po_ref_val       = "";
 $client_id_val    = ""; 
 
-// Generate Nomor Baru
+// Generate Nomor Baru (Auto)
 $prefix = "QLF" . date('Ym'); 
 $sqlNum = "SELECT quotation_no FROM quotations WHERE quotation_no LIKE '$prefix%' ORDER BY quotation_no DESC LIMIT 1";
 $resNum = $conn->query($sqlNum);
 $newUrut = ($resNum && $resNum->num_rows > 0) ? ((int)substr($resNum->fetch_assoc()['quotation_no'], -4) + 1) : 1;
 $display_quote_no = $prefix . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
 
-// --- EDIT MODE ---
+// --- EDIT MODE (LOAD DATA) ---
 if (isset($_GET['edit_id']) && !empty($_GET['edit_id'])) {
     $edit_id = intval($_GET['edit_id']);
-    $sqlHeader = "SELECT q.*, c.address, c.pic_name, c.company_name FROM quotations q JOIN clients c ON q.client_id = c.id WHERE q.id = $edit_id";
+    
+    // [SYNC FIX] Ambil data Address & PIC langsung dari tabel CLIENTS (Join), bukan field statis
+    $sqlHeader = "SELECT q.*, c.address, c.pic_name, c.company_name 
+                  FROM quotations q 
+                  JOIN clients c ON q.client_id = c.id 
+                  WHERE q.id = $edit_id";
     $resHeader = $conn->query($sqlHeader);
     
     if ($resHeader && $resHeader->num_rows > 0) {
@@ -41,8 +46,11 @@ if (isset($_GET['edit_id']) && !empty($_GET['edit_id'])) {
         $current_curr     = $q_data['currency'];
         $po_ref_val       = $q_data['po_number_client'];
         $client_id_val    = $q_data['client_id'];
+        
+        // Data ini diambil dari master client, jadi selalu update/sync
         $client_addr      = $q_data['address'];
         $client_pic       = $q_data['pic_name'];
+        
         $page_title = "Edit Quotation: " . $display_quote_no;
 
         $resItems = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = $edit_id");
@@ -53,9 +61,10 @@ if (isset($_GET['edit_id']) && !empty($_GET['edit_id'])) {
         echo "<script>alert('Data tidak ditemukan!'); window.location='quotation_list.php';</script>"; exit;
     }
 } 
+
 $clients = $conn->query("SELECT * FROM clients ORDER BY company_name ASC");
 
-// --- SAVE PROCESS ---
+// --- SAVE / UPDATE PROCESS ---
 if (isset($_POST['save_quotation'])) {
     $post_id = isset($_POST['quotation_id']) ? intval($_POST['quotation_id']) : 0;
     $q_no    = $conn->real_escape_string($_POST['quotation_no']);
@@ -65,53 +74,49 @@ if (isset($_POST['save_quotation'])) {
     $po_ref  = isset($_POST['po_ref']) ? $conn->real_escape_string($_POST['po_ref']) : '';
     
     if ($post_id > 0) {
+        // UPDATE MODE
         $conn->query("UPDATE quotations SET quotation_date='$q_date', client_id=$client, currency='$curr', po_number_client='$po_ref' WHERE id=$post_id");
+        // Hapus item lama, insert ulang (Full Edit)
         $conn->query("DELETE FROM quotation_items WHERE quotation_id=$post_id"); 
         $quot_id = $post_id;
         $msg = "Quotation Updated Successfully!";
     } else {
+        // INSERT MODE
         $chk = $conn->query("SELECT id FROM quotations WHERE quotation_no='$q_no'");
         if($chk->num_rows > 0) { $newUrut++; $q_no = $prefix . str_pad($newUrut, 4, "0", STR_PAD_LEFT); }
+        
         $conn->query("INSERT INTO quotations (quotation_no, client_id, created_by_user_id, quotation_date, currency, status, po_number_client) VALUES ('$q_no', $client, $my_id, '$q_date', '$curr', 'draft', '$po_ref')");
         $quot_id = $conn->insert_id;
         $msg = "Quotation Created Successfully!";
     }
 
-    // ITEM ARRAYS
+    // ITEM PROCESSING
     $items = $_POST['item_name'];
     $qtys  = $_POST['qty']; 
-    $prices= $_POST['unit_price']; // Input Text Universal
+    $prices= $_POST['unit_price']; 
     $descs = $_POST['description'];
+    // Ambil text duration (hasil olahan javascript)
     $dur_texts = $_POST['duration_text']; 
 
     for ($i = 0; $i < count($items); $i++) {
         if (!empty($items[$i])) {
-            $raw_name = $conn->real_escape_string($items[$i]);
-            
-            // [FIX] Jangan hapus tanda kurung. Simpan apa adanya.
-            $db_item_name = $raw_name;
-
+            $db_item_name = $conn->real_escape_string($items[$i]);
             $text_duration = isset($dur_texts[$i]) ? $conn->real_escape_string($dur_texts[$i]) : 'One Time';
             $it_qty  = floatval($qtys[$i]);
             $it_dsc  = $conn->real_escape_string($descs[$i]);
             
-            // --- [FIX] LOGIKA PEMBERSIH HARGA UNIVERSAL ---
+            // Format Harga
             $raw_price = $prices[$i];
-            // Hapus Rp, $, spasi
             $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
-
             if ($curr == 'IDR') {
-                // Format IDR: 1.500.000 (Titik = Ribuan)
                 $clean_price = str_replace('.', '', $clean_price); 
-                $clean_price = str_replace(',', '.', $clean_price); // Jika user iseng pakai koma
+                $clean_price = str_replace(',', '.', $clean_price); 
             } else {
-                // Format USD: 1,500.50 (Koma = Ribuan)
                 $clean_price = str_replace(',', '', $clean_price); 
             }
-            
             $it_prc = floatval($clean_price);
-            // ----------------------------------------------
             
+            // Simpan ke card_type (Duration)
             $conn->query("INSERT INTO quotation_items (quotation_id, item_name, qty, unit_price, description, card_type) VALUES ($quot_id, '$db_item_name', $it_qty, $it_prc, '$it_dsc', '$text_duration')");
         }
     }
@@ -153,11 +158,11 @@ if (isset($_POST['save_quotation'])) {
                             <input type="text" name="po_ref" class="form-control" value="<?= htmlspecialchars($po_ref_val) ?>">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small text-muted">Address</label>
+                            <label class="form-label small text-muted">Address (Auto Sync)</label>
                             <textarea id="cl_addr" class="form-control bg-light" rows="3" readonly><?= $client_addr ?></textarea>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label small text-muted">PIC</label>
+                            <label class="form-label small text-muted">PIC (Auto Sync)</label>
                             <input type="text" id="cl_pic" class="form-control bg-light" value="<?= $client_pic ?>" readonly>
                         </div>
                     </div>
@@ -211,31 +216,48 @@ if (isset($_POST['save_quotation'])) {
                         <tbody>
                             <?php if($is_edit && count($q_items) > 0): ?>
                                 <?php foreach($q_items as $itm): 
-                                    // [FIX] Tampilkan nama item apa adanya (termasuk kurung)
                                     $db_name = $itm['item_name'];
                                     $duration_text_db = $itm['card_type'];
+                                    
+                                    // Logika deteksi dropdown duration
+                                    $sel_one = ($duration_text_db == 'One Time') ? 'selected' : '';
+                                    $sel_mon = ($duration_text_db == 'Monthly') ? 'selected' : '';
+                                    $sel_3mo = ($duration_text_db == '3 Months') ? 'selected' : '';
+                                    $sel_6mo = ($duration_text_db == '6 Months') ? 'selected' : '';
+                                    $sel_ann = (strpos($duration_text_db, 'Annually') !== false) ? 'selected' : '';
+                                    
+                                    $is_custom = ($sel_one=='' && $sel_mon=='' && $sel_3mo=='' && $sel_6mo=='' && $sel_ann=='');
+                                    $sel_cus = $is_custom ? 'selected' : '';
+                                    $display_select = $is_custom ? 'd-none' : '';
+                                    $display_input = $is_custom ? '' : 'd-none';
+                                    
+                                    $custom_val = ''; $custom_unit = 'Months';
+                                    if($is_custom) {
+                                        $parts = explode(' ', $duration_text_db);
+                                        if(count($parts) >= 2) { $custom_val = $parts[0]; $custom_unit = $parts[1]; }
+                                    }
                                 ?>
                                 <tr>
                                     <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($db_name) ?>" required></td>
                                     
-                                    <td><input type="number" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" min="1" required></td>
+                                    <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="<?= floatval($itm['qty']) ?>" required></td>
                                     
                                     <td>
-                                        <select class="form-select duration-select" onchange="updateDuration(this)">
-                                            <option value="1" data-txt="One Time" <?= $duration_text_db=='One Time'?'selected':'' ?>>One Time</option>
-                                            <option value="1" data-txt="Monthly" <?= $duration_text_db=='Monthly'?'selected':'' ?>>Monthly</option>
-                                            <option value="3" data-txt="3 Months" <?= $duration_text_db=='3 Months'?'selected':'' ?>>3 Months</option>
-                                            <option value="6" data-txt="6 Months" <?= $duration_text_db=='6 Months'?'selected':'' ?>>6 Months</option>
-                                            <option value="12" data-txt="Annually" <?= strpos($duration_text_db, 'Annually')!==false?'selected':'' ?>>Annually (12 Mo)</option>
-                                            <option value="custom" class="fw-bold text-primary">Custom...</option>
+                                        <select class="form-select duration-select <?= $display_select ?>" onchange="updateDuration(this)">
+                                            <option value="1" data-txt="One Time" <?= $sel_one ?>>One Time</option>
+                                            <option value="1" data-txt="Monthly" <?= $sel_mon ?>>Monthly</option>
+                                            <option value="3" data-txt="3 Months" <?= $sel_3mo ?>>3 Months</option>
+                                            <option value="6" data-txt="6 Months" <?= $sel_6mo ?>>6 Months</option>
+                                            <option value="12" data-txt="Annually" <?= $sel_ann ?>>Annually (12 Mo)</option>
+                                            <option value="custom" class="fw-bold text-primary" <?= $sel_cus ?>>Custom...</option>
                                         </select>
                                         <input type="hidden" name="duration_text[]" class="duration-text-input" value="<?= $duration_text_db ?>">
                                         
-                                        <div class="input-group duration-input-group d-none" style="flex-wrap: nowrap;">
-                                            <input type="number" class="form-control text-center duration-custom" placeholder="0" oninput="updateCustomDuration(this)" style="min-width: 60px;">
+                                        <div class="input-group duration-input-group <?= $display_input ?>" style="flex-wrap: nowrap;">
+                                            <input type="number" class="form-control text-center duration-custom" placeholder="0" value="<?= $custom_val ?>" oninput="updateCustomDuration(this)" style="min-width: 60px;">
                                             <select class="form-select duration-unit" onchange="updateCustomDuration(this)" style="max-width: 100px; background-color: #f8f9fa;">
-                                                <option value="Months">Bulan</option>
-                                                <option value="Years">Tahun</option>
+                                                <option value="Months" <?= $custom_unit=='Months'?'selected':'' ?>>Bulan</option>
+                                                <option value="Years" <?= $custom_unit=='Years'?'selected':'' ?>>Tahun</option>
                                             </select>
                                             <button class="btn btn-outline-secondary" type="button" onclick="resetDuration(this)"><i class="bi bi-x"></i></button>
                                         </div>
@@ -253,7 +275,7 @@ if (isset($_POST['save_quotation'])) {
                             <?php else: ?>
                                 <tr>
                                     <td><input type="text" name="item_name[]" class="form-control" required></td>
-                                    <td><input type="number" name="qty[]" class="form-control text-center" value="1" min="1" required></td>
+                                    <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="1" required></td>
                                     <td>
                                         <select class="form-select duration-select" onchange="updateDuration(this)">
                                             <option value="1" data-txt="One Time">One Time</option>
@@ -313,7 +335,10 @@ if (isset($_POST['save_quotation'])) {
         
         for(var i=0; i<inputs.length; i++) { 
             inputs[i].value = ""; 
-            if(inputs[i].name == "qty[]") inputs[i].value = "1";
+            if(inputs[i].name == "qty[]") {
+                inputs[i].value = "1";
+                inputs[i].setAttribute("step", "any");
+            }
             if(inputs[i].classList.contains("duration-text-input")) inputs[i].value = "One Time"; 
         }
         
@@ -337,6 +362,7 @@ if (isset($_POST['save_quotation'])) {
         }
     }
 
+    // Logic Dropdown Duration
     function updateDuration(selectElem) {
         let row = selectElem.closest('tr');
         let inputGroup = row.querySelector('.duration-input-group');
