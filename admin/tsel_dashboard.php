@@ -89,7 +89,7 @@ while($row = $resClientChart->fetch_assoc()) {
     $chartDataFailed[] = intval($row['f']);
 }
 
-// Data Tabel All Clients (With ID for linking)
+// Data Tabel All Clients
 $sqlAllClients = "SELECT c.id, c.company_name, 
                     COUNT(h.id) as total,
                     SUM(CASE WHEN MONTH(h.created_at) = MONTH(CURRENT_DATE()) AND YEAR(h.created_at) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as monthly_total,
@@ -218,11 +218,13 @@ $resAllClients = $conn->query($sqlAllClients);
                                 $rateColor = ($rate < 50) ? 'danger' : (($rate < 80) ? 'warning text-dark' : 'success');
                             ?>
                             <tr>
-                                <td class="ps-4 fw-bold">
-                                    <a href="tsel_client_detail.php?id=<?= $c['id'] ?>" class="text-primary text-decoration-none">
-                                        <?= htmlspecialchars($c['company_name']) ?> 
-                                        <i class="bi bi-box-arrow-up-right small ms-1" style="font-size: 0.7rem;"></i>
-                                    </a>
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <span class="fw-bold text-dark"><?= htmlspecialchars($c['company_name']) ?></span>
+                                        <a href="tsel_client_detail.php?id=<?= $c['id'] ?>" class="btn btn-sm btn-primary shadow-sm ms-2 px-3" style="font-size: 0.75rem;">
+                                            <i class="bi bi-bar-chart-line-fill me-1"></i> Detail
+                                        </a>
+                                    </div>
                                 </td>
                                 <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format($total) ?></span></td>
                                 <td class="text-center table-info fw-bold text-dark"><?= number_format($monthly) ?></td>

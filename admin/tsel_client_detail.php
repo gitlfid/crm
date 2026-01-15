@@ -149,7 +149,7 @@ $tableDataReversed = array_reverse($tableData);
                                 <td class="text-center text-danger fw-bold"><?= number_format($f) ?></td>
                                 <td class="text-center"><span class="badge bg-<?= $rateColor ?>"><?= $rate ?>%</span></td>
                                 <td class="pe-4 text-end">
-                                    <a href="tsel_history.php?client_id=<?= $client_id ?>&month=<?= $row['month_key'] ?>" class="btn btn-sm btn-outline-primary">
+                                    <a href="tsel_history.php?client_id=<?= $client_id ?>&month=<?= $row['month_key'] ?>" class="btn btn-sm btn-primary shadow-sm px-3">
                                         <i class="bi bi-list-ul me-1"></i> Lihat Data
                                     </a>
                                 </td>
