@@ -108,12 +108,14 @@ if (isset($_POST['do_retry'])) {
     }
 }
 
-// Filter & Search Logic (TIDAK DIUBAH)
+// Filter & Search Logic
 $search    = isset($_GET['search']) ? $_GET['search'] : '';
 $f_client  = isset($_GET['client_id']) ? $_GET['client_id'] : '';
 $f_package = isset($_GET['package']) ? $_GET['package'] : '';
 $f_status  = isset($_GET['status']) ? $_GET['status'] : '';
 $batch_id  = isset($_GET['batch_id']) ? intval($_GET['batch_id']) : 0;
+// [BARU] Filter Month
+$f_month   = isset($_GET['month']) ? $_GET['month'] : '';
 
 $whereClauses = [];
 if ($batch_id > 0) $whereClauses[] = "h.batch_id = $batch_id";
@@ -132,6 +134,11 @@ if (!empty($f_package)) {
 if (!empty($f_status)) {
     $safe_status = $conn->real_escape_string($f_status);
     $whereClauses[] = "h.status = '$safe_status'";
+}
+// [BARU] Logika Filter Month (YYYY-MM)
+if (!empty($f_month)) {
+    $safe_month = $conn->real_escape_string($f_month);
+    $whereClauses[] = "DATE_FORMAT(h.created_at, '%Y-%m') = '$safe_month'";
 }
 
 $whereSql = (count($whereClauses) > 0) ? "WHERE " . implode(" AND ", $whereClauses) : "";

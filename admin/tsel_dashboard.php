@@ -1,5 +1,5 @@
 <?php
-// --- 1. LOGIKA EXPORT EXCEL (CSV) - DITARUH PALING ATAS ---
+// --- 1. LOGIKA EXPORT EXCEL (CSV) ---
 if (isset($_POST['export_stats'])) {
     include '../config/database.php'; 
     if (ob_get_length()) ob_end_clean();
@@ -9,10 +9,8 @@ if (isset($_POST['export_stats'])) {
     
     $output = fopen('php://output', 'w');
     
-    // [UPDATE] Header Kolom CSV (Tambah 'Total This Month')
     fputcsv($output, array('Client Name', 'Total Requests (All Time)', 'Total This Month', 'Success', 'Failed', 'Success Rate (%)', 'Last Activity'));
     
-    // [UPDATE] Query Data Statistik (Tambah Monthly Count)
     $sqlStats = "SELECT c.company_name, 
                     COUNT(h.id) as total,
                     SUM(CASE WHEN MONTH(h.created_at) = MONTH(CURRENT_DATE()) AND YEAR(h.created_at) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as monthly_total,
@@ -51,14 +49,13 @@ if (isset($_POST['export_stats'])) {
     exit();
 }
 
-// --- 2. MULAI HALAMAN DASHBOARD (HTML) ---
+// --- 2. DASHBOARD PAGE ---
 $page_title = "Inject Dashboard";
 include 'includes/header.php';
 include 'includes/sidebar.php';
 include '../config/functions.php';
 
-// --- QUERY DATA CHART ---
-// 1. Global Stats
+// Data Global
 $sqlGlobal = "SELECT 
                 SUM(CASE WHEN status='SUCCESS' THEN 1 ELSE 0 END) as total_success,
                 SUM(CASE WHEN status='FAILED' THEN 1 ELSE 0 END) as total_failed,
@@ -70,7 +67,7 @@ $gFailed = intval($statGlobal['total_failed'] ?? 0);
 $gPending = intval($statGlobal['total_pending'] ?? 0);
 $gTotal = $gSuccess + $gFailed + $gPending;
 
-// 2. Top Clients Chart
+// Data Chart (Top 10)
 $sqlClientChart = "SELECT c.company_name, 
                     COUNT(h.id) as total_req,
                     SUM(CASE WHEN h.status='SUCCESS' THEN 1 ELSE 0 END) as s,
@@ -92,8 +89,8 @@ while($row = $resClientChart->fetch_assoc()) {
     $chartDataFailed[] = intval($row['f']);
 }
 
-// 3. Tabel Detail Semua Client (Termasuk Monthly Total)
-$sqlAllClients = "SELECT c.company_name, 
+// Data Tabel All Clients (With ID for linking)
+$sqlAllClients = "SELECT c.id, c.company_name, 
                     COUNT(h.id) as total,
                     SUM(CASE WHEN MONTH(h.created_at) = MONTH(CURRENT_DATE()) AND YEAR(h.created_at) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as monthly_total,
                     SUM(CASE WHEN h.status='SUCCESS' THEN 1 ELSE 0 END) as s,
@@ -221,7 +218,12 @@ $resAllClients = $conn->query($sqlAllClients);
                                 $rateColor = ($rate < 50) ? 'danger' : (($rate < 80) ? 'warning text-dark' : 'success');
                             ?>
                             <tr>
-                                <td class="ps-4 fw-bold text-primary"><?= htmlspecialchars($c['company_name']) ?></td>
+                                <td class="ps-4 fw-bold">
+                                    <a href="tsel_client_detail.php?id=<?= $c['id'] ?>" class="text-primary text-decoration-none">
+                                        <?= htmlspecialchars($c['company_name']) ?> 
+                                        <i class="bi bi-box-arrow-up-right small ms-1" style="font-size: 0.7rem;"></i>
+                                    </a>
+                                </td>
                                 <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format($total) ?></span></td>
                                 <td class="text-center table-info fw-bold text-dark"><?= number_format($monthly) ?></td>
                                 <td class="text-center text-success fw-bold"><?= number_format($s) ?></td>
@@ -244,20 +246,13 @@ $resAllClients = $conn->query($sqlAllClients);
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        const globalSuccess = <?= $gSuccess ?>;
-        const globalFailed = <?= $gFailed ?>;
-        const globalPending = <?= $gPending ?>;
-        const clientLabels = <?= json_encode($chartLabels) ?>;
-        const clientSuccessData = <?= json_encode($chartDataSuccess) ?>;
-        const clientFailedData = <?= json_encode($chartDataFailed) ?>;
-
         const ctxGlobal = document.getElementById('chartGlobal').getContext('2d');
         new Chart(ctxGlobal, {
             type: 'doughnut',
             data: {
                 labels: ['Success', 'Failed', 'Pending'],
                 datasets: [{
-                    data: [globalSuccess, globalFailed, globalPending],
+                    data: [<?= $gSuccess ?>, <?= $gFailed ?>, <?= $gPending ?>],
                     backgroundColor: ['#198754', '#dc3545', '#ffc107'],
                     borderWidth: 2,
                     borderColor: '#fff'
@@ -274,10 +269,10 @@ $resAllClients = $conn->query($sqlAllClients);
         new Chart(ctxClient, {
             type: 'bar',
             data: {
-                labels: clientLabels,
+                labels: <?= json_encode($chartLabels) ?>,
                 datasets: [
-                    { label: 'Success', data: clientSuccessData, backgroundColor: '#198754' },
-                    { label: 'Failed', data: clientFailedData, backgroundColor: '#dc3545' }
+                    { label: 'Success', data: <?= json_encode($chartDataSuccess) ?>, backgroundColor: '#198754' },
+                    { label: 'Failed', data: <?= json_encode($chartDataFailed) ?>, backgroundColor: '#dc3545' }
                 ]
             },
             options: {
