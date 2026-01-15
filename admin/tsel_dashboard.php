@@ -1,12 +1,7 @@
 <?php
 // --- 1. LOGIKA EXPORT EXCEL (CSV) - DITARUH PALING ATAS ---
-// Harus dijalankan sebelum ada output HTML apapun agar tidak error header
 if (isset($_POST['export_stats'])) {
-    // Load koneksi database secara manual khusus untuk export ini
-    // Sesuaikan path ini dengan lokasi file config Anda
     include '../config/database.php'; 
-    
-    // Bersihkan buffer output jika ada sampah spasi/enter sebelumnya
     if (ob_get_length()) ob_end_clean();
     
     header('Content-Type: text/csv; charset=utf-8');
@@ -14,12 +9,13 @@ if (isset($_POST['export_stats'])) {
     
     $output = fopen('php://output', 'w');
     
-    // Header Kolom CSV
-    fputcsv($output, array('Client Name', 'Total Requests', 'Success', 'Failed', 'Success Rate (%)', 'Last Activity'));
+    // [UPDATE] Header Kolom CSV (Tambah 'Total This Month')
+    fputcsv($output, array('Client Name', 'Total Requests (All Time)', 'Total This Month', 'Success', 'Failed', 'Success Rate (%)', 'Last Activity'));
     
-    // Query Data Statistik
+    // [UPDATE] Query Data Statistik (Tambah Monthly Count)
     $sqlStats = "SELECT c.company_name, 
                     COUNT(h.id) as total,
+                    SUM(CASE WHEN MONTH(h.created_at) = MONTH(CURRENT_DATE()) AND YEAR(h.created_at) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as monthly_total,
                     SUM(CASE WHEN h.status='SUCCESS' THEN 1 ELSE 0 END) as s,
                     SUM(CASE WHEN h.status='FAILED' THEN 1 ELSE 0 END) as f,
                     MAX(h.created_at) as last_act
@@ -34,6 +30,7 @@ if (isset($_POST['export_stats'])) {
     if ($resStats) {
         while($row = $resStats->fetch_assoc()) {
             $total = intval($row['total']);
+            $monthly = intval($row['monthly_total']);
             $s = intval($row['s']);
             $f = intval($row['f']);
             $rate = ($total > 0) ? round(($s/$total)*100, 2) : 0;
@@ -41,6 +38,7 @@ if (isset($_POST['export_stats'])) {
             fputcsv($output, array(
                 $row['company_name'],
                 $total,
+                $monthly,
                 $s,
                 $f,
                 $rate . '%',
@@ -50,7 +48,7 @@ if (isset($_POST['export_stats'])) {
     }
     
     fclose($output);
-    exit(); // Matikan script segera setelah download selesai
+    exit();
 }
 
 // --- 2. MULAI HALAMAN DASHBOARD (HTML) ---
@@ -94,9 +92,10 @@ while($row = $resClientChart->fetch_assoc()) {
     $chartDataFailed[] = intval($row['f']);
 }
 
-// 3. Tabel Detail Semua Client
+// 3. Tabel Detail Semua Client (Termasuk Monthly Total)
 $sqlAllClients = "SELECT c.company_name, 
                     COUNT(h.id) as total,
+                    SUM(CASE WHEN MONTH(h.created_at) = MONTH(CURRENT_DATE()) AND YEAR(h.created_at) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as monthly_total,
                     SUM(CASE WHEN h.status='SUCCESS' THEN 1 ELSE 0 END) as s,
                     SUM(CASE WHEN h.status='FAILED' THEN 1 ELSE 0 END) as f,
                     MAX(h.created_at) as last_act
@@ -203,7 +202,8 @@ $resAllClients = $conn->query($sqlAllClients);
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-4">Client Name</th>
-                            <th class="text-center">Total</th>
+                            <th class="text-center">Total (All)</th>
+                            <th class="text-center table-info">This Month</th> 
                             <th class="text-center text-success">Success</th>
                             <th class="text-center text-danger">Failed</th>
                             <th class="text-center">Success Rate</th>
@@ -214,6 +214,7 @@ $resAllClients = $conn->query($sqlAllClients);
                         <?php if($resAllClients->num_rows > 0): ?>
                             <?php while($c = $resAllClients->fetch_assoc()): 
                                 $total = intval($c['total']);
+                                $monthly = intval($c['monthly_total']);
                                 $s = intval($c['s']);
                                 $f = intval($c['f']);
                                 $rate = ($total > 0) ? round(($s/$total)*100, 1) : 0;
@@ -222,6 +223,7 @@ $resAllClients = $conn->query($sqlAllClients);
                             <tr>
                                 <td class="ps-4 fw-bold text-primary"><?= htmlspecialchars($c['company_name']) ?></td>
                                 <td class="text-center"><span class="badge bg-light text-dark border"><?= number_format($total) ?></span></td>
+                                <td class="text-center table-info fw-bold text-dark"><?= number_format($monthly) ?></td>
                                 <td class="text-center text-success fw-bold"><?= number_format($s) ?></td>
                                 <td class="text-center text-danger fw-bold"><?= number_format($f) ?></td>
                                 <td class="text-center"><span class="badge bg-<?= $rateColor ?>"><?= $rate ?>%</span></td>
@@ -229,7 +231,7 @@ $resAllClients = $conn->query($sqlAllClients);
                             </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="6" class="text-center py-4 text-muted">Belum ada data inject.</td></tr>
+                            <tr><td colspan="7" class="text-center py-4 text-muted">Belum ada data inject.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
