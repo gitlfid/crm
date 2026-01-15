@@ -4,50 +4,6 @@ include 'includes/header.php';
 include 'includes/sidebar.php';
 include '../config/functions.php';
 
-// --- [BARU] LOGIKA EXPORT STATISTIK KE EXCEL (CSV) ---
-if (isset($_POST['export_stats'])) {
-    if (ob_get_length()) ob_end_clean(); // Bersihkan buffer output HTML
-    
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename=Inject_Statistics_' . date('Ymd_His') . '.csv');
-    
-    $output = fopen('php://output', 'w');
-    
-    // Header Kolom Excel
-    fputcsv($output, array('Client Name', 'Total Request', 'Success', 'Failed', 'Success Rate (%)'));
-    
-    // Query Data Statistik Per Client (Lengkap)
-    $sqlStats = "SELECT c.company_name, 
-                    COUNT(h.id) as total,
-                    SUM(CASE WHEN h.status='SUCCESS' THEN 1 ELSE 0 END) as s,
-                    SUM(CASE WHEN h.status='FAILED' THEN 1 ELSE 0 END) as f
-                   FROM inject_history h
-                   JOIN inject_batches b ON h.batch_id = b.id
-                   JOIN clients c ON b.client_id = c.id
-                   GROUP BY c.id
-                   ORDER BY total DESC";
-    $resStats = $conn->query($sqlStats);
-    
-    while($row = $resStats->fetch_assoc()) {
-        $total = intval($row['total']);
-        $s = intval($row['s']);
-        $f = intval($row['f']);
-        $rate = ($total > 0) ? round(($s/$total)*100, 2) : 0;
-        
-        fputcsv($output, array(
-            $row['company_name'],
-            $total,
-            $s,
-            $f,
-            $rate . '%'
-        ));
-    }
-    
-    fclose($output);
-    exit();
-}
-// -----------------------------------------------------
-
 // Ambil Client
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
@@ -56,37 +12,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
                          FROM inject_batches b 
                          LEFT JOIN clients c ON b.client_id = c.id 
                          ORDER BY b.created_at DESC LIMIT 10");
-
-// --- QUERY UNTUK CHART DASHBOARD ---
-// 1. Total Success vs Failed (Global)
-$sqlGlobal = "SELECT 
-                SUM(CASE WHEN status='SUCCESS' THEN 1 ELSE 0 END) as total_success,
-                SUM(CASE WHEN status='FAILED' THEN 1 ELSE 0 END) as total_failed
-              FROM inject_history";
-$statGlobal = $conn->query($sqlGlobal)->fetch_assoc();
-$totalSuccess = intval($statGlobal['total_success'] ?? 0);
-$totalFailed = intval($statGlobal['total_failed'] ?? 0);
-
-// 2. Statistik Per Client (Top 10 untuk Chart)
-$sqlClientStats = "SELECT c.company_name, 
-                    SUM(CASE WHEN h.status='SUCCESS' THEN 1 ELSE 0 END) as s,
-                    SUM(CASE WHEN h.status='FAILED' THEN 1 ELSE 0 END) as f
-                   FROM inject_history h
-                   JOIN inject_batches b ON h.batch_id = b.id
-                   JOIN clients c ON b.client_id = c.id
-                   GROUP BY c.id
-                   ORDER BY (s + f) DESC LIMIT 10";
-$resClientStats = $conn->query($sqlClientStats);
-
-$chartLabels = [];
-$chartDataSuccess = [];
-$chartDataFailed = [];
-
-while($row = $resClientStats->fetch_assoc()) {
-    $chartLabels[] = $row['company_name'];
-    $chartDataSuccess[] = intval($row['s']);
-    $chartDataFailed[] = intval($row['f']);
-}
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -179,43 +104,6 @@ while($row = $resClientStats->fetch_assoc()) {
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h6 class="m-0 fw-bold text-dark">Overall Success Rate</h6>
-                </div>
-                <div class="card-body d-flex align-items-center justify-content-center">
-                    <div style="height: 200px; width: 200px; position: relative;">
-                        <canvas id="chartGlobal"></canvas>
-                    </div>
-                </div>
-                <div class="card-footer bg-light text-center small">
-                    <span class="badge bg-success me-2">Success: <?= number_format($totalSuccess) ?></span>
-                    <span class="badge bg-danger">Failed: <?= number_format($totalFailed) ?></span>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-8">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 fw-bold text-dark">Inject Performance by Client (Top 10)</h6>
-                    
-                    <form method="POST" target="_blank" class="m-0">
-                        <button type="submit" name="export_stats" class="btn btn-success btn-sm text-white">
-                            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Stats
-                        </button>
-                    </form>
-                </div>
-                <div class="card-body">
-                    <div style="height: 235px;">
-                        <canvas id="chartClient"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="card shadow-sm step-card h-100">
@@ -376,76 +264,10 @@ while($row = $resClientStats->fetch_assoc()) {
     let isProcessing = false;
     let chartInstance = null;
 
-    // --- A. LOAD BALANCE & STATS CHARTS (ON PAGE LOAD) ---
+    // --- A. LOAD BALANCE INFO (ON PAGE LOAD) ---
     $(document).ready(function() {
         loadBalance();
-        initStatCharts();
     });
-
-    // FUNGSI INISIALISASI CHART STATISTIK
-    function initStatCharts() {
-        // Data dari PHP
-        const globalSuccess = <?= $totalSuccess ?>;
-        const globalFailed = <?= $totalFailed ?>;
-        
-        const clientLabels = <?= json_encode($chartLabels) ?>;
-        const clientSuccessData = <?= json_encode($chartDataSuccess) ?>;
-        const clientFailedData = <?= json_encode($chartDataFailed) ?>;
-
-        // 1. Chart Global (Donut)
-        const ctxGlobal = document.getElementById('chartGlobal').getContext('2d');
-        new Chart(ctxGlobal, {
-            type: 'doughnut',
-            data: {
-                labels: ['Success', 'Failed'],
-                datasets: [{
-                    data: [globalSuccess, globalFailed],
-                    backgroundColor: ['#198754', '#dc3545'],
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
-
-        // 2. Chart Client (Stacked Bar)
-        const ctxClient = document.getElementById('chartClient').getContext('2d');
-        new Chart(ctxClient, {
-            type: 'bar',
-            data: {
-                labels: clientLabels,
-                datasets: [
-                    {
-                        label: 'Success',
-                        data: clientSuccessData,
-                        backgroundColor: '#198754',
-                    },
-                    {
-                        label: 'Failed',
-                        data: clientFailedData,
-                        backgroundColor: '#dc3545',
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { stacked: true },
-                    y: { stacked: true, beginAtZero: true }
-                },
-                plugins: {
-                    legend: { position: 'top' }
-                }
-            }
-        });
-    }
 
     function loadBalance() {
         $("#balanceLoading").show();
@@ -498,7 +320,7 @@ while($row = $resClientStats->fetch_assoc()) {
                 labels: ['Sisa Saldo', 'Terpakai'],
                 datasets: [{
                     data: [bal, usage],
-                    backgroundColor: ['#198754', '#ffc107'], 
+                    backgroundColor: ['#198754', '#ffc107'], // Success Green, Warning Yellow
                     borderWidth: 0,
                     hoverOffset: 4
                 }]
