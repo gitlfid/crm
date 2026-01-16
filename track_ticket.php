@@ -252,6 +252,9 @@ function isImage($file) {
         .form-control:focus { box-shadow: 0 0 0 0.25rem rgba(67, 94, 190, 0.15); border-color: #435ebe; }
         .btn-primary { background-color: #435ebe; border-color: #435ebe; }
         .btn-primary:hover { background-color: #354a96; border-color: #354a96; }
+
+        /* form info */
+        .form-info {color: #f50404}
     </style>
 </head>
 
@@ -280,6 +283,10 @@ function isImage($file) {
                     <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
                         <i class="bi bi-search me-2"></i>Cari
                     </button>
+                    <div Class="form-info">
+                        <li>*mohon catat nomor ticket atau bisa di akses melalui email yang di daftarkan</li>
+                    </div>
+                    
                 </div>
             </form>
             <?php if($error): ?>
