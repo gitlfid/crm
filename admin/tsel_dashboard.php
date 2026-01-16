@@ -1,42 +1,53 @@
 <?php
-// --- 1. LOGIKA EXPORT EXCEL (CSV) ---
+// --- 1. LOGIKA EXPORT EXCEL (CSV) - DETAILED MONTHLY PER COMPANY ---
 if (isset($_POST['export_stats'])) {
     include '../config/database.php'; 
     if (ob_get_length()) ob_end_clean();
     
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename=Inject_Performance_Report_' . date('Ymd_His') . '.csv');
+    header('Content-Disposition: attachment; filename=Inject_Performance_Detail_' . date('Ymd_His') . '.csv');
     
     $output = fopen('php://output', 'w');
     
-    fputcsv($output, array('Client Name', 'Total Requests (All Time)', 'Total This Month', 'Success', 'Failed', 'Success Rate (%)', 'Last Activity'));
+    // [UPDATE] Header Kolom CSV (Lebih Detail)
+    fputcsv($output, array('Client Name', 'Month / Period', 'Total Request', 'Success', 'Failed', 'Success Rate (%)', 'Last Activity in Month'));
     
-    $sqlStats = "SELECT c.company_name, 
+    // [UPDATE] Query: Group by Client AND Month
+    $sqlStats = "SELECT 
+                    c.company_name, 
+                    DATE_FORMAT(h.created_at, '%Y-%m') as month_sort,
+                    DATE_FORMAT(h.created_at, '%M %Y') as month_label,
                     COUNT(h.id) as total,
-                    SUM(CASE WHEN MONTH(h.created_at) = MONTH(CURRENT_DATE()) AND YEAR(h.created_at) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as monthly_total,
                     SUM(CASE WHEN h.status='SUCCESS' THEN 1 ELSE 0 END) as s,
                     SUM(CASE WHEN h.status='FAILED' THEN 1 ELSE 0 END) as f,
                     MAX(h.created_at) as last_act
                    FROM inject_history h
                    JOIN inject_batches b ON h.batch_id = b.id
                    JOIN clients c ON b.client_id = c.id
-                   GROUP BY c.id
-                   ORDER BY total DESC";
+                   GROUP BY c.id, month_sort
+                   ORDER BY c.company_name ASC, month_sort DESC";
                    
     $resStats = $conn->query($sqlStats);
     
     if ($resStats) {
+        $currentCompany = "";
+        
         while($row = $resStats->fetch_assoc()) {
+            // Logika visual: Jika company beda, kasih pemisah baris kosong di Excel (opsional, tapi bagus untuk dibaca)
+            if($currentCompany != "" && $currentCompany != $row['company_name']) {
+               fputcsv($output, array('', '', '', '', '', '', '')); 
+            }
+            $currentCompany = $row['company_name'];
+
             $total = intval($row['total']);
-            $monthly = intval($row['monthly_total']);
             $s = intval($row['s']);
             $f = intval($row['f']);
             $rate = ($total > 0) ? round(($s/$total)*100, 2) : 0;
             
             fputcsv($output, array(
                 $row['company_name'],
+                $row['month_label'], // Contoh: January 2026
                 $total,
-                $monthly,
                 $s,
                 $f,
                 $rate . '%',
@@ -49,7 +60,7 @@ if (isset($_POST['export_stats'])) {
     exit();
 }
 
-// --- 2. DASHBOARD PAGE ---
+// --- 2. DASHBOARD PAGE (TIDAK BERUBAH) ---
 $page_title = "Inject Dashboard";
 include 'includes/header.php';
 include 'includes/sidebar.php';
@@ -89,7 +100,7 @@ while($row = $resClientChart->fetch_assoc()) {
     $chartDataFailed[] = intval($row['f']);
 }
 
-// Data Tabel All Clients
+// Data Tabel All Clients (Summary Dashboard)
 $sqlAllClients = "SELECT c.id, c.company_name, 
                     COUNT(h.id) as total,
                     SUM(CASE WHEN MONTH(h.created_at) = MONTH(CURRENT_DATE()) AND YEAR(h.created_at) = YEAR(CURRENT_DATE()) THEN 1 ELSE 0 END) as monthly_total,
@@ -115,7 +126,7 @@ $resAllClients = $conn->query($sqlAllClients);
         <div class="col-12 col-md-6 text-end">
             <form method="POST" target="_blank" class="d-inline">
                 <button type="submit" name="export_stats" class="btn btn-success shadow-sm">
-                    <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export Report (CSV)
+                    <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export Detailed Report (CSV)
                 </button>
             </form>
         </div>
