@@ -284,7 +284,7 @@ function isImage($file) {
                         <i class="bi bi-search me-2"></i>Cari
                     </button>
                     <div Class="form-info">
-                        <br>*mohon catat nomor ticket atau bisa di akses melalui email yang di daftarkan
+                        *mohon catat nomor ticket atau bisa di akses melalui email yang di daftarkan
                     </div>  
                 </div>
             </form>
