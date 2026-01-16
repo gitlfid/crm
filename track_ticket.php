@@ -285,8 +285,7 @@ function isImage($file) {
                     </button>
                     <div Class="form-info">
                         <br>*mohon catat nomor ticket atau bisa di akses melalui email yang di daftarkan
-                    </div>
-                    
+                    </div>  
                 </div>
             </form>
             <?php if($error): ?>
