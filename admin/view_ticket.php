@@ -44,53 +44,53 @@ if (isset($_POST['submit_assign'])) {
 
 // --- LOGIKA 2: PROSES REPLY & UPDATE STATUS ---
 if (isset($_POST['submit_reply'])) {
-    // Ambil pesan manual admin
-    $reply_msg = $conn->real_escape_string($_POST['reply_message']);
-    $new_status = $conn->real_escape_string($_POST['ticket_status']);
+    // [FIX] Hapus real_escape_string karena nanti pakai bind_param
+    $reply_msg = $_POST['reply_message'];
+    $new_status = $_POST['ticket_status'];
     
     // --- [ADDON] AUTO TEMPLATE MESSAGE ---
     $auto_footer = "";
 
-    // 1. Template CLOSED (Sesuai Request Lengkap)
+    // 1. Template CLOSED
     if ($new_status == 'closed') {
         $auto_footer = "
-        <br><br><hr style='border-top: 1px solid #ddd;'><br>
-        <strong>Yth. Pelanggan Linksfield Networks Indonesia,</strong><br><br>
-        Terima kasih telah berinteraksi dengan layanan Ticketing Linksfield Networks Indonesia.<br>
-        Kami senantiasa berkomitmen untuk memberikan pengalaman terbaik bagi pelanggan dengan terus meningkatkan kualitas layanan kami. Masukan dan interaksi Anda sangat berarti bagi kami dalam upaya menjaga standar pelayanan yang profesional, responsif, dan optimal.<br><br>
-        Apabila Anda memiliki pertanyaan, kebutuhan lanjutan, atau masukan tambahan, jangan ragu untuk menghubungi kami melalui kanal layanan yang tersedia.<br><br>
-        Terima kasih atas kepercayaan Anda kepada Linksfield Networks Indonesia.<br><br>
-        Hormat kami,<br>
-        <strong>Linksfield Networks Indonesia</strong>
-        <br><br><br>
-        <strong>Dear Linksfield Networks Indonesia Customers,</strong><br><br>
-        Thank you for interacting with Linksfield Networks Indonesia's Ticketing service.<br>
-        We are committed to providing the best experience for our customers by continuously improving the quality of our services. Your feedback and interaction are very important to us in our efforts to maintain professional, responsive, and optimal service standards.<br><br>
-        If you have any questions, further needs, or additional feedback, please do not hesitate to contact us through the available service channels.<br><br>
-        Thank you for your trust in Linksfield Networks Indonesia.<br><br>
-        Sincerely,<br>
-        <strong>Linksfield Networks Indonesia</strong>";
+<br><br><hr style='border-top: 1px solid #ddd;'><br>
+<strong>Yth. Pelanggan Linksfield Networks Indonesia,</strong><br><br>
+Terima kasih telah berinteraksi dengan layanan Ticketing Linksfield Networks Indonesia.<br>
+Kami senantiasa berkomitmen untuk memberikan pengalaman terbaik bagi pelanggan dengan terus meningkatkan kualitas layanan kami. Masukan dan interaksi Anda sangat berarti bagi kami dalam upaya menjaga standar pelayanan yang profesional, responsif, dan optimal.<br><br>
+Apabila Anda memiliki pertanyaan, kebutuhan lanjutan, atau masukan tambahan, jangan ragu untuk menghubungi kami melalui kanal layanan yang tersedia.<br><br>
+Terima kasih atas kepercayaan Anda kepada Linksfield Networks Indonesia.<br><br>
+Hormat kami,<br>
+<strong>Linksfield Networks Indonesia</strong>
+<br><br><br>
+<strong>Dear Linksfield Networks Indonesia Customers,</strong><br><br>
+Thank you for interacting with Linksfield Networks Indonesia's Ticketing service.<br>
+We are committed to providing the best experience for our customers by continuously improving the quality of our services. Your feedback and interaction are very important to us in our efforts to maintain professional, responsive, and optimal service standards.<br><br>
+If you have any questions, further needs, or additional feedback, please do not hesitate to contact us through the available service channels.<br><br>
+Thank you for your trust in Linksfield Networks Indonesia.<br><br>
+Sincerely,<br>
+<strong>Linksfield Networks Indonesia</strong>";
     }
-    // 2. Template OPEN (Jika Admin mengubah status kembali ke Open)
+    // 2. Template OPEN
     elseif ($new_status == 'open') {
         $auto_footer = "
-        <br><br><hr style='border-top: 1px dashed #ddd;'><br>
-        <strong>Status Update: OPEN</strong><br>
-        Tiket ini telah kami buka kembali untuk peninjauan lebih lanjut. Tim kami akan segera merespons.<br><br>
-        <em>This ticket has been reopened for further review. Our team will respond shortly.</em>";
+<br><br><hr style='border-top: 1px dashed #ddd;'><br>
+<strong>Status Update: OPEN</strong><br>
+Tiket ini telah kami buka kembali untuk peninjauan lebih lanjut. Tim kami akan segera merespons.<br><br>
+<em>This ticket has been reopened for further review. Our team will respond shortly.</em>";
     }
-    // 3. Template IN PROGRESS (Jika Admin mengubah status ke In Progress)
+    // 3. Template IN PROGRESS
     elseif ($new_status == 'progress') {
         $auto_footer = "
-        <br><br><hr style='border-top: 1px dashed #ddd;'><br>
-        <strong>Status Update: IN PROGRESS</strong><br>
-        Kami sedang menindaklanjuti laporan ini. Mohon menunggu update selanjutnya dari tim teknis kami.<br><br>
-        <em>We are currently working on this issue. Please wait for further updates from our technical team.</em>";
+<br><br><hr style='border-top: 1px dashed #ddd;'><br>
+<strong>Status Update: IN PROGRESS</strong><br>
+Kami sedang menindaklanjuti laporan ini. Mohon menunggu update selanjutnya dari tim teknis kami.<br><br>
+<em>We are currently working on this issue. Please wait for further updates from our technical team.</em>";
     }
 
-    // Gabungkan pesan manual + footer (escape footer agar aman masuk DB)
+    // Gabungkan pesan manual + footer
     if (!empty($auto_footer)) {
-        $reply_msg .= $conn->real_escape_string($auto_footer);
+        $reply_msg .= $auto_footer;
     }
     // --- [END ADDON] ---
 
@@ -113,13 +113,14 @@ if (isset($_POST['submit_reply'])) {
     }
 
     if (strpos($msg_status, 'alert-danger') === false) { 
-        // Insert Reply
+        // Insert Reply (Pakai Prepared Statement untuk keamanan)
         $stmt = $conn->prepare("INSERT INTO ticket_replies (ticket_id, user, message, attachment) VALUES (?, 'Admin', ?, ?)");
         $stmt->bind_param("iss", $ticket_id, $reply_msg, $attachment);
         
         if ($stmt->execute()) {
             // Update Status
-            $conn->query("UPDATE tickets SET status = '$new_status' WHERE id = $ticket_id");
+            $safe_status = $conn->real_escape_string($new_status);
+            $conn->query("UPDATE tickets SET status = '$safe_status' WHERE id = $ticket_id");
 
             // Ambil Data Ticket 
             $t_data = $conn->query("SELECT * FROM tickets WHERE id = $ticket_id")->fetch_assoc();
@@ -134,8 +135,8 @@ if (isset($_POST['submit_reply'])) {
                 // Menambahkan Status Ticket
                 $emailBody .= "<p><strong>Status Ticket:</strong> <span style='color:blue; font-weight:bold;'>" . strtoupper($new_status) . "</span></p>";
                 
-                // Gunakan stripslashes agar tag HTML di footer ter-render dengan benar di email
-                $emailBody .= "<p><strong>Pesan Admin:</strong><br>" . stripslashes($reply_msg) . "</p>";
+                // [FIX] Gunakan pesan langsung tanpa stripslashes karena tidak di-escape
+                $emailBody .= "<p><strong>Pesan Admin:</strong><br>" . $reply_msg . "</p>";
                 
                 if($attachment) $emailBody .= "<p><em>(Admin menyertakan lampiran)</em></p>";
                 
@@ -146,8 +147,8 @@ if (isset($_POST['submit_reply'])) {
 
             // Kirim Discord (Reply to Thread)
             if (function_exists('sendToDiscord')) {
-                // Bersihkan HTML tag untuk preview Discord
-                $cleanMsg = strip_tags(stripslashes($reply_msg));
+                // Bersihkan HTML tag untuk preview Discord agar rapi
+                $cleanMsg = strip_tags($reply_msg);
                 
                 $discordFields = [
                     ["name" => "Ticket ID", "value" => $t_data['ticket_code'], "inline" => true],
@@ -187,13 +188,8 @@ $res_rep = $conn->query("SELECT * FROM ticket_replies WHERE ticket_id = $ticket_
 while($row = $res_rep->fetch_assoc()) { $replies[] = $row; }
 
 // Helper Functions
-// Update formatText untuk men-support HTML tag dari template kita, tapi tetap escape input user lain jika perlu
+// [FIX] Hanya gunakan nl2br agar HTML (<b>, <br>) dari footer tetap render
 function formatText($text) { 
-    // Kita decode dulu special chars, lalu nl2br. 
-    // Karena kita menyimpan HTML tag (br, hr, strong) di DB, kita tidak boleh htmlspecialchars total.
-    // Solusi aman: htmlspecialchars sudah dilakukan saat input (kecuali footer kita).
-    // Tapi karena code sebelumnya menggunakan htmlspecialchars saat output, 
-    // kita akan biarkan output apa adanya (HTML allowed) karena footer mengandung HTML.
     return nl2br($text); 
 }
 
@@ -202,7 +198,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
 
 <style>
     .chat-box {
-        background-color: #f8f9fa; /* Background abu muda */
+        background-color: #f8f9fa; 
         padding: 20px;
         border-radius: 0 0 10px 10px;
         max-height: 600px;
@@ -216,7 +212,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
     }
     
     .chat-row.admin {
-        flex-direction: row-reverse; /* Admin dikanan */
+        flex-direction: row-reverse; 
     }
     
     .chat-avatar {
@@ -244,16 +240,14 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
         line-height: 1.6;
     }
     
-    /* Bubble User (Kiri) */
     .chat-row:not(.admin) .chat-bubble {
         background-color: #ffffff;
         color: #333;
         border-top-left-radius: 0;
     }
     
-    /* Bubble Admin (Kanan) */
     .chat-row.admin .chat-bubble {
-        background-color: #435ebe; /* Biru Mazer */
+        background-color: #435ebe;
         color: #ffffff;
         border-top-right-radius: 0;
     }
