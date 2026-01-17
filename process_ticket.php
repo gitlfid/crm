@@ -66,7 +66,8 @@ if (isset($_POST['submit_ticket'])) {
     }
     
     // C. Insert Database
-    $query = "INSERT INTO tickets (ticket_code, type, email, company, name, phone, subject, description, attachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    // Default status ticket saat dibuat adalah 'open' (sesuai struktur DB default)
+    $query = "INSERT INTO tickets (ticket_code, type, email, company, name, phone, subject, description, attachment, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', NOW())";
     
     $stmt = $conn->prepare($query);
     if ($stmt) {
@@ -74,7 +75,7 @@ if (isset($_POST['submit_ticket'])) {
         
         if ($stmt->execute()) {
             
-            // D. Kirim Discord Notification (SUPPORT THREADS)
+            // D. Kirim Discord Notification (Fitur Lama Tetap Ada)
             // ------------------------------------------------------------------
             $discordDesc = (strlen($description) > 1000) ? substr($description, 0, 1000) . "..." : $description;
 
@@ -86,31 +87,59 @@ if (isset($_POST['submit_ticket'])) {
             ];
             
             if (function_exists('sendToDiscord')) {
-                // Parameter ke-5 adalah Nama Thread (Format: Nomor Ticket - Subject)
                 $threadName = $ticketCode . " - " . $subject;
-                
-                // Kirim dan Tangkap Response (untuk dapat ID Thread)
                 $response = sendToDiscord("New Ticket Created!", "A new ticket has been submitted.", $discordFields, null, $threadName);
                 
-                // SIMPAN THREAD ID KE DATABASE
-                // Discord API mengembalikan objek channel, ID thread ada di properti 'id'
                 if (isset($response['id'])) {
                     $thread_id = $response['id'];
-                    // Update kolom discord_thread_id
                     $conn->query("UPDATE tickets SET discord_thread_id = '$thread_id' WHERE ticket_code = '$ticketCode'");
                 }
             }
             // ------------------------------------------------------------------
             
-            // E. Kirim Email ke User
-            $emailBody = "Halo $name,\n\nTicket Anda berhasil dibuat dengan ID: $ticketCode.\nAnda dapat melacak statusnya di website kami.";
+            // E. Hitung Nomor Antrian (Ticket Open saat ini)
+            // Logika: Hitung jumlah tiket dengan status 'open'. Tiket yang baru dibuat ini termasuk di dalamnya.
+            $queueQuery = "SELECT COUNT(*) as total FROM tickets WHERE status = 'open'";
+            $queueRes = $conn->query($queueQuery);
+            $queueData = $queueRes->fetch_assoc();
+            $queueNumber = $queueData['total']; // Ini adalah nomor antrian saat tiket dibuat
+
+            // F. Kirim Email ke User (Template Baru)
             if (function_exists('sendEmailNotification')) {
-                sendEmailNotification($email, "Ticket Created: $ticketCode", $emailBody);
+                $emailSubject = "Konfirmasi Pembuatan Ticket: $ticketCode – Linksfield Networks Indonesia";
+                
+                // Menggunakan nl2br agar format baris baru di email terjaga
+                $emailBodyRaw = "Yth. Bapak/Ibu Pelanggan,
+
+Terima kasih telah menghubungi layanan dukungan Linksfield Networks Indonesia.
+
+Dengan ini kami informasikan bahwa ticket layanan Anda telah berhasil dibuat dengan detail sebagai berikut:
+
+ID Ticket: $ticketCode
+Nomor Antrian: $queueNumber
+
+Tim kami akan segera menindaklanjuti permintaan Anda sesuai dengan urutan antrian dan tingkat prioritas yang berlaku.
+Anda dapat memantau status serta perkembangan penanganan ticket melalui website resmi kami.
+
+https://system.linksfield.id (Klik pada Lacak Status Ticket)
+
+Apabila Anda memerlukan informasi tambahan atau memiliki pertanyaan lebih lanjut, silakan membalas email ini atau menghubungi kanal layanan kami yang tersedia.
+
+Terima kasih atas kepercayaan Anda kepada Linksfield Networks Indonesia.
+
+Hormat kami,
+Tim Support
+Linksfield Networks Indonesia";
+
+                // Konversi newlines ke <br> untuk HTML email
+                $emailBodyHtml = nl2br($emailBodyRaw);
+
+                sendEmailNotification($email, $emailSubject, $emailBodyHtml);
             }
             
             // REDIRECT SUCCESS
             echo "<script>
-                alert('Ticket Berhasil Dibuat! ID Anda: $ticketCode'); 
+                alert('Ticket Berhasil Dibuat! ID Anda: $ticketCode. Nomor Antrian: $queueNumber'); 
                 window.location.href = 'track_ticket.php?track_id=$ticketCode';
             </script>";
             exit(); 

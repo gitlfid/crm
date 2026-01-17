@@ -23,6 +23,7 @@ $replies = [];
 $error = "";
 $msg_success = "";
 $msg_error = "";
+$currentQueue = "-"; // Default Antrian
 
 // LOGIKA PENCARIAN TICKET
 if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
@@ -34,6 +35,21 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
     
     if ($result && $result->num_rows > 0) {
         $ticket = $result->fetch_assoc();
+        
+        // --- [BARU] LOGIKA HITUNG ANTRIAN DINAMIS ---
+        // Antrian hanya relevan jika status = 'open'
+        if (strtolower($ticket['status']) == 'open') {
+            $ticketDbId = intval($ticket['id']);
+            // Hitung berapa banyak tiket open yang dibuat SEBELUM atau BERSAMAAN dengan tiket ini
+            // Logic: ID lebih kecil atau sama dengan ID tiket ini AND status = open
+            $queueSql = "SELECT COUNT(*) as pos FROM tickets WHERE status = 'open' AND id <= $ticketDbId";
+            $queueRes = $conn->query($queueSql);
+            if ($queueRes) {
+                $qRow = $queueRes->fetch_assoc();
+                $currentQueue = $qRow['pos'];
+            }
+        }
+        // -------------------------------------------
         
         // --- PROSES REPLY DARI CUSTOMER ---
         if (isset($_POST['submit_reply'])) {
@@ -252,6 +268,19 @@ function isImage($file) {
         .form-control:focus { box-shadow: 0 0 0 0.25rem rgba(67, 94, 190, 0.15); border-color: #435ebe; }
         .btn-primary { background-color: #435ebe; border-color: #435ebe; }
         .btn-primary:hover { background-color: #354a96; border-color: #354a96; }
+        
+        /* Queue Badge Style */
+        .queue-badge {
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+        }
+        .queue-badge i { margin-right: 6px; color: #435ebe; }
     </style>
 </head>
 
@@ -293,10 +322,19 @@ function isImage($file) {
         
         <div class="card-custom">
             <div class="ticket-status-bar">
-                <div>
-                    <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Ticket Number</small>
-                    <div class="ticket-code">#<?= htmlspecialchars($ticket['ticket_code']) ?></div>
+                <div class="d-flex align-items-center gap-3">
+                    <div>
+                        <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Ticket Number</small>
+                        <div class="ticket-code">#<?= htmlspecialchars($ticket['ticket_code']) ?></div>
+                    </div>
+                    <?php if(strtolower($ticket['status']) == 'open'): ?>
+                    <div class="queue-badge ms-3" title="Nomor Antrian Anda saat ini">
+                        <i class="bi bi-people-fill"></i> Antrian: 
+                        <span class="text-primary ms-1" style="font-size:1rem;"><?= $currentQueue ?></span>
+                    </div>
+                    <?php endif; ?>
                 </div>
+                
                 <?php 
                     $status = strtolower($ticket['status']);
                     $bg = ($status=='open')?'success':(($status=='progress')?'warning':(($status=='closed')?'secondary':'danger'));

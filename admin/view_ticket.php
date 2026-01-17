@@ -44,11 +44,12 @@ if (isset($_POST['submit_assign'])) {
 
 // --- LOGIKA 2: PROSES REPLY & UPDATE STATUS ---
 if (isset($_POST['submit_reply'])) {
-    // [FIX] Hapus real_escape_string karena nanti pakai bind_param
+    // [FIX] Jangan pakai real_escape_string di sini agar tidak ada masalah "\n" jadi "n"
+    // Kita akan pakai bind_param nanti untuk keamanan.
     $reply_msg = $_POST['reply_message'];
     $new_status = $_POST['ticket_status'];
     
-    // --- [ADDON] AUTO TEMPLATE MESSAGE ---
+    // --- [BARU] AUTO TEMPLATE MESSAGE ---
     $auto_footer = "";
 
     // 1. Template CLOSED
@@ -71,7 +72,7 @@ Thank you for your trust in Linksfield Networks Indonesia.<br><br>
 Sincerely,<br>
 <strong>Linksfield Networks Indonesia</strong>";
     }
-    // 2. Template OPEN
+    // 2. Template OPEN (Opsional)
     elseif ($new_status == 'open') {
         $auto_footer = "
 <br><br><hr style='border-top: 1px dashed #ddd;'><br>
@@ -79,7 +80,7 @@ Sincerely,<br>
 Tiket ini telah kami buka kembali untuk peninjauan lebih lanjut. Tim kami akan segera merespons.<br><br>
 <em>This ticket has been reopened for further review. Our team will respond shortly.</em>";
     }
-    // 3. Template IN PROGRESS
+    // 3. Template IN PROGRESS (Opsional)
     elseif ($new_status == 'progress') {
         $auto_footer = "
 <br><br><hr style='border-top: 1px dashed #ddd;'><br>
@@ -92,7 +93,7 @@ Kami sedang menindaklanjuti laporan ini. Mohon menunggu update selanjutnya dari 
     if (!empty($auto_footer)) {
         $reply_msg .= $auto_footer;
     }
-    // --- [END ADDON] ---
+    // --- [END AUTO TEMPLATE] ---
 
     // Upload Attachment Logic
     $attachment = null;
@@ -113,7 +114,7 @@ Kami sedang menindaklanjuti laporan ini. Mohon menunggu update selanjutnya dari 
     }
 
     if (strpos($msg_status, 'alert-danger') === false) { 
-        // Insert Reply (Pakai Prepared Statement untuk keamanan)
+        // Insert Reply (Pakai Prepared Statement)
         $stmt = $conn->prepare("INSERT INTO ticket_replies (ticket_id, user, message, attachment) VALUES (?, 'Admin', ?, ?)");
         $stmt->bind_param("iss", $ticket_id, $reply_msg, $attachment);
         
@@ -128,28 +129,21 @@ Kami sedang menindaklanjuti laporan ini. Mohon menunggu update selanjutnya dari 
             // --- KIRIM EMAIL DENGAN STATUS ---
             if (function_exists('sendEmailNotification')) {
                 $emailSubject = "Balasan Ticket #" . $t_data['ticket_code'];
-                
                 $emailBody = "<h3>Halo " . $t_data['name'] . ",</h3>";
                 $emailBody .= "<p>Ticket Anda <strong>#" . $t_data['ticket_code'] . "</strong> telah dibalas oleh Admin.</p>";
-                
-                // Menambahkan Status Ticket
                 $emailBody .= "<p><strong>Status Ticket:</strong> <span style='color:blue; font-weight:bold;'>" . strtoupper($new_status) . "</span></p>";
                 
-                // [FIX] Gunakan pesan langsung tanpa stripslashes karena tidak di-escape
+                // Gunakan pesan langsung (tanpa stripslashes karena tidak di-escape)
                 $emailBody .= "<p><strong>Pesan Admin:</strong><br>" . $reply_msg . "</p>";
                 
                 if($attachment) $emailBody .= "<p><em>(Admin menyertakan lampiran)</em></p>";
-                
                 $emailBody .= "<hr><p>Silakan cek detailnya di website kami.</p>";
-                
                 sendEmailNotification($t_data['email'], $emailSubject, $emailBody);
             }
 
-            // Kirim Discord (Reply to Thread)
+            // Kirim Discord
             if (function_exists('sendToDiscord')) {
-                // Bersihkan HTML tag untuk preview Discord agar rapi
                 $cleanMsg = strip_tags($reply_msg);
-                
                 $discordFields = [
                     ["name" => "Ticket ID", "value" => $t_data['ticket_code'], "inline" => true],
                     ["name" => "Admin Reply", "value" => (strlen($cleanMsg) > 900 ? substr($cleanMsg,0,900).'...' : $cleanMsg)],
@@ -177,6 +171,19 @@ if (!$ticket) {
     include 'includes/footer.php'; exit;
 }
 
+// --- [BARU] LOGIKA HITUNG ANTRIAN (UNTUK ADMIN) ---
+$queue_badge = "";
+if (strtolower($ticket['status']) == 'open') {
+    // Hitung posisi antrian (Sama persis logikanya dengan di user side)
+    $qSql = "SELECT COUNT(*) as pos FROM tickets WHERE status = 'open' AND id <= $ticket_id";
+    $qRes = $conn->query($qSql);
+    if($qRes) {
+        $qRow = $qRes->fetch_assoc();
+        $queue_badge = '<span class="badge bg-primary fs-6 ms-2" title="Posisi Antrian Tiket"><i class="bi bi-people-fill me-1"></i> Antrian: ' . $qRow['pos'] . '</span>';
+    }
+}
+// ------------------------------------------------
+
 // 4. AMBIL LIST ADMIN
 $admins = [];
 $res_adm = $conn->query("SELECT id, username FROM users WHERE role = 'admin'");
@@ -188,17 +195,13 @@ $res_rep = $conn->query("SELECT * FROM ticket_replies WHERE ticket_id = $ticket_
 while($row = $res_rep->fetch_assoc()) { $replies[] = $row; }
 
 // Helper Functions
-// [FIX] Hanya gunakan nl2br agar HTML (<b>, <br>) dari footer tetap render
-function formatText($text) { 
-    return nl2br($text); 
-}
-
+function formatText($text) { return nl2br($text); } // Cukup nl2br agar HTML footer tampil
 function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp']); }
 ?>
 
 <style>
     .chat-box {
-        background-color: #f8f9fa; 
+        background-color: #f8f9fa; /* Background abu muda */
         padding: 20px;
         border-radius: 0 0 10px 10px;
         max-height: 600px;
@@ -212,7 +215,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
     }
     
     .chat-row.admin {
-        flex-direction: row-reverse; 
+        flex-direction: row-reverse; /* Admin dikanan */
     }
     
     .chat-avatar {
@@ -240,14 +243,16 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
         line-height: 1.6;
     }
     
+    /* Bubble User (Kiri) */
     .chat-row:not(.admin) .chat-bubble {
         background-color: #ffffff;
         color: #333;
         border-top-left-radius: 0;
     }
     
+    /* Bubble Admin (Kanan) */
     .chat-row.admin .chat-bubble {
-        background-color: #435ebe;
+        background-color: #435ebe; /* Biru Mazer */
         color: #ffffff;
         border-top-right-radius: 0;
     }
@@ -296,7 +301,9 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                             <small class="text-muted">Dibuat: <?= date('d M Y, H:i', strtotime($ticket['created_at'])) ?></small>
                         </div>
                         <div>
-                            <span class="badge bg-<?= ($ticket['status']=='open'?'success':($ticket['status']=='progress'?'warning':'secondary')) ?> fs-6">
+                            <?= $queue_badge ?>
+                            
+                            <span class="badge bg-<?= ($ticket['status']=='open'?'success':($ticket['status']=='progress'?'warning':(($ticket['status']=='closed')?'secondary':'danger'))) ?> fs-6 ms-1">
                                 <?= strtoupper($ticket['status']) ?>
                             </span>
                         </div>
