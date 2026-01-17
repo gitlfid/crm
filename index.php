@@ -14,7 +14,7 @@ $replies = [];
 $track_error = "";
 $msg_success = "";
 $msg_error = "";
-$currentQueue = ""; // [BARU] Variabel Antrian
+$currentQueue = ""; // Variabel Antrian
 
 // Default View
 $current_view = 'default'; 
@@ -36,17 +36,15 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
     if ($result && $result->num_rows > 0) {
         $ticket = $result->fetch_assoc();
         
-        // --- [BARU] LOGIKA HITUNG ANTRIAN ---
+        // --- LOGIKA HITUNG ANTRIAN ---
         if (strtolower($ticket['status']) == 'open') {
             $ticketDbId = intval($ticket['id']);
-            // Hitung posisi antrian (Ticket Open dengan ID lebih kecil atau sama)
             $qSql = "SELECT COUNT(*) as pos FROM tickets WHERE status = 'open' AND id <= $ticketDbId";
             $qRes = $conn->query($qSql);
             if ($qRes && $qRow = $qRes->fetch_assoc()) {
                 $currentQueue = $qRow['pos'];
             }
         }
-        // ------------------------------------
         
         // LOGIKA 2: KIRIM BALASAN (REPLY)
         if (isset($_POST['submit_reply'])) {
@@ -60,11 +58,9 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
             $uploadOk = true;
 
-            // Cek apakah ada file yang diupload
             if (isset($_FILES['reply_attachment']) && $_FILES['reply_attachment']['error'] == 0) {
                 $allowed = 2 * 1024 * 1024; // 2MB
                 if ($_FILES['reply_attachment']['size'] <= $allowed) {
-                    // Sanitasi nama file
                     $fileExt = pathinfo($_FILES['reply_attachment']['name'], PATHINFO_EXTENSION);
                     $cleanName = preg_replace("/[^a-zA-Z0-9]/", "", pathinfo($_FILES['reply_attachment']['name'], PATHINFO_FILENAME));
                     $fileName = time() . '_user_' . $cleanName . '.' . $fileExt;
@@ -86,21 +82,16 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
                 $stmt->bind_param("isss", $ticket_id, $user_name, $reply_msg, $attachment);
                 
                 if ($stmt->execute()) {
-                    // Kirim Notif Discord
                     if (function_exists('sendToDiscord')) {
                         $discordFields = [
                             ["name" => "Ticket ID", "value" => $ticket['ticket_code'], "inline" => true],
                             ["name" => "Reply From", "value" => $user_name . " (Customer)", "inline" => true],
                             ["name" => "Message", "value" => (strlen($reply_msg)>900?substr($reply_msg,0,900).'...':$reply_msg)]
                         ];
-                        if($attachment) {
-                            $discordFields[] = ["name" => "Attachment", "value" => "Yes", "inline" => true];
-                        }
+                        if($attachment) $discordFields[] = ["name" => "Attachment", "value" => "Yes", "inline" => true];
                         $thread_id = isset($ticket['discord_thread_id']) ? $ticket['discord_thread_id'] : null;
                         sendToDiscord("New Reply from Customer", "Customer has replied.", $discordFields, $thread_id);
                     }
-                    
-                    // Redirect agar tidak resubmit form saat refresh
                     header("Location: index.php?track_id=$track_id&view=track_result");
                     exit;
                 } else { 
@@ -109,7 +100,7 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
             }
         }
 
-        // Ambil History Chat (Refresh setelah post)
+        // Ambil History Chat
         $replies = [];
         $reply_res = $conn->query("SELECT * FROM ticket_replies WHERE ticket_id = " . intval($ticket['id']) . " ORDER BY created_at ASC");
         if ($reply_res) { while($row = $reply_res->fetch_assoc()) { $replies[] = $row; } }
@@ -120,8 +111,16 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
     }
 }
 
-// Helper Functions
-function formatTextOutput($text) { return nl2br(htmlspecialchars($text)); }
+// [FIXED] Helper Functions
+function formatTextOutput($text) { 
+    // 1. Izinkan tag HTML tertentu untuk formatting (template admin)
+    // 2. Hapus tag lain (security xss sederhana)
+    // 3. Ubah newline menjadi <br>
+    $allowed_tags = '<br><hr><strong><em><b><i><u><p><span><div>';
+    $clean_text = strip_tags($text, $allowed_tags);
+    return nl2br($clean_text); 
+}
+
 function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg','jpeg','png','gif','webp']); }
 ?>
 
@@ -166,7 +165,8 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
             display: flex; align-items: center; justify-content: center;
             border-radius: 50%; transition: all 0.2s ease;
         }
-        .btn-circle i { font-size: 1.2rem; line-height: 0; display: flex; align-items: center; justify-content: center; }
+        /* [FIXED] Icon centering */
+        .btn-circle i { font-size: 1.1rem; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; }
         
         /* Menu Button Active State */
         .btn-menu.active { background-color: #435ebe; color: white; border-color: #435ebe; }
@@ -465,7 +465,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                                     <input type="text" name="reply_message" class="form-control input-modern" placeholder="Ketik balasan Anda..." required autocomplete="off">
                                     
                                     <button type="submit" name="submit_reply" class="btn btn-primary btn-circle shadow-sm ms-2">
-                                        <i class="bi bi-send-fill fs-6 ps-1"></i>
+                                        <i class="bi bi-send-fill"></i>
                                     </button>
                                 </div>
                                 <div class="text-end mt-1">
