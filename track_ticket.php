@@ -1,6 +1,6 @@
 <?php
 // ==========================================
-// 1. BACKEND LOGIC (TIDAK DIUBAH - FUNGSI TETAP SAMA)
+// 1. BACKEND LOGIC
 // ==========================================
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -23,7 +23,7 @@ $replies = [];
 $error = "";
 $msg_success = "";
 $msg_error = "";
-$currentQueue = "-"; // Default Antrian
+$currentQueue = ""; // Variabel untuk menyimpan nomor antrian
 
 // LOGIKA PENCARIAN TICKET
 if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
@@ -37,11 +37,9 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
         $ticket = $result->fetch_assoc();
         
         // --- [BARU] LOGIKA HITUNG ANTRIAN DINAMIS ---
-        // Antrian hanya relevan jika status = 'open'
+        // Jika status OPEN, hitung posisinya
         if (strtolower($ticket['status']) == 'open') {
             $ticketDbId = intval($ticket['id']);
-            // Hitung berapa banyak tiket open yang dibuat SEBELUM atau BERSAMAAN dengan tiket ini
-            // Logic: ID lebih kecil atau sama dengan ID tiket ini AND status = open
             $queueSql = "SELECT COUNT(*) as pos FROM tickets WHERE status = 'open' AND id <= $ticketDbId";
             $queueRes = $conn->query($queueSql);
             if ($queueRes) {
@@ -327,7 +325,8 @@ function isImage($file) {
                         <small class="text-muted text-uppercase fw-bold d-block mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Ticket Number</small>
                         <div class="ticket-code">#<?= htmlspecialchars($ticket['ticket_code']) ?></div>
                     </div>
-                    <?php if(strtolower($ticket['status']) == 'open'): ?>
+                    
+                    <?php if(!empty($currentQueue)): ?>
                     <div class="queue-badge ms-3" title="Nomor Antrian Anda saat ini">
                         <i class="bi bi-people-fill"></i> Antrian: 
                         <span class="text-primary ms-1" style="font-size:1rem;"><?= $currentQueue ?></span>
