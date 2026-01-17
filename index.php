@@ -48,54 +48,66 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
         
         // LOGIKA 2: KIRIM BALASAN (REPLY)
         if (isset($_POST['submit_reply'])) {
-            $reply_msg = $conn->real_escape_string($_POST['reply_message']);
-            $ticket_id = $ticket['id'];
-            $user_name = $ticket['name']; 
+            
+            // [BARU] Cek Status Ticket sebelum proses
+            // Jika status masih OPEN, tolak pengiriman pesan
+            if (strtolower($ticket['status']) == 'open') {
+                $msg_error = "Mohon menunggu antrian. Chat akan terbuka saat status berubah menjadi IN PROGRESS.";
+            } 
+            elseif (strtolower($ticket['status']) == 'closed' || strtolower($ticket['status']) == 'canceled') {
+                $msg_error = "Tiket sudah ditutup, tidak dapat mengirim pesan.";
+            }
+            else {
+                // Proses Kirim Pesan (Hanya jika In Progress/Hold/dll)
+                $reply_msg = $conn->real_escape_string($_POST['reply_message']);
+                $ticket_id = $ticket['id'];
+                $user_name = $ticket['name']; 
 
-            // Upload File Logic
-            $attachment = null;
-            $uploadDir = __DIR__ . '/uploads/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-            $uploadOk = true;
+                // Upload File Logic
+                $attachment = null;
+                $uploadDir = __DIR__ . '/uploads/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+                $uploadOk = true;
 
-            if (isset($_FILES['reply_attachment']) && $_FILES['reply_attachment']['error'] == 0) {
-                $allowed = 2 * 1024 * 1024; // 2MB
-                if ($_FILES['reply_attachment']['size'] <= $allowed) {
-                    $fileExt = pathinfo($_FILES['reply_attachment']['name'], PATHINFO_EXTENSION);
-                    $cleanName = preg_replace("/[^a-zA-Z0-9]/", "", pathinfo($_FILES['reply_attachment']['name'], PATHINFO_FILENAME));
-                    $fileName = time() . '_user_' . $cleanName . '.' . $fileExt;
-                    
-                    if (move_uploaded_file($_FILES['reply_attachment']['tmp_name'], $uploadDir . $fileName)) {
-                        $attachment = $fileName;
+                if (isset($_FILES['reply_attachment']) && $_FILES['reply_attachment']['error'] == 0) {
+                    $allowed = 2 * 1024 * 1024; // 2MB
+                    if ($_FILES['reply_attachment']['size'] <= $allowed) {
+                        $fileExt = pathinfo($_FILES['reply_attachment']['name'], PATHINFO_EXTENSION);
+                        $cleanName = preg_replace("/[^a-zA-Z0-9]/", "", pathinfo($_FILES['reply_attachment']['name'], PATHINFO_FILENAME));
+                        $fileName = time() . '_user_' . $cleanName . '.' . $fileExt;
+                        
+                        if (move_uploaded_file($_FILES['reply_attachment']['tmp_name'], $uploadDir . $fileName)) {
+                            $attachment = $fileName;
+                        } else { 
+                            $msg_error = "Gagal upload file ke server."; 
+                            $uploadOk = false; 
+                        }
                     } else { 
-                        $msg_error = "Gagal upload file ke server."; 
+                        $msg_error = "File terlalu besar (Max 2MB)."; 
                         $uploadOk = false; 
                     }
-                } else { 
-                    $msg_error = "File terlalu besar (Max 2MB)."; 
-                    $uploadOk = false; 
                 }
-            }
 
-            if ($uploadOk) {
-                $stmt = $conn->prepare("INSERT INTO ticket_replies (ticket_id, user, message, attachment) VALUES (?, ?, ?, ?)");
-                $stmt->bind_param("isss", $ticket_id, $user_name, $reply_msg, $attachment);
-                
-                if ($stmt->execute()) {
-                    if (function_exists('sendToDiscord')) {
-                        $discordFields = [
-                            ["name" => "Ticket ID", "value" => $ticket['ticket_code'], "inline" => true],
-                            ["name" => "Reply From", "value" => $user_name . " (Customer)", "inline" => true],
-                            ["name" => "Message", "value" => (strlen($reply_msg)>900?substr($reply_msg,0,900).'...':$reply_msg)]
-                        ];
-                        if($attachment) $discordFields[] = ["name" => "Attachment", "value" => "Yes", "inline" => true];
-                        $thread_id = isset($ticket['discord_thread_id']) ? $ticket['discord_thread_id'] : null;
-                        sendToDiscord("New Reply from Customer", "Customer has replied.", $discordFields, $thread_id);
+                if ($uploadOk) {
+                    $stmt = $conn->prepare("INSERT INTO ticket_replies (ticket_id, user, message, attachment) VALUES (?, ?, ?, ?)");
+                    $stmt->bind_param("isss", $ticket_id, $user_name, $reply_msg, $attachment);
+                    
+                    if ($stmt->execute()) {
+                        if (function_exists('sendToDiscord')) {
+                            $discordFields = [
+                                ["name" => "Ticket ID", "value" => $ticket['ticket_code'], "inline" => true],
+                                ["name" => "Reply From", "value" => $user_name . " (Customer)", "inline" => true],
+                                ["name" => "Message", "value" => (strlen($reply_msg)>900?substr($reply_msg,0,900).'...':$reply_msg)]
+                            ];
+                            if($attachment) $discordFields[] = ["name" => "Attachment", "value" => "Yes", "inline" => true];
+                            $thread_id = isset($ticket['discord_thread_id']) ? $ticket['discord_thread_id'] : null;
+                            sendToDiscord("New Reply from Customer", "Customer has replied.", $discordFields, $thread_id);
+                        }
+                        header("Location: index.php?track_id=$track_id&view=track_result");
+                        exit;
+                    } else { 
+                        $msg_error = "Gagal simpan ke database."; 
                     }
-                    header("Location: index.php?track_id=$track_id&view=track_result");
-                    exit;
-                } else { 
-                    $msg_error = "Gagal simpan ke database."; 
                 }
             }
         }
@@ -111,11 +123,8 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
     }
 }
 
-// [FIXED] Helper Functions
+// Helper Functions
 function formatTextOutput($text) { 
-    // 1. Izinkan tag HTML tertentu untuk formatting (template admin)
-    // 2. Hapus tag lain (security xss sederhana)
-    // 3. Ubah newline menjadi <br>
     $allowed_tags = '<br><hr><strong><em><b><i><u><p><span><div>';
     $clean_text = strip_tags($text, $allowed_tags);
     return nl2br($clean_text); 
@@ -165,7 +174,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
             display: flex; align-items: center; justify-content: center;
             border-radius: 50%; transition: all 0.2s ease;
         }
-        /* [FIXED] Icon centering */
+        /* Icon centering */
         .btn-circle i { font-size: 1.1rem; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; }
         
         /* Menu Button Active State */
@@ -452,30 +461,42 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                             <?php endif; ?>
                         </div>
 
-                        <?php if($ticket['status'] != 'closed' && $ticket['status'] != 'canceled'): ?>
-                        <div class="ticket-footer">
-                            <form action="index.php?track_id=<?= htmlspecialchars($track_id) ?>&view=track_result" method="POST" enctype="multipart/form-data">
-                                <div class="input-group-modern">
-                                    <label class="btn btn-link text-secondary p-2 m-0 border-0 rounded-circle d-flex align-items-center justify-content-center position-relative btn-attachment" style="width: 40px; height: 40px; cursor: pointer;" id="attachBtn">
-                                        <i class="bi bi-paperclip fs-5"></i>
-                                        <span class="file-indicator"></span>
-                                        <input type="file" name="reply_attachment" class="d-none" id="fileInput">
-                                    </label>
-                                    
-                                    <input type="text" name="reply_message" class="form-control input-modern" placeholder="Ketik balasan Anda..." required autocomplete="off">
-                                    
-                                    <button type="submit" name="submit_reply" class="btn btn-primary btn-circle shadow-sm ms-2">
-                                        <i class="bi bi-send-fill"></i>
-                                    </button>
-                                </div>
-                                <div class="text-end mt-1">
-                                    <small class="text-muted" style="font-size: 0.7rem;" id="fileNameDisplay">*Max 2MB (JPG/PDF)</small>
-                                </div>
-                            </form>
-                        </div>
-                        <?php else: ?>
+                        <?php if($ticket['status'] == 'closed' || $ticket['status'] == 'canceled'): ?>
                             <div class="ticket-footer text-center bg-light py-4">
                                 <span class="badge bg-secondary p-2 px-3 rounded-pill"><i class="bi bi-lock-fill me-1"></i> Tiket Ditutup</span>
+                            </div>
+                        <?php elseif($ticket['status'] == 'open'): ?>
+                            <div class="ticket-footer text-center bg-light py-4">
+                                <div class="d-flex flex-column align-items-center text-muted">
+                                    <i class="bi bi-hourglass-split fs-4 mb-2 text-primary"></i>
+                                    <h6 class="fw-bold mb-1 text-dark">Menunggu Antrian</h6>
+                                    <small class="px-4">Chat akan terbuka otomatis saat petugas memulai pengerjaan (Status: In Progress).</small>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <?php if($msg_error): ?>
+                                <div class="alert alert-danger m-3 mb-0 py-2 small"><?= $msg_error ?></div>
+                            <?php endif; ?>
+                            
+                            <div class="ticket-footer">
+                                <form action="index.php?track_id=<?= htmlspecialchars($track_id) ?>&view=track_result" method="POST" enctype="multipart/form-data">
+                                    <div class="input-group-modern">
+                                        <label class="btn btn-link text-secondary p-2 m-0 border-0 rounded-circle d-flex align-items-center justify-content-center position-relative btn-attachment" style="width: 40px; height: 40px; cursor: pointer;" id="attachBtn">
+                                            <i class="bi bi-paperclip fs-5"></i>
+                                            <span class="file-indicator"></span>
+                                            <input type="file" name="reply_attachment" class="d-none" id="fileInput">
+                                        </label>
+                                        
+                                        <input type="text" name="reply_message" class="form-control input-modern" placeholder="Ketik balasan Anda..." required autocomplete="off">
+                                        
+                                        <button type="submit" name="submit_reply" class="btn btn-primary btn-circle shadow-sm ms-2">
+                                            <i class="bi bi-send-fill"></i>
+                                        </button>
+                                    </div>
+                                    <div class="text-end mt-1">
+                                        <small class="text-muted" style="font-size: 0.7rem;" id="fileNameDisplay">*Max 2MB (JPG/PDF)</small>
+                                    </div>
+                                </form>
                             </div>
                         <?php endif; ?>
 
