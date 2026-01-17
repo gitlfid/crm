@@ -1,4 +1,26 @@
 <?php
+// --- 1. LOGIKA HAPUS BATCH (AJAX HANDLER DI FILE SAMA) ---
+// Kita taruh di atas sebelum HTML dimuat agar bisa merespon AJAX delete
+if (isset($_POST['action']) && $_POST['action'] == 'delete_batch_direct') {
+    include '../config/database.php'; // Pastikan koneksi DB dimuat
+    
+    $batch_name = $conn->real_escape_string($_POST['batch_name']);
+    
+    // Hapus data di staging (detail nomor) dulu
+    $conn->query("DELETE FROM inject_staging WHERE batch_name = '$batch_name'");
+    
+    // Hapus data di header batch
+    $del = $conn->query("DELETE FROM inject_batches WHERE batch_name = '$batch_name'");
+    
+    if ($del) {
+        echo json_encode(['status' => 'success', 'message' => 'Batch berhasil dihapus.']);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Gagal menghapus batch: ' . $conn->error]);
+    }
+    exit; // Stop script agar tidak memuat HTML di bawahnya
+}
+
+// --- 2. HALAMAN UTAMA ---
 $page_title = "Process Inject Telkomsel";
 include 'includes/header.php';
 include 'includes/sidebar.php';
@@ -21,8 +43,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
     .progress-wrapper { display: none; margin-top: 20px; }
     .console-log { background: #1e1e1e; color: #00ff00; padding: 10px; height: 150px; overflow-y: auto; font-family: monospace; font-size: 11px; margin-top: 10px; border-radius: 4px; }
     .table-history th { background-color: #f8f9fa; }
-    
-    /* Styling khusus Card Saldo */
     .border-start-primary { border-left: 5px solid #0d6efd !important; }
     .chart-container { position: relative; height: 160px; width: 160px; margin: 0 auto; }
     .chart-center-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
@@ -49,12 +69,10 @@ $batches = $conn->query("SELECT b.*, c.company_name
             <h5 class="card-title text-primary"><i class="bi bi-wallet2 me-2"></i>Informasi Saldo API</h5>
         </div>
         <div class="card-body pt-2">
-            
             <div id="balanceLoading" class="text-center py-4">
                 <div class="spinner-border text-primary" role="status"></div>
                 <p class="mt-2 text-muted small">Mengambil data saldo...</p>
             </div>
-
             <div id="balanceContent" class="row align-items-center" style="display:none;">
                 <div class="col-md-3 text-center border-end">
                     <div class="chart-container">
@@ -69,10 +87,8 @@ $batches = $conn->query("SELECT b.*, c.company_name
                         <span class="badge bg-warning text-dark ms-1"> </span>Pakai
                     </div>
                 </div>
-
                 <div class="col-md-9 ps-md-4">
                     <h5 class="mb-3 text-dark fw-bold" id="txtPkgName">-</h5>
-                    
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="text-primary fw-bold small text-uppercase">Total Kuota</label>
@@ -87,7 +103,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
                             <div class="fs-3 fw-bold text-dark"><span id="txtBalance">0</span> <small class="fs-6 text-muted">GB</small></div>
                         </div>
                     </div>
-
                     <div class="mt-3 pt-2 border-top d-flex justify-content-between align-items-center small">
                         <div>
                             <span class="text-muted">Status:</span> <span class="badge bg-success" id="txtStatus">-</span>
@@ -97,7 +112,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
                     </div>
                 </div>
             </div>
-
             <div id="balanceError" class="alert alert-danger mt-3" style="display:none;">
                 Gagal memuat saldo. <button class="btn btn-sm btn-outline-danger ms-2" onclick="loadBalance()">Retry</button>
             </div>
@@ -121,9 +135,16 @@ $batches = $conn->query("SELECT b.*, c.company_name
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold">Pilih Batch Upload</label>
-                        <select id="sel_batch" class="form-select" onchange="enableCheckButton()" disabled>
-                            <option value="">-- Pilih Client Terlebih Dahulu --</option>
-                        </select>
+                        
+                        <div class="input-group">
+                            <select id="sel_batch" class="form-select" onchange="enableCheckButton()" disabled>
+                                <option value="">-- Pilih Client Terlebih Dahulu --</option>
+                            </select>
+                            <button class="btn btn-outline-danger" type="button" id="btnDeleteBatch" onclick="deleteBatch()" disabled title="Hapus Batch Ini">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+
                         <div id="batch_loading" style="display:none;" class="text-primary small mt-1">
                             <span class="spinner-border spinner-border-sm" role="status"></span> Mengambil data batch...
                         </div>
@@ -264,7 +285,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
     let isProcessing = false;
     let chartInstance = null;
 
-    // --- A. LOAD BALANCE INFO (ON PAGE LOAD) ---
     $(document).ready(function() {
         loadBalance();
     });
@@ -292,7 +312,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
                     $("#txtExpiry").text(d.expiryDate);
                     $("#txtPilot").text(d.pilotMsisdn);
 
-                    // Hitung Persen Sisa
                     let pct = 0;
                     if(d.totalQuota > 0) pct = Math.round((d.balance / d.totalQuota) * 100);
                     $("#txtChartPercent").text(pct + "%");
@@ -320,7 +339,7 @@ $batches = $conn->query("SELECT b.*, c.company_name
                 labels: ['Sisa Saldo', 'Terpakai'],
                 datasets: [{
                     data: [bal, usage],
-                    backgroundColor: ['#198754', '#ffc107'], // Success Green, Warning Yellow
+                    backgroundColor: ['#198754', '#ffc107'], 
                     borderWidth: 0,
                     hoverOffset: 4
                 }]
@@ -334,13 +353,13 @@ $batches = $conn->query("SELECT b.*, c.company_name
         });
     }
 
-    // --- B. LOAD BATCHES (FIXED AJAX) ---
     function loadBatches() {
         let clientId = $("#sel_client").val();
         let batchSelect = $("#sel_batch");
         
         batchSelect.html('<option value="">-- Loading... --</option>').prop('disabled', true);
         $("#btnCheck").prop('disabled', true);
+        $("#btnDeleteBatch").prop('disabled', true); // Disable delete button
         $("#previewCard").hide();
         $("#placeholderCard").show();
 
@@ -354,7 +373,7 @@ $batches = $conn->query("SELECT b.*, c.company_name
                 dataType: 'json',
                 success: function(response) {
                     $("#batch_loading").hide();
-                    batchSelect.html('<option value="">-- Pilih Batch --</option>'); // Reset
+                    batchSelect.html('<option value="">-- Pilih Batch --</option>');
 
                     if(Array.isArray(response) && response.length > 0) {
                         $.each(response, function(key, val) {
@@ -379,12 +398,42 @@ $batches = $conn->query("SELECT b.*, c.company_name
     function enableCheckButton() {
         if($("#sel_batch").val()) {
             $("#btnCheck").prop('disabled', false);
+            $("#btnDeleteBatch").prop('disabled', false); // Enable delete button
         } else {
             $("#btnCheck").prop('disabled', true);
+            $("#btnDeleteBatch").prop('disabled', true);
         }
     }
 
-    // --- C. LOAD PREVIEW DATA ---
+    // --- [BARU] FUNGSI HAPUS BATCH ---
+    function deleteBatch() {
+        let batchName = $("#sel_batch").val();
+        if(!batchName) return;
+
+        if(confirm("PERINGATAN: Apakah Anda yakin ingin menghapus Batch ini (" + batchName + ")? Data yang belum diproses akan hilang.")) {
+            // Kita gunakan file ini sendiri sebagai handler karena kita sudah nambahin logika PHP di atas
+            $.ajax({
+                url: 'tsel_inject.php', 
+                type: 'POST',
+                data: { action: 'delete_batch_direct', batch_name: batchName },
+                dataType: 'json',
+                success: function(res) {
+                    if(res.status === 'success') {
+                        alert(res.message);
+                        loadBatches(); // Reload list batch
+                        resetPage();
+                    } else {
+                        alert("Error: " + res.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert("Terjadi kesalahan saat menghapus data.");
+                    console.error(error);
+                }
+            });
+        }
+    }
+
     function loadDataPreview() {
         let clientId = $("#sel_client").val();
         let batchName = $("#sel_batch").val();
@@ -441,9 +490,9 @@ $batches = $conn->query("SELECT b.*, c.company_name
         $("#placeholderCard").show();
         $("#sel_batch").val('');
         $("#btnCheck").prop('disabled', true);
+        $("#btnDeleteBatch").prop('disabled', true);
     }
 
-    // --- D. PROSES INJECT (LOOPING ASYNC) ---
     function confirmInject() {
         let checkedCount = $('.row-check:checked').length;
         if(checkedCount === 0) { alert("Pilih minimal 1 nomor!"); return; }
@@ -459,13 +508,12 @@ $batches = $conn->query("SELECT b.*, c.company_name
         $("#progressArea").slideDown();
         $(".row-check").prop('disabled', true);
         $("#checkAll").prop('disabled', true);
+        $("#btnDeleteBatch").prop('disabled', true); // Disable delete saat proses
 
-        // 1. Create Batch Record
         let clientId = $("#sel_client").val();
         let batchNameOriginal = $("#sel_batch").val();
         let newBatchCode = batchNameOriginal + "-RUN-" + Math.floor(Date.now() / 1000).toString().substr(-4);
         
-        // Ambil indeks yang dicentang
         let selectedIndices = [];
         $('.row-check:checked').each(function() {
             selectedIndices.push($(this).val());
@@ -473,7 +521,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
         
         let total = selectedIndices.length;
 
-        // Create Batch di DB
         let batchRes = await $.post('tsel_process_ajax.php', {
             action: 'create_batch',
             client_id: clientId,
@@ -484,7 +531,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
         let batchId = batchRes.batch_id;
         logConsole(`Batch ID: ${batchId} Created. Starting...`);
 
-        // 2. Loop Inject per Item
         let success = 0;
         let failed = 0;
 
@@ -492,7 +538,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
             let idx = selectedIndices[i];
             let item = stagingData[idx];
 
-            // Update status row jadi spinner
             $(`#status_${idx}`).html('<span class="spinner-border spinner-border-sm text-primary"></span>');
 
             try {
@@ -524,7 +569,6 @@ $batches = $conn->query("SELECT b.*, c.company_name
                 failed++;
             }
 
-            // Update Progress Bar
             let pct = Math.round(((i + 1) / total) * 100);
             $("#progressBar").css("width", pct + "%").text(pct + "%");
             $("#progressText").text(`${i + 1} / ${total}`);
@@ -533,9 +577,8 @@ $batches = $conn->query("SELECT b.*, c.company_name
         logConsole(`--- DONE: Success ${success}, Failed ${failed} ---`);
         
         $("#progressBar").removeClass('progress-bar-animated bg-success').addClass('bg-primary');
-        $("#btnFinish").show(); // Tampilkan tombol history
+        $("#btnFinish").show(); 
         
-        // Refresh Saldo Otomatis Setelah Inject Selesai
         loadBalance();
         
         alert("Proses Selesai! Cek log history.");
