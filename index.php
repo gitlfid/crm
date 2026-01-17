@@ -14,6 +14,7 @@ $replies = [];
 $track_error = "";
 $msg_success = "";
 $msg_error = "";
+$currentQueue = ""; // [BARU] Variabel Antrian
 
 // Default View
 $current_view = 'default'; 
@@ -34,6 +35,18 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
     
     if ($result && $result->num_rows > 0) {
         $ticket = $result->fetch_assoc();
+        
+        // --- [BARU] LOGIKA HITUNG ANTRIAN ---
+        if (strtolower($ticket['status']) == 'open') {
+            $ticketDbId = intval($ticket['id']);
+            // Hitung posisi antrian (Ticket Open dengan ID lebih kecil atau sama)
+            $qSql = "SELECT COUNT(*) as pos FROM tickets WHERE status = 'open' AND id <= $ticketDbId";
+            $qRes = $conn->query($qSql);
+            if ($qRes && $qRow = $qRes->fetch_assoc()) {
+                $currentQueue = $qRow['pos'];
+            }
+        }
+        // ------------------------------------
         
         // LOGIKA 2: KIRIM BALASAN (REPLY)
         if (isset($_POST['submit_reply'])) {
@@ -88,7 +101,6 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
                     }
                     
                     // Redirect agar tidak resubmit form saat refresh
-                    // PENTING: Pastikan URL mengandung track_id agar balik ke halaman chat
                     header("Location: index.php?track_id=$track_id&view=track_result");
                     exit;
                 } else { 
@@ -355,11 +367,19 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                                         <small class="text-muted font-monospace">#<?= $ticket['ticket_code'] ?></small>
                                     </div>
                                 </div>
-                                <?php 
-                                    $st = strtolower($ticket['status']); 
-                                    $bg = ($st=='open')?'success':(($st=='progress')?'warning text-dark':(($st=='closed')?'secondary':'danger')); 
-                                ?>
-                                <span class="badge bg-<?= $bg ?> ticket-status-badge"><?= strtoupper($st) ?></span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <?php if(!empty($currentQueue)): ?>
+                                        <span class="badge bg-white text-primary border border-primary px-3 py-2 rounded-pill fw-bold" title="Posisi antrian Anda">
+                                            <i class="bi bi-people-fill me-1"></i> Antrian: <?= $currentQueue ?>
+                                        </span>
+                                    <?php endif; ?>
+
+                                    <?php 
+                                        $st = strtolower($ticket['status']); 
+                                        $bg = ($st=='open')?'success':(($st=='progress')?'warning text-dark':(($st=='closed')?'secondary':'danger')); 
+                                    ?>
+                                    <span class="badge bg-<?= $bg ?> ticket-status-badge"><?= strtoupper($st) ?></span>
+                                </div>
                             </div>
                             
                             <div class="d-flex align-items-center text-muted small mt-3 ps-5 ms-3">
