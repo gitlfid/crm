@@ -49,8 +49,7 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
         // LOGIKA 2: KIRIM BALASAN (REPLY)
         if (isset($_POST['submit_reply'])) {
             
-            // [BARU] Cek Status Ticket sebelum proses
-            // Jika status masih OPEN, tolak pengiriman pesan
+            // Cek Status Ticket
             if (strtolower($ticket['status']) == 'open') {
                 $msg_error = "Mohon menunggu antrian. Chat akan terbuka saat status berubah menjadi IN PROGRESS.";
             } 
@@ -58,7 +57,6 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
                 $msg_error = "Tiket sudah ditutup, tidak dapat mengirim pesan.";
             }
             else {
-                // Proses Kirim Pesan (Hanya jika In Progress/Hold/dll)
                 $reply_msg = $conn->real_escape_string($_POST['reply_message']);
                 $ticket_id = $ticket['id'];
                 $user_name = $ticket['name']; 
@@ -70,7 +68,7 @@ if (isset($_GET['track_id']) && !empty($_GET['track_id'])) {
                 $uploadOk = true;
 
                 if (isset($_FILES['reply_attachment']) && $_FILES['reply_attachment']['error'] == 0) {
-                    $allowed = 2 * 1024 * 1024; // 2MB
+                    $allowed = 2 * 1024 * 1024; 
                     if ($_FILES['reply_attachment']['size'] <= $allowed) {
                         $fileExt = pathinfo($_FILES['reply_attachment']['name'], PATHINFO_EXTENSION);
                         $cleanName = preg_replace("/[^a-zA-Z0-9]/", "", pathinfo($_FILES['reply_attachment']['name'], PATHINFO_FILENAME));
@@ -131,13 +129,22 @@ function formatTextOutput($text) {
 }
 
 function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg','jpeg','png','gif','webp']); }
+
+// --- [OPTIMASI MOBILE] LOGIKA TAMPILAN ---
+// Menentukan class Bootstrap untuk kolom Kiri dan Kanan berdasarkan View saat ini
+$is_default_page = ($current_view == 'default');
+
+// Jika Default: Mobile tampilkan Kiri, Sembunyikan Kanan. Desktop tampilkan dua-duanya.
+// Jika Ada Aksi (Create/Track): Mobile sembunyikan Kiri, Tampilkan Kanan. Desktop tampilkan dua-duanya.
+$left_col_class  = $is_default_page ? 'd-flex' : 'd-none d-lg-flex';
+$right_col_class = $is_default_page ? 'd-none d-lg-block' : 'd-block';
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Helpdesk Portal</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -146,14 +153,24 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
     
     <style>
         /* RESET & LAYOUT */
-        body, html { height: 100%; overflow: hidden; background-color: #f2f7ff; font-family: 'Inter', sans-serif; }
+        body, html { 
+            height: 100%; 
+            background-color: #f2f7ff; 
+            font-family: 'Inter', sans-serif; 
+        }
+        
         #auth { height: 100%; }
         
         /* SIDEBAR KIRI */
         #auth-left {
-            height: 100%; overflow-y: auto; padding: 3rem;
-            display: flex; flex-direction: column; justify-content: center;
-            background: #fff; z-index: 10;
+            height: 100%; 
+            overflow-y: auto; 
+            padding: 3rem;
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center;
+            background: #fff; 
+            z-index: 10;
         }
 
         /* AREA KANAN (BIRU) */
@@ -166,6 +183,35 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
             justify-content: center;
             padding: 2rem;
             position: relative;
+            overflow-y: auto; /* Allow scroll on mobile if content overflows */
+        }
+
+        /* RESPONSIVE TWEAKS */
+        @media (max-width: 991.98px) {
+            /* Mobile View Adjustments */
+            body, html { height: auto; overflow: auto; }
+            #auth { height: auto; min-height: 100vh; }
+            
+            #auth-left {
+                height: 100vh; /* Menu tetap full height di mobile */
+                padding: 2rem;
+            }
+            
+            #auth-right {
+                height: 100vh; /* Content full height di mobile */
+                padding: 1rem;
+                align-items: flex-start; /* Align top on mobile */
+                padding-top: 2rem;
+            }
+
+            .content-card {
+                padding: 1.5rem !important; /* Reduce padding on mobile */
+            }
+
+            .track-result-wrapper {
+                height: calc(100vh - 40px) !important; /* Fit screen on mobile */
+                border-radius: 12px;
+            }
         }
 
         /* BUTTONS & ICONS SYMMETRY FIX */
@@ -174,7 +220,6 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
             display: flex; align-items: center; justify-content: center;
             border-radius: 50%; transition: all 0.2s ease;
         }
-        /* Icon centering */
         .btn-circle i { font-size: 1.1rem; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; }
         
         /* Menu Button Active State */
@@ -205,7 +250,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
         /* Header Ticket */
         .ticket-header {
             background: #ffffff;
-            padding: 1.25rem 1.5rem;
+            padding: 1rem 1.5rem;
             border-bottom: 1px solid #e0e0e0;
             flex-shrink: 0; z-index: 5;
         }
@@ -226,22 +271,21 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
         .message-row.admin { justify-content: flex-start; }
         .message-row.user { justify-content: flex-end; }
 
-        /* AVATAR FIX (PERFECT CENTER) */
+        /* AVATAR FIX */
         .msg-avatar {
             width: 42px; height: 42px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; font-size: 16px; flex-shrink: 0;
-            line-height: 1; /* Reset line height */
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            line-height: 1; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .avatar-admin { background: #fff; color: #435ebe; margin-right: 12px; }
         .avatar-user { background: #ffc107; color: #333; margin-left: 12px; }
 
         /* Bubbles */
         .msg-bubble {
-            max-width: 70%; padding: 12px 16px; border-radius: 12px;
+            max-width: 75%; padding: 12px 16px; border-radius: 12px;
             position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-            font-size: 0.95rem; line-height: 1.5;
+            font-size: 0.95rem; line-height: 1.5; word-wrap: break-word;
         }
         .message-row.admin .msg-bubble { background: #ffffff; color: #111; border-top-left-radius: 0; }
         .message-row.user .msg-bubble { background: #435ebe; color: #ffffff; border-top-right-radius: 0; }
@@ -280,7 +324,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
     <div id="auth">
         <div class="row h-100 g-0">
             
-            <div class="col-lg-5 col-12 d-flex flex-column h-100 shadow position-relative" style="z-index:100; background:#fff;">
+            <div class="col-lg-5 col-12 flex-column h-100 shadow position-relative <?= $left_col_class ?>" style="z-index:100; background:#fff;">
                 <div id="auth-left">
                     <div class="mb-5">
                         <h3 class="fw-bold text-primary d-flex align-items-center">
@@ -306,7 +350,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                 </div>
             </div>
             
-            <div class="col-lg-7 d-none d-lg-block">
+            <div class="col-lg-7 col-12 <?= $right_col_class ?>">
                 <div id="auth-right">
                     
                     <?php if($current_view == 'default'): ?>
@@ -319,6 +363,12 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
 
                     <?php if($current_view == 'create'): ?>
                     <div class="content-card">
+                        <div class="d-lg-none mb-3">
+                            <a href="index.php" class="btn btn-sm btn-outline-light text-white border-white">
+                                <i class="bi bi-arrow-left"></i> Kembali ke Menu
+                            </a>
+                        </div>
+
                         <h4 class="mb-4 text-primary fw-bold border-bottom pb-3">Buat Ticket Baru</h4>
                         <form action="process_ticket.php" method="POST" enctype="multipart/form-data">
                             <div class="row g-3">
@@ -341,6 +391,12 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
 
                     <?php if($current_view == 'track_search'): ?>
                     <div class="content-card text-center">
+                        <div class="d-lg-none mb-3 text-start">
+                            <a href="index.php" class="btn btn-sm btn-light text-primary fw-bold">
+                                <i class="bi bi-arrow-left"></i> Kembali
+                            </a>
+                        </div>
+
                         <div class="mb-4 text-primary"><i class="bi bi-search" style="font-size: 3.5rem;"></i></div>
                         <h3 class="fw-bold text-dark">Lacak Status Ticket</h3>
                         <p class="text-muted mb-4">Masukkan Nomor ID Ticket Anda untuk melihat progress terbaru.</p>
@@ -372,14 +428,14 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                                         <i class="bi bi-arrow-left"></i>
                                     </a>
                                     <div>
-                                        <h5 class="fw-bold mb-0 text-dark lh-1"><?= htmlspecialchars($ticket['subject']) ?></h5>
+                                        <h5 class="fw-bold mb-0 text-dark lh-1 text-truncate" style="max-width: 180px;"><?= htmlspecialchars($ticket['subject']) ?></h5>
                                         <small class="text-muted font-monospace">#<?= $ticket['ticket_code'] ?></small>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
                                     <?php if(!empty($currentQueue)): ?>
                                         <span class="badge bg-white text-primary border border-primary px-3 py-2 rounded-pill fw-bold" title="Posisi antrian Anda">
-                                            <i class="bi bi-people-fill me-1"></i> Antrian: <?= $currentQueue ?>
+                                            <i class="bi bi-people-fill me-1"></i> <span class="d-none d-sm-inline">Antrian:</span> <?= $currentQueue ?>
                                         </span>
                                     <?php endif; ?>
 
@@ -391,17 +447,17 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                                 </div>
                             </div>
                             
-                            <div class="d-flex align-items-center text-muted small mt-3 ps-5 ms-3">
+                            <div class="d-flex align-items-center text-muted small mt-3 ps-0 ps-md-5 ms-0 ms-md-3">
                                 <span class="me-3"><i class="bi bi-person-circle me-1"></i> <?= htmlspecialchars($ticket['name']) ?></span>
-                                <span><i class="bi bi-clock me-1"></i> <?= date('d M, H:i', strtotime($ticket['created_at'])) ?></span>
+                                <span class="d-none d-md-inline"><i class="bi bi-clock me-1"></i> <?= date('d M, H:i', strtotime($ticket['created_at'])) ?></span>
                             </div>
                             
-                            <div class="mt-2 ps-5 ms-3">
+                            <div class="mt-2 ps-0 ps-md-5 ms-0 ms-md-3">
                                 <a class="text-decoration-none small text-primary fw-bold" data-bs-toggle="collapse" href="#detailProblem" role="button">
                                     Lihat Detail Masalah <i class="bi bi-chevron-down"></i>
                                 </a>
                                 <div class="collapse mt-2" id="detailProblem">
-                                    <div class="card card-body bg-light border-0 small text-secondary">
+                                    <div class="card card-body bg-light border-0 small text-secondary" style="max-height: 100px; overflow-y: auto;">
                                         <?= formatTextOutput($ticket['description']) ?>
                                     </div>
                                 </div>
