@@ -131,11 +131,7 @@ function formatTextOutput($text) {
 function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg','jpeg','png','gif','webp']); }
 
 // --- [OPTIMASI MOBILE] LOGIKA TAMPILAN ---
-// Menentukan class Bootstrap untuk kolom Kiri dan Kanan berdasarkan View saat ini
 $is_default_page = ($current_view == 'default');
-
-// Jika Default: Mobile tampilkan Kiri, Sembunyikan Kanan. Desktop tampilkan dua-duanya.
-// Jika Ada Aksi (Create/Track): Mobile sembunyikan Kiri, Tampilkan Kanan. Desktop tampilkan dua-duanya.
 $left_col_class  = $is_default_page ? 'd-flex' : 'd-none d-lg-flex';
 $right_col_class = $is_default_page ? 'd-none d-lg-block' : 'd-block';
 ?>
@@ -183,33 +179,32 @@ $right_col_class = $is_default_page ? 'd-none d-lg-block' : 'd-block';
             justify-content: center;
             padding: 2rem;
             position: relative;
-            overflow-y: auto; /* Allow scroll on mobile if content overflows */
+            overflow-y: auto; 
         }
 
         /* RESPONSIVE TWEAKS */
         @media (max-width: 991.98px) {
-            /* Mobile View Adjustments */
             body, html { height: auto; overflow: auto; }
             #auth { height: auto; min-height: 100vh; }
             
             #auth-left {
-                height: 100vh; /* Menu tetap full height di mobile */
+                height: 100vh; 
                 padding: 2rem;
             }
             
             #auth-right {
-                height: 100vh; /* Content full height di mobile */
+                height: 100vh; 
                 padding: 1rem;
-                align-items: flex-start; /* Align top on mobile */
+                align-items: flex-start;
                 padding-top: 2rem;
             }
 
             .content-card {
-                padding: 1.5rem !important; /* Reduce padding on mobile */
+                padding: 1.5rem !important;
             }
 
             .track-result-wrapper {
-                height: calc(100vh - 40px) !important; /* Fit screen on mobile */
+                height: calc(100vh - 40px) !important;
                 border-radius: 12px;
             }
         }
@@ -363,8 +358,9 @@ $right_col_class = $is_default_page ? 'd-none d-lg-block' : 'd-block';
 
                     <?php if($current_view == 'create'): ?>
                     <div class="content-card">
+                        
                         <div class="d-lg-none mb-3">
-                            <a href="index.php" class="btn btn-sm btn-outline-light text-white border-white">
+                            <a href="index.php" class="btn btn-sm btn-light text-primary fw-bold shadow-sm border">
                                 <i class="bi bi-arrow-left"></i> Kembali ke Menu
                             </a>
                         </div>
@@ -391,8 +387,9 @@ $right_col_class = $is_default_page ? 'd-none d-lg-block' : 'd-block';
 
                     <?php if($current_view == 'track_search'): ?>
                     <div class="content-card text-center">
+                        
                         <div class="d-lg-none mb-3 text-start">
-                            <a href="index.php" class="btn btn-sm btn-light text-primary fw-bold">
+                            <a href="index.php" class="btn btn-sm btn-light text-primary fw-bold shadow-sm border">
                                 <i class="bi bi-arrow-left"></i> Kembali
                             </a>
                         </div>
