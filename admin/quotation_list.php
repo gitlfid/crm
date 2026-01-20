@@ -27,7 +27,7 @@ if(!empty($f_start) && !empty($f_end)) {
     $where .= " AND q.quotation_date BETWEEN '$f_start' AND '$f_end'";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (UPDATED: ITEM DETAILS) ---
+// --- 3. LOGIKA EXPORT EXCEL (UPDATED: ITEM DETAILS VERTICAL) ---
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
@@ -43,7 +43,7 @@ if (isset($_POST['export_excel'])) {
     
     $output = fopen('php://output', 'w');
     
-    // [UPDATE] Header Kolom CSV - Menambahkan 'Item Detail List'
+    // Header Kolom CSV
     fputcsv($output, array('Quotation No', 'Date', 'Client', 'Card Types (Int)', 'Item Detail List', 'PIC', 'Items Count', 'Total Amount', 'Currency', 'Status', 'Created By'));
     
     while($row = $resEx->fetch_assoc()) {
@@ -56,26 +56,28 @@ if (isset($_POST['export_excel'])) {
         while($rc = $resCard->fetch_assoc()) if(!empty($rc['card_type'])) $cardsArr[] = $rc['card_type'];
         $cardString = implode(", ", $cardsArr);
 
-        // [BARU] Get Detailed Items (Name & Desc)
+        // Get Detailed Items (Name & Desc)
         $itemsDetailArr = [];
         $resItems = $conn->query("SELECT item_name, description, qty FROM quotation_items WHERE quotation_id = $qId");
         while($ri = $resItems->fetch_assoc()) {
-            // Bersihkan spasi/enter agar rapi di CSV
+            // Bersihkan spasi/enter di dalam teks asli agar rapi
             $cleanName = trim(preg_replace('/\s+/', ' ', $ri['item_name']));
             $cleanDesc = trim(preg_replace('/\s+/', ' ', $ri['description']));
             
-            // Format: (Qty) Nama - Deskripsi
-            $itemsDetailArr[] = "({$ri['qty']}x) $cleanName" . (!empty($cleanDesc) ? " - $cleanDesc" : "");
+            // Format per item: - (Qty) Nama Item [Deskripsi]
+            $itemsDetailArr[] = "- ({$ri['qty']}x) $cleanName" . (!empty($cleanDesc) ? " [$cleanDesc]" : "");
         }
-        // Gabungkan semua item dengan pemisah " | "
-        $itemsDetailString = implode(" | ", $itemsDetailArr);
+        
+        // [MODIFIKASI DI SINI] 
+        // Menggunakan "\n" (New Line) sebagai pemisah agar turun ke bawah dalam satu sel Excel
+        $itemsDetailString = implode("\n", $itemsDetailArr);
 
         fputcsv($output, array(
             $row['quotation_no'],
             $row['quotation_date'],
             $row['company_name'],
             $cardString,
-            $itemsDetailString, // Kolom Baru: Deskripsi Item Lengkap
+            $itemsDetailString, // Kolom ini sekarang berisi enter (\n)
             $row['pic_name'],
             $calc['c'], 
             $calc['t'], 
@@ -110,7 +112,7 @@ if (isset($_GET['delete_id'])) {
         }
     }
 }
-// Update Status (Digunakan untuk Sent, Cancel, dan REVERT TO DRAFT)
+// Update Status
 if (isset($_GET['status_id']) && isset($_GET['st'])) {
     $st_id = intval($_GET['status_id']);
     $st_val = $conn->real_escape_string($_GET['st']);
