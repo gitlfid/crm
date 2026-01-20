@@ -27,60 +27,64 @@ if(!empty($f_start) && !empty($f_end)) {
     $where .= " AND q.quotation_date BETWEEN '$f_start' AND '$f_end'";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (UPDATED: ITEM DETAILS VERTICAL) ---
+// --- 3. LOGIKA EXPORT EXCEL (UPDATED: 1 BARIS = 1 ITEM) ---
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
-    $sqlEx = "SELECT q.*, c.company_name, c.pic_name, u.username 
+    // [UPDATE QUERY] JOIN quotation_items agar data terpecah per item (tidak digabung)
+    $sqlEx = "SELECT q.quotation_no, q.quotation_date, q.currency, q.status,
+                     c.company_name, c.pic_name, 
+                     u.username,
+                     qi.item_name, qi.description, qi.qty, qi.unit_price, qi.card_type
               FROM quotations q 
               JOIN clients c ON q.client_id = c.id 
               JOIN users u ON q.created_by_user_id = u.id 
-              WHERE $where ORDER BY q.created_at DESC";
+              JOIN quotation_items qi ON q.id = qi.quotation_id
+              WHERE $where 
+              ORDER BY q.created_at DESC, qi.id ASC";
+              
     $resEx = $conn->query($sqlEx);
 
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename=Quotations_Data_' . date('Ymd_His') . '.csv');
+    header('Content-Disposition: attachment; filename=Quotations_Detail_Items_' . date('Ymd_His') . '.csv');
     
     $output = fopen('php://output', 'w');
     
-    // Header Kolom CSV
-    fputcsv($output, array('Quotation No', 'Date', 'Client', 'Card Types (Int)', 'Item Detail List', 'PIC', 'Items Count', 'Total Amount', 'Currency', 'Status', 'Created By'));
+    // [UPDATE HEADER] Kolom lebih spesifik per item
+    fputcsv($output, array(
+        'Quotation No', 
+        'Date', 
+        'Client', 
+        'PIC', 
+        'Item Name',        // Nama Item
+        'Description',      // Deskripsi Item
+        'Qty',              // Jumlah
+        'Unit Price',       // Harga Satuan
+        'Line Amount',      // Total per Baris (Qty * Price)
+        'Card Type', 
+        'Currency', 
+        'Status', 
+        'Created By'
+    ));
     
     while($row = $resEx->fetch_assoc()) {
-        $qId = $row['id'];
-        $calc = $conn->query("SELECT SUM(qty * unit_price) as t, COUNT(*) as c FROM quotation_items WHERE quotation_id = $qId")->fetch_assoc();
+        $lineAmount = floatval($row['qty']) * floatval($row['unit_price']);
         
-        // Get Card Types
-        $cardsArr = [];
-        $resCard = $conn->query("SELECT DISTINCT card_type FROM quotation_items WHERE quotation_id = $qId");
-        while($rc = $resCard->fetch_assoc()) if(!empty($rc['card_type'])) $cardsArr[] = $rc['card_type'];
-        $cardString = implode(", ", $cardsArr);
-
-        // Get Detailed Items (Name & Desc)
-        $itemsDetailArr = [];
-        $resItems = $conn->query("SELECT item_name, description, qty FROM quotation_items WHERE quotation_id = $qId");
-        while($ri = $resItems->fetch_assoc()) {
-            // Bersihkan spasi/enter di dalam teks asli agar rapi
-            $cleanName = trim(preg_replace('/\s+/', ' ', $ri['item_name']));
-            $cleanDesc = trim(preg_replace('/\s+/', ' ', $ri['description']));
-            
-            // Format per item: - (Qty) Nama Item [Deskripsi]
-            $itemsDetailArr[] = "- ({$ri['qty']}x) $cleanName" . (!empty($cleanDesc) ? " [$cleanDesc]" : "");
-        }
-        
-        // [MODIFIKASI DI SINI] 
-        // Menggunakan "\n" (New Line) sebagai pemisah agar turun ke bawah dalam satu sel Excel
-        $itemsDetailString = implode("\n", $itemsDetailArr);
+        // Membersihkan karakter newline/tab agar sel CSV rapi
+        $itemName = trim(preg_replace('/\s+/', ' ', $row['item_name']));
+        $desc = trim(preg_replace('/\s+/', ' ', $row['description']));
 
         fputcsv($output, array(
             $row['quotation_no'],
             $row['quotation_date'],
             $row['company_name'],
-            $cardString,
-            $itemsDetailString, // Kolom ini sekarang berisi enter (\n)
             $row['pic_name'],
-            $calc['c'], 
-            $calc['t'], 
+            $itemName,
+            $desc,
+            $row['qty'],
+            $row['unit_price'],
+            $lineAmount,
+            $row['card_type'],
             $row['currency'],
             $row['status'],
             $row['username']
@@ -147,7 +151,7 @@ if (isset($_POST['process_po'])) {
     }
 }
 
-// QUERY DATA TAMPILAN
+// QUERY DATA TAMPILAN (Tidak berubah, tetap Group by Quotation untuk tampilan web)
 $sql = "SELECT q.*, c.company_name, u.username 
         FROM quotations q 
         JOIN clients c ON q.client_id = c.id 
@@ -246,7 +250,7 @@ $res = $conn->query($sql);
                         <input type="hidden" name="end_date" value="<?= htmlspecialchars($f_end) ?>">
                         
                         <button type="submit" name="export_excel" class="btn btn-success text-white btn-sm">
-                            <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export Filtered Data
+                            <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export Item Details
                         </button>
                     </form>
                 </div>
