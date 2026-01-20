@@ -27,7 +27,7 @@ if(!empty($f_start) && !empty($f_end)) {
     $where .= " AND q.quotation_date BETWEEN '$f_start' AND '$f_end'";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (UPDATED) ---
+// --- 3. LOGIKA EXPORT EXCEL (UPDATED: ITEM DETAILS) ---
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
@@ -43,8 +43,8 @@ if (isset($_POST['export_excel'])) {
     
     $output = fopen('php://output', 'w');
     
-    // Header Kolom CSV
-    fputcsv($output, array('Quotation No', 'Date', 'Client', 'Card Types (Int)', 'PIC', 'Items Count', 'Total Amount', 'Currency', 'Status', 'Created By'));
+    // [UPDATE] Header Kolom CSV - Menambahkan 'Item Detail List'
+    fputcsv($output, array('Quotation No', 'Date', 'Client', 'Card Types (Int)', 'Item Detail List', 'PIC', 'Items Count', 'Total Amount', 'Currency', 'Status', 'Created By'));
     
     while($row = $resEx->fetch_assoc()) {
         $qId = $row['id'];
@@ -56,11 +56,26 @@ if (isset($_POST['export_excel'])) {
         while($rc = $resCard->fetch_assoc()) if(!empty($rc['card_type'])) $cardsArr[] = $rc['card_type'];
         $cardString = implode(", ", $cardsArr);
 
+        // [BARU] Get Detailed Items (Name & Desc)
+        $itemsDetailArr = [];
+        $resItems = $conn->query("SELECT item_name, description, qty FROM quotation_items WHERE quotation_id = $qId");
+        while($ri = $resItems->fetch_assoc()) {
+            // Bersihkan spasi/enter agar rapi di CSV
+            $cleanName = trim(preg_replace('/\s+/', ' ', $ri['item_name']));
+            $cleanDesc = trim(preg_replace('/\s+/', ' ', $ri['description']));
+            
+            // Format: (Qty) Nama - Deskripsi
+            $itemsDetailArr[] = "({$ri['qty']}x) $cleanName" . (!empty($cleanDesc) ? " - $cleanDesc" : "");
+        }
+        // Gabungkan semua item dengan pemisah " | "
+        $itemsDetailString = implode(" | ", $itemsDetailArr);
+
         fputcsv($output, array(
             $row['quotation_no'],
             $row['quotation_date'],
             $row['company_name'],
             $cardString,
+            $itemsDetailString, // Kolom Baru: Deskripsi Item Lengkap
             $row['pic_name'],
             $calc['c'], 
             $calc['t'], 
@@ -360,7 +375,7 @@ $res = $conn->query($sql);
                 <div class="mb-3"><label class="form-label fw-bold">Client PO Number</label><input type="text" name="po_number_client" class="form-control" required></div>
                 <div class="mb-3"><label class="form-label fw-bold">Upload PO Document</label><input type="file" name="po_document" class="form-control" accept=".pdf,.jpg,.png,.jpeg" required></div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss=\"modal\">Batal</button><button type="submit" name="process_po" class="btn btn-success">Proses</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button><button type="submit" name="process_po" class="btn btn-success">Proses</button></div>
         </form>
     </div>
 </div>
