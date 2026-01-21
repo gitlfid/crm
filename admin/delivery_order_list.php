@@ -19,11 +19,34 @@ if (!empty($f_client)) {
     $where .= " AND c.id = $safe_client";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (CSV) ---
+// --- 3. LOGIKA EXPORT EXCEL (CSV) DETAIL & RAPI ---
 if (isset($_POST['export_excel'])) {
+    // Bersihkan buffer output agar file tidak rusak
     if (ob_get_length()) ob_end_clean();
     
-    // [UPDATE QUERY] Tambahkan i.invoice_no
+    // Header File untuk Download CSV
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename=DeliveryOrders_Detail_' . date('Ymd_His') . '.csv');
+    
+    $output = fopen('php://output', 'w');
+
+    // Tulis Header Kolom CSV
+    fputcsv($output, array(
+        'DO Number', 
+        'Ref Invoice', 
+        'DO Date', 
+        'Client Name', 
+        'Delivery Address', 
+        'Item Name', 
+        'Unit (Qty)', 
+        'Charge Mode', 
+        'Description', 
+        'Receiver Name', 
+        'Receiver Phone', 
+        'Status'
+    ));
+    
+    // Ambil Data DO Utama
     $sqlEx = "SELECT d.*, d.address as do_address_fix, 
                      c.company_name, c.address as client_address_fix, 
                      p.invoice_id, i.quotation_id, i.invoice_no
@@ -34,51 +57,79 @@ if (isset($_POST['export_excel'])) {
               JOIN clients c ON q.client_id = c.id
               WHERE $where
               ORDER BY d.do_number DESC"; 
-    $resEx = $conn->query($sqlEx);
-
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename=DeliveryOrders_' . date('Ymd_His') . '.csv');
     
-    $output = fopen('php://output', 'w');
-    // [UPDATE HEADER CSV] Tambah Ref Invoice
-    fputcsv($output, array('DO Number', 'Ref Invoice', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
+    $resEx = $conn->query($sqlEx);
     
     while($row = $resEx->fetch_assoc()) {
+        // Tentukan Alamat Akhir
         $final_address = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
+        $final_address = str_replace(array("\r", "\n"), " ", $final_address); // Rapikan enter di alamat
+
         $do_id = $row['id'];
         $itemsData = [];
 
-        // Ambil Item
+        // 1. Cek Item Edit Manual (Prioritas Utama)
         $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resDOItems = $conn->query($sqlDOItems);
 
         if ($resDOItems && $resDOItems->num_rows > 0) {
-            while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
+            while($itm = $resDOItems->fetch_assoc()) {
+                $itemsData[] = $itm;
+            }
         } else {
+            // 2. Jika Kosong, Ambil dari Invoice atau Quotation
             $inv_id = $row['invoice_id'];
             $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = $inv_id";
             $resItems = $conn->query($items_sql);
+            
             if($resItems->num_rows == 0 && isset($row['quotation_id'])) {
                 $resItems = $conn->query("SELECT item_name, qty, card_type as charge_mode, description FROM quotation_items WHERE quotation_id=".$row['quotation_id']);
             }
-            while($itm = $resItems->fetch_assoc()) $itemsData[] = $itm;
+            
+            while($itm = $resItems->fetch_assoc()) {
+                $itemsData[] = $itm;
+            }
         }
 
+        // Loop Item untuk Export (1 Item = 1 Baris)
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
+                // Bersihkan teks dari karakter aneh
+                $itemName = trim(preg_replace('/\s+/', ' ', $item['item_name']));
+                $itemDesc = trim(preg_replace('/\s+/', ' ', $item['description']));
+
                 fputcsv($output, array(
                     $row['do_number'], 
-                    $row['invoice_no'], // [UPDATE DATA CSV]
-                    $row['do_date'], $row['company_name'], 
+                    $row['invoice_no'],
+                    $row['do_date'], 
+                    $row['company_name'], 
                     $final_address,
-                    $item['item_name'], floatval($item['qty']), $item['charge_mode'], $item['description'],
-                    $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])
+                    $itemName, 
+                    floatval($item['qty']), 
+                    $item['charge_mode'], 
+                    $itemDesc,
+                    $row['pic_name'], 
+                    $row['pic_phone'], 
+                    strtoupper($row['status'])
                 ));
             }
         } else {
-            fputcsv($output, array($row['do_number'], $row['invoice_no'], $row['do_date'], $row['company_name'], $final_address, '- No Item -', '', '', '', $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])));
+            // Jika tidak ada item (Baris Kosong Item)
+            fputcsv($output, array(
+                $row['do_number'], 
+                $row['invoice_no'], 
+                $row['do_date'], 
+                $row['company_name'], 
+                $final_address, 
+                '- No Item Found -', 
+                '', '', '', 
+                $row['pic_name'], 
+                $row['pic_phone'], 
+                strtoupper($row['status'])
+            ));
         }
     }
+    
     fclose($output);
     exit();
 }
@@ -90,7 +141,7 @@ include 'includes/sidebar.php';
 
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
-// [UPDATE QUERY DASHBOARD] Tambahkan i.invoice_no
+// Query Tampilan Web (Tetap Grouping)
 $sql = "SELECT d.*, d.address as do_address_fix, 
                c.company_name, c.address as client_address_fix, 
                p.invoice_id, i.quotation_id, i.invoice_no
@@ -132,7 +183,7 @@ $res = $conn->query($sql);
                 </div>
                 <div class="col-md-3 d-flex gap-2">
                     <button type="submit" class="btn btn-primary flex-grow-1">Filter</button>
-                    <button type="submit" name="export_excel" class="btn btn-success text-white btn-sm">
+                    <button type="submit" formmethod="POST" name="export_excel" class="btn btn-success text-white btn-sm">
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export
                     </button>
                 </div>
@@ -164,7 +215,7 @@ $res = $conn->query($sql);
                                 // Alamat
                                 $displayAddress = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
 
-                                // Item
+                                // Item untuk Tampilan Web
                                 $do_id = $row['id'];
                                 $itemsData = [];
                                 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode FROM delivery_order_items WHERE delivery_order_id = $do_id";
