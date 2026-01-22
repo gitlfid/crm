@@ -29,13 +29,14 @@ $items_list = [];
 
 // KASUS 1: CREATE DARI INVOICE
 if ($from_inv_id > 0) {
+    // Cek Payment (Optional: Bisa dibuat NULL jika belum bayar)
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     if ($resPay->num_rows > 0) {
         $payRow = $resPay->fetch_assoc();
         $payment_id = $payRow['id'];
     } else {
-        $payment_id = 0; 
+        $payment_id = 0; // Set 0 dulu, nanti diubah jadi NULL saat save
     }
 
     $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
@@ -58,11 +59,11 @@ if ($from_inv_id > 0) {
     }
 }
 
-// KASUS 2: EDIT DO
+// KASUS 2: EDIT DO (FIX SYNC ISSUE)
 if ($do_id > 0) {
-    // [UPDATE] Mengambil kolom client_name dari tabel delivery_orders (jika ada)
-    // Menggunakan IFNULL/Coalesce untuk kompatibilitas jika kolom belum ada di query tapi di DB sudah
-    $sqlData = "SELECT d.*, d.address as do_addr, 
+    // [FIX] Gunakan LEFT JOIN agar DO yang belum lunas/draft tetap terbaca datanya
+    // Jika pakai JOIN biasa, DO tanpa payment tidak akan muncul, sehingga nomor DO ter-generate ulang (tidak sync).
+    $sqlData = "SELECT d.*, d.address as do_addr, d.client_name as do_client_name,
                        c.company_name, c.address as client_addr, 
                        i.invoice_no, i.id as inv_id 
                 FROM delivery_orders d 
@@ -71,25 +72,26 @@ if ($do_id > 0) {
                 LEFT JOIN quotations q ON i.quotation_id = q.id 
                 LEFT JOIN clients c ON q.client_id = c.id
                 WHERE d.id = $do_id";
+                
     $resData = $conn->query($sqlData);
-    
     if ($resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
-        $do_number = $row['do_number'];
+        
+        // KUNCI: Timpa $do_number dengan data dari DB agar Sync
+        $do_number = $row['do_number']; 
+        
         $do_date = $row['do_date'];
         $status = $row['status'];
         $pic_name = $row['pic_name'];
         $pic_phone = $row['pic_phone'];
         $payment_id = $row['payment_id'] ? $row['payment_id'] : 0;
         
-        // Cek apakah ada data client manual di DO (support fitur baru)
-        if (isset($row['client_name']) && !empty($row['client_name'])) {
-            $client_name = $row['client_name'];
-        } else {
-            $client_name = $row['company_name'];
-        }
+        // Prioritas Nama Client: Manual (jika ada kolomnya) > Master Client
+        $client_name = !empty($row['do_client_name']) ? $row['do_client_name'] : $row['company_name'];
         
+        // Prioritas Alamat: Manual > Master Client
         $client_address = !empty($row['do_addr']) ? $row['do_addr'] : $row['client_addr'];
+        
         $ref_info = "Ref: Invoice #" . $row['invoice_no'];
 
         $sqlItems = "SELECT * FROM delivery_order_items WHERE delivery_order_id = $do_id";
@@ -111,7 +113,7 @@ if ($do_id > 0) {
 
 // --- PROSES SIMPAN ---
 if (isset($_POST['save_do'])) {
-    // [FIX 1] Handle Payment ID agar NULL jika 0 (Solusi Fatal Error Foreign Key)
+    // [FIX] Ubah 0 menjadi NULL untuk mencegah Error Foreign Key
     $p_id_raw = intval($_POST['payment_id']);
     $p_id_sql = ($p_id_raw > 0) ? $p_id_raw : "NULL";
 
@@ -121,15 +123,12 @@ if (isset($_POST['save_do'])) {
     $d_pic = $conn->real_escape_string($_POST['pic_name']);
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
     $d_addr = $conn->real_escape_string($_POST['address']);
-    
-    // [FITUR BARU] Simpan Nama Client Manual
     $d_client = $conn->real_escape_string($_POST['client_name']);
     
     $user_id = $_SESSION['user_id'];
 
     if ($do_id > 0) {
-        // Update DO (Termasuk client_name)
-        // Pastikan Anda sudah menjalankan ALTER TABLE di database!
+        // UPDATE (Cek apakah kolom client_name ada di DB, jika tidak ada fallback)
         $sql = "UPDATE delivery_orders SET 
                 do_number='$d_num', 
                 do_date='$d_date', 
@@ -141,30 +140,28 @@ if (isset($_POST['save_do'])) {
                 client_name='$d_client' 
                 WHERE id=$do_id";
         
+        // Try query, if fail (unknown column), run fallback
         if (!$conn->query($sql)) {
-            // Fallback jika kolom client_name belum dibuat user (menghindari error)
-            $sql_fallback = "UPDATE delivery_orders SET 
+             $sql_fb = "UPDATE delivery_orders SET 
                 do_number='$d_num', do_date='$d_date', status='$d_stat', payment_id=$p_id_sql, 
                 pic_name='$d_pic', pic_phone='$d_phone', address='$d_addr' WHERE id=$do_id";
-            $conn->query($sql_fallback);
+             $conn->query($sql_fb);
         }
         
         $curr_do_id = $do_id;
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
-        // Insert DO Baru (Termasuk client_name)
+        // INSERT
         $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address, client_name) 
                 VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr', '$d_client')";
         
         if (!$conn->query($sql)) {
-             // Fallback jika kolom client_name belum dibuat user
-             $sql_fallback = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
+             $sql_fb = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
                 VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr')";
-             
-             if($conn->query($sql_fallback)) {
+             if($conn->query($sql_fb)) {
                  $curr_do_id = $conn->insert_id;
              } else {
-                 echo "<script>alert('Error: " . addslashes($conn->error) . "');</script>";
+                 echo "<script>alert('Error Saving: " . addslashes($conn->error) . "');</script>";
                  exit;
              }
         } else {
