@@ -5,10 +5,10 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL HEADER (PERBAIKAN LOGIKA CLIENT MANUAL)
-// Kita gunakan alias (AS) agar tidak tertukar antara data DO dan data Client Linked
+// 1. AMBIL HEADER
+// [FIX] Mengambil kolom manual_client_name jika ada (dari d.client_name)
+// [FIX] Join Users diarahkan ke d.created_by_user_id (Pembuat DO) bukan Invoice
 $sql = "SELECT d.*, 
-               d.client_name as manual_client_name,
                d.address as manual_address,
                d.pic_name as manual_pic,
                d.pic_phone as manual_phone,
@@ -23,27 +23,30 @@ $sql = "SELECT d.*,
         LEFT JOIN invoices i ON p.invoice_id = i.id
         LEFT JOIN quotations q ON i.quotation_id = q.id
         LEFT JOIN clients c ON q.client_id = c.id
-        LEFT JOIN users u ON i.created_by_user_id = u.id 
+        LEFT JOIN users u ON d.created_by_user_id = u.id 
         WHERE d.id = $id";
 
 $do = $conn->query($sql)->fetch_assoc();
 if(!$do) die("DO not found");
 
 // --- LOGIKA PRIORITAS TAMPILAN (MANUAL vs LINKED) ---
-// 1. Nama Client: Cek kolom manual dulu, kalau kosong baru ambil dari master client
-$display_client_name = !empty($do['manual_client_name']) ? $do['manual_client_name'] : $do['linked_company'];
+// Cek apakah kolom client_name ada di hasil query (d.*)
+$manual_client_name = isset($do['client_name']) ? $do['client_name'] : '';
 
-// 2. Alamat: Cek kolom manual (yang diedit di form), kalau kosong ambil master
-$display_address = !empty($do['manual_address']) ? $do['manual_address'] : $do['linked_address'];
+// 1. Nama Client
+$display_client_name = !empty($manual_client_name) ? $manual_client_name : ($do['linked_company'] ?? '');
+
+// 2. Alamat
+$display_address = !empty($do['manual_address']) ? $do['manual_address'] : ($do['linked_address'] ?? '');
 
 // 3. PIC / Receiver
-$display_pic = !empty($do['manual_pic']) ? $do['manual_pic'] : $do['linked_pic'];
+$display_pic = !empty($do['manual_pic']) ? $do['manual_pic'] : ($do['linked_pic'] ?? '');
 
 // 4. Phone
-$display_phone = !empty($do['manual_phone']) ? $do['manual_phone'] : $do['linked_phone'];
+$display_phone = !empty($do['manual_phone']) ? $do['manual_phone'] : ($do['linked_phone'] ?? '');
 
 
-// 2. AMBIL ITEM (LOGIKA ANTI-HILANG)
+// 2. AMBIL ITEM
 $itemsData = [];
 
 // Cek tabel DO Items (Hasil Edit Manual)
@@ -51,31 +54,32 @@ $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM deli
 $resDOItems = $conn->query($sqlDOItems);
 
 if ($resDOItems && $resDOItems->num_rows > 0) {
-    // Jika ada data edit, pakai ini
     while($itm = $resDOItems->fetch_assoc()) {
         $itemsData[] = $itm;
     }
 } else {
-    // JIKA KOSONG, AMBIL DARI INVOICE (Data Asli/Lama)
-    $inv_id = $do['invoice_id'];
-    $quo_id = $do['quotation_id'];
+    // JIKA KOSONG, AMBIL DARI INVOICE/QUOTATION
+    $inv_id = $do['invoice_id'] ?? 0;
+    $quo_id = $do['quotation_id'] ?? 0;
     
-    // Coba Invoice
-    $sql_items = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = '$inv_id'";
-    $resItems = $conn->query($sql_items);
+    $resItems = false;
+    if ($inv_id > 0) {
+        $sql_items = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = '$inv_id'";
+        $resItems = $conn->query($sql_items);
+    }
     
-    // Coba Quotation jika Invoice kosong
-    if ($resItems->num_rows == 0) {
+    if ((!$resItems || $resItems->num_rows == 0) && $quo_id > 0) {
         $sql_items = "SELECT item_name, qty, card_type as charge_mode, description FROM quotation_items WHERE quotation_id = '$quo_id'";
         $resItems = $conn->query($sql_items);
     }
 
-    while($itm = $resItems->fetch_assoc()) {
-        // Force fix tampilan jika data lama
-        if(empty($itm['charge_mode']) || stripos($itm['charge_mode'], 'BBC') !== false) {
-            $itm['charge_mode'] = 'Prepaid';
+    if ($resItems) {
+        while($itm = $resItems->fetch_assoc()) {
+            if(empty($itm['charge_mode']) || stripos($itm['charge_mode'], 'BBC') !== false) {
+                $itm['charge_mode'] = 'Prepaid';
+            }
+            $itemsData[] = $itm;
         }
-        $itemsData[] = $itm;
     }
 }
 
@@ -88,53 +92,39 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>DO <?= $do['do_number'] ?></title>
+    <title>DO <?= $do['do_number'] ?? 'DRAFT' ?></title>
     <style>
         * { box-sizing: border-box; }
         body { 
             font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; 
-            color: #000 !important; /* Paksa Hitam */
-            -webkit-print-color-adjust: exact !important; /* Paksa Warna Background */
+            color: #000 !important; -webkit-print-color-adjust: exact !important; 
         }
-        
         @page { size: A4; margin: 0.5cm; }
-        
-        /* WRAPPER TENGAH & LEBAR 95% AGAR TIDAK KEPOTONG */
         .wrapper { width: 95%; margin: 0 auto; padding-top: 10px; }
-
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
         .company-addr { font-size: 10px; color: #000; max-width: 350px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 20px; font-weight: bold; text-transform: uppercase; padding-top: 20px; color: #000; }
-
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; }
         .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 120px; }
         .inner-table { width: 100%; font-size: 11px; }
         .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } .sep { width: 10px; text-align: center; }
-
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; border: 1px solid #000; }
-        
-        /* WARNA HEADER TABEL */
         .items-table th { 
-            border: 1px solid #000; 
-            background-color: #ff6b6b !important; 
-            color: white !important; 
+            border: 1px solid #000; background-color: #ff6b6b !important; color: white !important; 
             padding: 8px; font-weight: bold; text-align: center; 
         }
         .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: center; color: #000; }
         .text-left { text-align: left !important; }
-
         .footer-table { width: 100%; margin-top: 30px; border-collapse: collapse; page-break-inside: avoid; }
         .footer-col { vertical-align: bottom; padding: 10px; }
         .remarks-col { width: 34%; font-size: 10px; border-right: 1px solid #eee; padding-right: 15px; vertical-align: top; }
         .sender-col, .recipient-col { width: 33%; text-align: center; }
-
         .sign-area { height: 130px; display: flex; align-items: flex-end; justify-content: center; width: 100%; }
         .sign-img { max-height: 120px; max-width: 100%; object-fit: contain; }
         .sign-name { font-weight: bold; text-decoration: underline; margin-top: 5px; font-size: 11px; }
         .sign-line { border-bottom: 1px solid #000; width: 80%; margin: 0 auto; }
-        
         @media print { .no-print { display: none; } }
         .no-print { text-align: center; padding: 10px; background: #eee; border-bottom: 1px solid #ddd; }
     </style>
@@ -150,7 +140,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         <table class="header-table">
             <tr>
                 <td>
-                    <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
+                    <img src="../uploads/<?= $sets['company_logo'] ?? '' ?>" class="logo" onerror="this.style.display='none'">
                     <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?></div>
                 </td>
                 <td align="right" valign="top"><div class="doc-title">DELIVERY ORDER</div></td>
@@ -161,18 +151,18 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <tr>
                 <td class="info-box">
                     <table class="inner-table">
-                        <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($display_client_name) ?></strong></td></tr>
-                        <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($display_address)) ?></td></tr>
-                        <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
+                        <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($display_client_name ?? '') ?></strong></td></tr>
+                        <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($display_address ?? '')) ?></td></tr>
+                        <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic ?? '') ?></td></tr>
                     </table>
                 </td>
                 <td style="width:4%"></td>
                 <td class="info-box">
                     <table class="inner-table">
-                        <tr><td class="lbl">Delivery Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($do['do_date'])) ?></td></tr>
-                        <tr><td class="lbl">Delivery No</td><td class="sep">:</td><td><strong><?= $do['do_number'] ?></strong></td></tr>
-                        <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
-                        <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($display_phone) ?></td></tr>
+                        <tr><td class="lbl">Delivery Date</td><td class="sep">:</td><td><?= isset($do['do_date']) ? date('d/m/Y', strtotime($do['do_date'])) : '-' ?></td></tr>
+                        <tr><td class="lbl">Delivery No</td><td class="sep">:</td><td><strong><?= $do['do_number'] ?? '-' ?></strong></td></tr>
+                        <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic ?? '') ?></td></tr>
+                        <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($display_phone ?? '') ?></td></tr>
                     </table>
                 </td>
             </tr>
@@ -188,7 +178,6 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 <?php 
                 $no=1; 
                 $maxQty = 0; 
-                
                 foreach($itemsData as $itm) {
                     $qty = floatval($itm['qty']);
                     if($qty > $maxQty) $maxQty = $qty;
@@ -199,10 +188,10 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 ?>
                 <tr>
                     <td><?= $no++ ?></td>
-                    <td class="text-left"><?= htmlspecialchars($itm['item_name']) ?></td>
+                    <td class="text-left"><?= htmlspecialchars($itm['item_name'] ?? '') ?></td>
                     <td><?= floatval($itm['qty']) ?></td>
-                    <td><?= htmlspecialchars($itm['charge_mode']) ?></td>
-                    <td class="text-left"><?= htmlspecialchars($itm['description']) ?></td>
+                    <td><?= htmlspecialchars($itm['charge_mode'] ?? '') ?></td>
+                    <td class="text-left"><?= htmlspecialchars($itm['description'] ?? '') ?></td>
                 </tr>
                 <?php endforeach; ?>
                 
@@ -232,13 +221,15 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                     <div class="sign-title">Sender</div>
                     <div class="sign-area">
                         <?php 
-                            $signFile = $do['sender_sign']; $src = '';
+                            $signFile = $do['sender_sign'] ?? ''; 
+                            $senderId = $do['sender_id'] ?? 0;
+                            $src = '';
                             $baseDir = dirname(__DIR__);
                             
                             if(!empty($signFile) && file_exists($baseDir."/uploads/signatures/$signFile")) {
                                 $src="../uploads/signatures/$signFile";
-                            } elseif(!empty($do['sender_id'])) {
-                                $files = glob($baseDir."/uploads/signatures/SIG_*_".$do['sender_id']."_*.png");
+                            } elseif(!empty($senderId)) {
+                                $files = glob($baseDir."/uploads/signatures/SIG_*_".$senderId."_*.png");
                                 if($files) $src = "../uploads/signatures/" . basename($files[0]);
                             }
                             if(!$src && file_exists($baseDir."/assets/images/signature.png")) {
@@ -247,12 +238,12 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                         ?>
                         <?php if($src): ?><img src="<?= $src ?>" class="sign-img"><?php endif; ?>
                     </div>
-                    <div class="sign-name"><?= htmlspecialchars($do['sender_name']) ?></div>
+                    <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Admin') ?></div>
                 </td>
                 <td class="footer-col recipient-col">
                     <div class="sign-title">Recipient</div>
                     <div class="sign-area"><div class="sign-line"></div></div>
-                    <div class="sign-name"><?= htmlspecialchars($display_pic) ?></div>
+                    <div class="sign-name"><?= htmlspecialchars($display_pic ?? '') ?></div>
                 </td>
             </tr>
         </table>
