@@ -7,7 +7,7 @@ include '../config/functions.php';
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// GENERATOR NOMOR OTOMATIS
+// GENERATOR NOMOR
 $prefixDO = "DO" . date('Ym'); 
 $sqlCek = "SELECT do_number FROM delivery_orders WHERE do_number LIKE '$prefixDO%' AND CHAR_LENGTH(do_number) = 12 ORDER BY do_number DESC LIMIT 1";
 $resCek = $conn->query($sqlCek);
@@ -20,7 +20,6 @@ if ($resCek && $resCek->num_rows > 0) {
 }
 $do_number_auto = $prefixDO . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
 
-// Default Values
 $do_number = $do_number_auto;
 $do_date = date('Y-m-d');
 $status = 'draft';
@@ -44,11 +43,11 @@ if ($from_inv_id > 0) {
                 WHERE i.id = $from_inv_id";
     $info = $conn->query($sqlInfo)->fetch_assoc();
     if ($info) {
-        $client_name = $info['company_name'];
-        $client_address = $info['address']; 
-        $pic_name = $info['pic_name'];
-        $pic_phone = $info['pic_phone'];
-        $ref_info = "Ref: Invoice #" . $info['invoice_no'];
+        $client_name = $info['company_name'] ?? '';
+        $client_address = $info['address'] ?? ''; 
+        $pic_name = $info['pic_name'] ?? '';
+        $pic_phone = $info['pic_phone'] ?? '';
+        $ref_info = "Ref: Invoice #" . ($info['invoice_no'] ?? '-');
     }
     
     $sqlItems = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $from_inv_id";
@@ -59,9 +58,9 @@ if ($from_inv_id > 0) {
     }
 }
 
-// KASUS 2: EDIT DO (Perbaikan Sync ID)
+// KASUS 2: EDIT DO
 if ($do_id > 0) {
-    // [FIX] Hapus 'd.client_name' agar query tidak error dan data bisa dimuat
+    // Ambil data (termasuk client_name jika ada kolomnya)
     $sqlData = "SELECT d.*, d.address as do_addr, 
                        c.company_name, c.address as client_addr, 
                        i.invoice_no, i.id as inv_id 
@@ -74,31 +73,32 @@ if ($do_id > 0) {
                 
     $resData = $conn->query($sqlData);
     
-    // Jika query berhasil dan ada data
     if ($resData && $resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
         
-        // TIMPA ID GENERATE DENGAN ID DB (Fix Sync)
-        $do_number = $row['do_number']; 
-        
+        $do_number = $row['do_number'] ?? $do_number_auto; 
         $do_date = $row['do_date'];
         $status = $row['status'];
-        $pic_name = $row['pic_name'];
-        $pic_phone = $row['pic_phone'];
+        $pic_name = $row['pic_name'] ?? '';
+        $pic_phone = $row['pic_phone'] ?? '';
         $payment_id = $row['payment_id'] ? $row['payment_id'] : 0;
         
-        // Ambil nama client (Fallback ke Company Name jika client_name tidak ada di DB)
-        $client_name = isset($row['client_name']) ? $row['client_name'] : $row['company_name'];
+        // [FIX ERROR NULL CLIENT]
+        // Cek apakah kolom client_name ada di hasil query
+        $manual_client = isset($row['client_name']) ? $row['client_name'] : '';
+        $linked_client = isset($row['company_name']) ? $row['company_name'] : '';
         
-        $client_address = !empty($row['do_addr']) ? $row['do_addr'] : $row['client_addr'];
-        $ref_info = "Ref: Invoice #" . $row['invoice_no'];
+        // Prioritas: Manual > Linked > Kosong
+        $client_name = !empty($manual_client) ? $manual_client : $linked_client;
+        
+        $client_address = !empty($row['do_addr']) ? $row['do_addr'] : ($row['client_addr'] ?? '');
+        $ref_info = "Ref: Invoice #" . ($row['invoice_no'] ?? '-');
 
-        // Ambil Item
         $sqlItems = "SELECT * FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resItems = $conn->query($sqlItems);
         if ($resItems->num_rows > 0) {
             while($itm = $resItems->fetch_assoc()) {
-                $mode = $itm['charge_mode'];
+                $mode = $itm['charge_mode'] ?? 'Prepaid';
                 if (stripos($mode, 'BBC') !== false || empty($mode)) $mode = 'Prepaid';
                 $items_list[] = [
                     'item_name' => $itm['item_name'],
@@ -113,7 +113,6 @@ if ($do_id > 0) {
 
 // --- PROSES SIMPAN ---
 if (isset($_POST['save_do'])) {
-    // 1. Handle Payment ID (Fix Foreign Key Error)
     $p_id_raw = intval($_POST['payment_id']);
     $p_id_sql = ($p_id_raw > 0) ? $p_id_raw : "NULL";
 
@@ -124,14 +123,13 @@ if (isset($_POST['save_do'])) {
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
     $d_addr = $conn->real_escape_string($_POST['address']);
     
-    // Ambil Input Client Name (Untuk disimpan jika kolom ada)
+    // Ambil Client Name
     $d_client = $conn->real_escape_string($_POST['client_name']);
     
     $user_id = $_SESSION['user_id'];
 
     if ($do_id > 0) {
-        // [FIX] Coba Update Standar dulu (Tanpa client_name agar aman)
-        // Jika kolom client_name sudah Anda buat di DB, Anda bisa menambahkannya ke query ini manual.
+        // Coba Update dengan client_name
         $sql = "UPDATE delivery_orders SET 
                 do_number='$d_num', 
                 do_date='$d_date', 
@@ -139,24 +137,38 @@ if (isset($_POST['save_do'])) {
                 payment_id=$p_id_sql, 
                 pic_name='$d_pic', 
                 pic_phone='$d_phone', 
-                address='$d_addr'
+                address='$d_addr',
+                client_name='$d_client' 
                 WHERE id=$do_id";
         
-        $conn->query($sql);
+        if (!$conn->query($sql)) {
+            // Fallback jika kolom client_name belum ada
+            $sql_fb = "UPDATE delivery_orders SET 
+                do_number='$d_num', do_date='$d_date', status='$d_stat', payment_id=$p_id_sql, 
+                pic_name='$d_pic', pic_phone='$d_phone', address='$d_addr' WHERE id=$do_id";
+            $conn->query($sql_fb);
+        }
         
-        // Hapus item lama untuk insert ulang (Logic standar update item)
         $curr_do_id = $do_id;
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
-        // [FIX] Insert Standar (Tanpa client_name agar aman)
-        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
-                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr')";
+        // Coba Insert dengan client_name
+        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address, client_name) 
+                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr', '$d_client')";
         
-        if ($conn->query($sql)) {
-            $curr_do_id = $conn->insert_id;
+        if (!$conn->query($sql)) {
+             // Fallback
+             $sql_fb = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
+                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr')";
+             
+             if($conn->query($sql_fb)) {
+                 $curr_do_id = $conn->insert_id;
+             } else {
+                 echo "<script>alert('Error Saving: " . addslashes($conn->error) . "');</script>";
+                 exit;
+             }
         } else {
-            echo "<script>alert('Error Saving: " . addslashes($conn->error) . "');</script>";
-            exit;
+            $curr_do_id = $conn->insert_id;
         }
     }
 
@@ -191,22 +203,22 @@ if (isset($_POST['save_do'])) {
                 
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="mb-3"><label class="fw-bold">DO Number</label><input type="text" name="do_number" class="form-control fw-bold" value="<?= htmlspecialchars($do_number) ?>" required></div>
+                        <div class="mb-3"><label class="fw-bold">DO Number</label><input type="text" name="do_number" class="form-control fw-bold" value="<?= htmlspecialchars($do_number ?? '') ?>" required></div>
                         <div class="mb-3"><label class="fw-bold">Date</label><input type="date" name="do_date" class="form-control" value="<?= $do_date ?>" required></div>
                         
                         <div class="mb-3">
                             <label class="fw-bold">Client</label>
-                            <input type="text" name="client_name" class="form-control" value="<?= htmlspecialchars($client_name) ?>" required>
+                            <input type="text" name="client_name" class="form-control" value="<?= htmlspecialchars($client_name ?? '') ?>" required>
                         </div>
                         
                         <div class="mb-3">
                             <label class="fw-bold text-primary">Address (Edit Disini)</label>
-                            <textarea name="address" class="form-control" rows="4" required><?= htmlspecialchars($client_address) ?></textarea>
+                            <textarea name="address" class="form-control" rows="4" required><?= htmlspecialchars($client_address ?? '') ?></textarea>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="mb-3"><label class="fw-bold">Receiver</label><input type="text" name="pic_name" class="form-control" value="<?= htmlspecialchars($pic_name) ?>" required></div>
-                        <div class="mb-3"><label class="fw-bold">Phone</label><input type="text" name="pic_phone" class="form-control" value="<?= htmlspecialchars($pic_phone) ?>"></div>
+                        <div class="mb-3"><label class="fw-bold">Receiver</label><input type="text" name="pic_name" class="form-control" value="<?= htmlspecialchars($pic_name ?? '') ?>" required></div>
+                        <div class="mb-3"><label class="fw-bold">Phone</label><input type="text" name="pic_phone" class="form-control" value="<?= htmlspecialchars($pic_phone ?? '') ?>"></div>
                         <div class="mb-3"><label class="fw-bold">Status</label>
                             <select name="status" class="form-select">
                                 <option value="draft" <?= $status=='draft'?'selected':'' ?>>DRAFT</option>
@@ -222,10 +234,10 @@ if (isset($_POST['save_do'])) {
                         <tbody id="doItemsBody">
                             <?php if (!empty($items_list)): foreach ($items_list as $item): ?>
                                 <tr>
-                                    <td><input type="text" name="item_name[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['item_name']) ?>"></td>
+                                    <td><input type="text" name="item_name[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['item_name'] ?? '') ?>"></td>
                                     <td><input type="number" step="any" name="qty[]" class="form-control form-control-sm text-center" value="<?= floatval($item['qty']) ?>"></td>
-                                    <td><input type="text" name="charge_mode[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['card_type']) ?>"></td>
-                                    <td><input type="text" name="description[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['description']) ?>"></td>
+                                    <td><input type="text" name="charge_mode[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['card_type'] ?? '') ?>"></td>
+                                    <td><input type="text" name="description[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['description'] ?? '') ?>"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                                 </tr>
                             <?php endforeach; else: ?>
