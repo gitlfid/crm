@@ -21,16 +21,14 @@ if (!empty($f_client)) {
 
 // --- 3. LOGIKA EXPORT EXCEL (CSV) DETAIL & RAPI ---
 if (isset($_POST['export_excel'])) {
-    // Bersihkan buffer output agar file tidak rusak
     if (ob_get_length()) ob_end_clean();
     
-    // Header File untuk Download CSV
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=DeliveryOrders_Detail_' . date('Ymd_His') . '.csv');
     
     $output = fopen('php://output', 'w');
 
-    // Tulis Header Kolom CSV
+    // Header CSV
     fputcsv($output, array(
         'DO Number', 
         'Ref Invoice', 
@@ -46,7 +44,7 @@ if (isset($_POST['export_excel'])) {
         'Status'
     ));
     
-    // Ambil Data DO Utama
+    // Query Data DO
     $sqlEx = "SELECT d.*, d.address as do_address_fix, 
                      c.company_name, c.address as client_address_fix, 
                      p.invoice_id, i.quotation_id, i.invoice_no
@@ -61,14 +59,13 @@ if (isset($_POST['export_excel'])) {
     $resEx = $conn->query($sqlEx);
     
     while($row = $resEx->fetch_assoc()) {
-        // Tentukan Alamat Akhir
         $final_address = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
-        $final_address = str_replace(array("\r", "\n"), " ", $final_address); // Rapikan enter di alamat
+        $final_address = str_replace(array("\r", "\n"), " ", $final_address); 
 
         $do_id = $row['id'];
         $itemsData = [];
 
-        // 1. Cek Item Edit Manual (Prioritas Utama)
+        // 1. Cek Item Edit Manual
         $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resDOItems = $conn->query($sqlDOItems);
 
@@ -77,7 +74,7 @@ if (isset($_POST['export_excel'])) {
                 $itemsData[] = $itm;
             }
         } else {
-            // 2. Jika Kosong, Ambil dari Invoice atau Quotation
+            // 2. Ambil dari Invoice/Quotation
             $inv_id = $row['invoice_id'];
             $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = $inv_id";
             $resItems = $conn->query($items_sql);
@@ -91,10 +88,9 @@ if (isset($_POST['export_excel'])) {
             }
         }
 
-        // Loop Item untuk Export (1 Item = 1 Baris)
+        // Loop Item (1 Baris per Item)
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
-                // Bersihkan teks dari karakter aneh
                 $itemName = trim(preg_replace('/\s+/', ' ', $item['item_name']));
                 $itemDesc = trim(preg_replace('/\s+/', ' ', $item['description']));
 
@@ -114,7 +110,6 @@ if (isset($_POST['export_excel'])) {
                 ));
             }
         } else {
-            // Jika tidak ada item (Baris Kosong Item)
             fputcsv($output, array(
                 $row['do_number'], 
                 $row['invoice_no'], 
@@ -141,7 +136,7 @@ include 'includes/sidebar.php';
 
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
-// Query Tampilan Web (Tetap Grouping)
+// Query Tampilan Web
 $sql = "SELECT d.*, d.address as do_address_fix, 
                c.company_name, c.address as client_address_fix, 
                p.invoice_id, i.quotation_id, i.invoice_no
@@ -157,9 +152,12 @@ $res = $conn->query($sql);
 
 <div class="page-heading">
     <div class="row align-items-center">
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 order-md-1 order-last">
             <h3>Delivery Orders</h3>
             <p class="text-subtitle text-muted">Daftar surat jalan pengiriman barang ke client.</p>
+        </div>
+        <div class="col-12 col-md-6 order-md-2 order-first text-end">
+            <a href="delivery_order_form.php" class="btn btn-primary shadow-sm"><i class="bi bi-plus-lg me-2"></i> Create New</a>
         </div>
     </div>
 </div>
@@ -215,7 +213,7 @@ $res = $conn->query($sql);
                                 // Alamat
                                 $displayAddress = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
 
-                                // Item untuk Tampilan Web
+                                // Item Tampilan Web
                                 $do_id = $row['id'];
                                 $itemsData = [];
                                 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode FROM delivery_order_items WHERE delivery_order_id = $do_id";
