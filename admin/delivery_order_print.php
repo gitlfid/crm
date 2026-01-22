@@ -5,9 +5,17 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL HEADER
+// 1. AMBIL HEADER (PERBAIKAN LOGIKA CLIENT MANUAL)
+// Kita gunakan alias (AS) agar tidak tertukar antara data DO dan data Client Linked
 $sql = "SELECT d.*, 
-               c.company_name, c.address, c.pic_name, c.pic_phone,
+               d.client_name as manual_client_name,
+               d.address as manual_address,
+               d.pic_name as manual_pic,
+               d.pic_phone as manual_phone,
+               c.company_name as linked_company, 
+               c.address as linked_address, 
+               c.pic_name as linked_pic, 
+               c.pic_phone as linked_phone,
                u.id as sender_id, u.username as sender_name, u.signature_file as sender_sign,
                p.invoice_id, i.quotation_id
         FROM delivery_orders d
@@ -20,6 +28,20 @@ $sql = "SELECT d.*,
 
 $do = $conn->query($sql)->fetch_assoc();
 if(!$do) die("DO not found");
+
+// --- LOGIKA PRIORITAS TAMPILAN (MANUAL vs LINKED) ---
+// 1. Nama Client: Cek kolom manual dulu, kalau kosong baru ambil dari master client
+$display_client_name = !empty($do['manual_client_name']) ? $do['manual_client_name'] : $do['linked_company'];
+
+// 2. Alamat: Cek kolom manual (yang diedit di form), kalau kosong ambil master
+$display_address = !empty($do['manual_address']) ? $do['manual_address'] : $do['linked_address'];
+
+// 3. PIC / Receiver
+$display_pic = !empty($do['manual_pic']) ? $do['manual_pic'] : $do['linked_pic'];
+
+// 4. Phone
+$display_phone = !empty($do['manual_phone']) ? $do['manual_phone'] : $do['linked_phone'];
+
 
 // 2. AMBIL ITEM (LOGIKA ANTI-HILANG)
 $itemsData = [];
@@ -139,9 +161,9 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <tr>
                 <td class="info-box">
                     <table class="inner-table">
-                        <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($do['company_name'] ?? '') ?></strong></td></tr>
-                        <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($do['address'] ?? '')) ?></td></tr>
-                        <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_name'] ?? '') ?></td></tr>
+                        <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($display_client_name) ?></strong></td></tr>
+                        <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($display_address)) ?></td></tr>
+                        <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
                     </table>
                 </td>
                 <td style="width:4%"></td>
@@ -149,8 +171,8 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                     <table class="inner-table">
                         <tr><td class="lbl">Delivery Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($do['do_date'])) ?></td></tr>
                         <tr><td class="lbl">Delivery No</td><td class="sep">:</td><td><strong><?= $do['do_number'] ?></strong></td></tr>
-                        <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_name'] ?? '') ?></td></tr>
-                        <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($do['pic_phone'] ?? '') ?></td></tr>
+                        <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
+                        <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($display_phone) ?></td></tr>
                     </table>
                 </td>
             </tr>
@@ -165,17 +187,14 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <tbody>
                 <?php 
                 $no=1; 
-                // --- LOGIKA TOTAL UNIT PINTAR (Permintaan: Jangan dijumlah jika ada Fee) ---
-                $maxQty = 0; // Mencari nilai tertinggi
+                $maxQty = 0; 
                 
                 foreach($itemsData as $itm) {
                     $qty = floatval($itm['qty']);
                     if($qty > $maxQty) $maxQty = $qty;
                 }
-                // Total Unit = Angka Terbesar yang ditemukan (Misal: 10 Kartu + 10 Fee = Total 10)
                 $finalTotal = $maxQty;
 
-                // Tampilkan Baris Item
                 foreach($itemsData as $itm): 
                 ?>
                 <tr>
@@ -216,7 +235,6 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                             $signFile = $do['sender_sign']; $src = '';
                             $baseDir = dirname(__DIR__);
                             
-                            // Auto Search Signature
                             if(!empty($signFile) && file_exists($baseDir."/uploads/signatures/$signFile")) {
                                 $src="../uploads/signatures/$signFile";
                             } elseif(!empty($do['sender_id'])) {
@@ -234,7 +252,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 <td class="footer-col recipient-col">
                     <div class="sign-title">Recipient</div>
                     <div class="sign-area"><div class="sign-line"></div></div>
-                    <div class="sign-name"><?= htmlspecialchars($do['pic_name']) ?></div>
+                    <div class="sign-name"><?= htmlspecialchars($display_pic) ?></div>
                 </td>
             </tr>
         </table>
