@@ -6,8 +6,7 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 $id = intval($_GET['id']);
 
 // 1. AMBIL HEADER
-// [FIX] Mengambil kolom manual_client_name jika ada (dari d.client_name)
-// [FIX] Join Users diarahkan ke d.created_by_user_id (Pembuat DO) bukan Invoice
+// Mengambil data DO beserta data Client yang terhubung (jika ada)
 $sql = "SELECT d.*, 
                d.address as manual_address,
                d.pic_name as manual_pic,
@@ -30,26 +29,31 @@ $do = $conn->query($sql)->fetch_assoc();
 if(!$do) die("DO not found");
 
 // --- LOGIKA PRIORITAS TAMPILAN (MANUAL vs LINKED) ---
-// Cek apakah kolom client_name ada di hasil query (d.*)
+
+// 1. NAMA CLIENT (TO)
+// Cek apakah ada kolom client_name di tabel DO (Data Manual)
 $manual_client_name = isset($do['client_name']) ? $do['client_name'] : '';
-
-// 1. Nama Client
+// Prioritas: Input Manual > Data Client Master > Nama PIC (sebagai fallback terakhir)
 $display_client_name = !empty($manual_client_name) ? $manual_client_name : ($do['linked_company'] ?? '');
+if (empty($display_client_name)) {
+    // Jika masih kosong, coba pakai nama PIC agar tidak blank
+    $display_client_name = $do['pic_name'] ?? '-';
+}
 
-// 2. Alamat
-$display_address = !empty($do['manual_address']) ? $do['manual_address'] : ($do['linked_address'] ?? '');
+// 2. ALAMAT
+$display_address = !empty($do['manual_address']) ? $do['manual_address'] : ($do['linked_address'] ?? '-');
 
-// 3. PIC / Receiver
-$display_pic = !empty($do['manual_pic']) ? $do['manual_pic'] : ($do['linked_pic'] ?? '');
+// 3. PIC / ATTN
+$display_pic = !empty($do['manual_pic']) ? $do['manual_pic'] : ($do['linked_pic'] ?? '-');
 
-// 4. Phone
-$display_phone = !empty($do['manual_phone']) ? $do['manual_phone'] : ($do['linked_phone'] ?? '');
+// 4. PHONE
+$display_phone = !empty($do['manual_phone']) ? $do['manual_phone'] : ($do['linked_phone'] ?? '-');
 
 
 // 2. AMBIL ITEM
 $itemsData = [];
 
-// Cek tabel DO Items (Hasil Edit Manual)
+// Cek tabel DO Items (Hasil Edit Manual - Prioritas Utama)
 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $id";
 $resDOItems = $conn->query($sqlDOItems);
 
@@ -58,7 +62,7 @@ if ($resDOItems && $resDOItems->num_rows > 0) {
         $itemsData[] = $itm;
     }
 } else {
-    // JIKA KOSONG, AMBIL DARI INVOICE/QUOTATION
+    // JIKA KOSONG, AMBIL DARI INVOICE/QUOTATION (Data Otomatis)
     $inv_id = $do['invoice_id'] ?? 0;
     $quo_id = $do['quotation_id'] ?? 0;
     
@@ -151,9 +155,9 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <tr>
                 <td class="info-box">
                     <table class="inner-table">
-                        <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($display_client_name ?? '') ?></strong></td></tr>
-                        <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($display_address ?? '')) ?></td></tr>
-                        <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic ?? '') ?></td></tr>
+                        <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($display_client_name) ?></strong></td></tr>
+                        <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($display_address)) ?></td></tr>
+                        <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
                     </table>
                 </td>
                 <td style="width:4%"></td>
@@ -161,8 +165,8 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                     <table class="inner-table">
                         <tr><td class="lbl">Delivery Date</td><td class="sep">:</td><td><?= isset($do['do_date']) ? date('d/m/Y', strtotime($do['do_date'])) : '-' ?></td></tr>
                         <tr><td class="lbl">Delivery No</td><td class="sep">:</td><td><strong><?= $do['do_number'] ?? '-' ?></strong></td></tr>
-                        <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic ?? '') ?></td></tr>
-                        <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($display_phone ?? '') ?></td></tr>
+                        <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
+                        <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($display_phone) ?></td></tr>
                     </table>
                 </td>
             </tr>
@@ -243,7 +247,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 <td class="footer-col recipient-col">
                     <div class="sign-title">Recipient</div>
                     <div class="sign-area"><div class="sign-line"></div></div>
-                    <div class="sign-name"><?= htmlspecialchars($display_pic ?? '') ?></div>
+                    <div class="sign-name"><?= htmlspecialchars($display_pic) ?></div>
                 </td>
             </tr>
         </table>
