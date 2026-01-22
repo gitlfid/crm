@@ -27,44 +27,48 @@ $pic_name = ''; $pic_phone = ''; $payment_id = 0;
 $client_name = ''; $client_address = ''; $ref_info = '';
 $items_list = [];
 
-// KASUS 1: CREATE DARI INVOICE
+// KASUS 1: CREATE DARI INVOICE (Membuat DO Baru)
 if ($from_inv_id > 0) {
+    // Ambil Payment ID jika ada, tapi tidak wajib
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     if ($resPay->num_rows > 0) {
         $payRow = $resPay->fetch_assoc();
         $payment_id = $payRow['id'];
-        $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
-                    FROM invoices i JOIN quotations q ON i.quotation_id = q.id JOIN clients c ON q.client_id = c.id
-                    WHERE i.id = $from_inv_id";
-        $info = $conn->query($sqlInfo)->fetch_assoc();
-        if ($info) {
-            $client_name = $info['company_name'];
-            $client_address = $info['address']; // Default dari Client
-            $pic_name = $info['pic_name'];
-            $pic_phone = $info['pic_phone'];
-            $ref_info = "Ref: Invoice #" . $info['invoice_no'];
-        }
-        $sqlItems = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $from_inv_id";
-        $resItems = $conn->query($sqlItems);
-        while($itm = $resItems->fetch_assoc()) {
-            $itm['card_type'] = "Prepaid"; 
-            $items_list[] = $itm;
-        }
     } else {
-        echo "<script>alert('Invoice belum dibayar.'); window.location='invoice_list.php';</script>"; exit;
+        // Jika belum ada payment, set 0 (Nanti diubah jadi NULL saat save)
+        $payment_id = 0; 
+    }
+
+    $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
+                FROM invoices i JOIN quotations q ON i.quotation_id = q.id JOIN clients c ON q.client_id = c.id
+                WHERE i.id = $from_inv_id";
+    $info = $conn->query($sqlInfo)->fetch_assoc();
+    if ($info) {
+        $client_name = $info['company_name'];
+        $client_address = $info['address']; 
+        $pic_name = $info['pic_name'];
+        $pic_phone = $info['pic_phone'];
+        $ref_info = "Ref: Invoice #" . $info['invoice_no'];
+    }
+    
+    // Ambil Item Invoice
+    $sqlItems = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $from_inv_id";
+    $resItems = $conn->query($sqlItems);
+    while($itm = $resItems->fetch_assoc()) {
+        $itm['card_type'] = "Prepaid"; 
+        $items_list[] = $itm;
     }
 }
 
-// KASUS 2: EDIT
+// KASUS 2: EDIT DO (Update data lama)
 if ($do_id > 0) {
-    // AMBIL ALAMAT KHUSUS DO (do_addr) DAN ALAMAT CLIENT (client_addr)
     $sqlData = "SELECT d.*, d.address as do_addr, c.company_name, c.address as client_addr, i.invoice_no, i.id as inv_id 
                 FROM delivery_orders d 
-                JOIN payments p ON d.payment_id = p.id 
-                JOIN invoices i ON p.invoice_id = i.id
-                JOIN quotations q ON i.quotation_id = q.id 
-                JOIN clients c ON q.client_id = c.id
+                LEFT JOIN payments p ON d.payment_id = p.id 
+                LEFT JOIN invoices i ON p.invoice_id = i.id
+                LEFT JOIN quotations q ON i.quotation_id = q.id 
+                LEFT JOIN clients c ON q.client_id = c.id
                 WHERE d.id = $do_id";
     $resData = $conn->query($sqlData);
     if ($resData->num_rows > 0) {
@@ -74,12 +78,9 @@ if ($do_id > 0) {
         $status = $row['status'];
         $pic_name = $row['pic_name'];
         $pic_phone = $row['pic_phone'];
-        $payment_id = $row['payment_id'];
+        $payment_id = $row['payment_id'] ? $row['payment_id'] : 0;
         $client_name = $row['company_name'];
-        
-        // PRIORITAS: Jika ada alamat edit di DO, pakai itu. Jika tidak, pakai alamat master.
         $client_address = !empty($row['do_addr']) ? $row['do_addr'] : $row['client_addr'];
-        
         $ref_info = "Ref: Invoice #" . $row['invoice_no'];
 
         $sqlItems = "SELECT * FROM delivery_order_items WHERE delivery_order_id = $do_id";
@@ -95,44 +96,43 @@ if ($do_id > 0) {
                     'description' => $itm['description']
                 ];
             }
-        } else {
-            $inv_id_src = $row['inv_id'];
-            $sqlItemsInv = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $inv_id_src";
-            $resItemsInv = $conn->query($sqlItemsInv);
-            while($itm = $resItemsInv->fetch_assoc()) {
-                $itm['card_type'] = "Prepaid"; 
-                $items_list[] = $itm;
-            }
         }
     }
 }
 
 // --- PROSES SIMPAN ---
 if (isset($_POST['save_do'])) {
-    $p_id = intval($_POST['payment_id']);
+    // [FIX 1] Handle Payment ID agar NULL jika 0/Kosong (Mencegah Error Foreign Key)
+    $p_id_raw = intval($_POST['payment_id']);
+    $p_id_sql = ($p_id_raw > 0) ? $p_id_raw : "NULL";
+
     $d_num = $conn->real_escape_string($_POST['do_number']);
     $d_date = $_POST['do_date'];
     $d_stat = $_POST['status'];
     $d_pic = $conn->real_escape_string($_POST['pic_name']);
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
-    
-    // [FIX] Ambil Alamat dari Form
     $d_addr = $conn->real_escape_string($_POST['address']); 
-    
     $user_id = $_SESSION['user_id'];
 
     if ($do_id > 0) {
-        // [FIX] UPDATE ke database kolom address
-        $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', pic_name='$d_pic', pic_phone='$d_phone', address='$d_addr' WHERE id=$do_id";
+        // MODE UPDATE (Jika Edit ID ada)
+        // [FIX 2] Update payment_id menggunakan variabel $p_id_sql (tanpa kutip)
+        $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', payment_id=$p_id_sql, pic_name='$d_pic', pic_phone='$d_phone', address='$d_addr' WHERE id=$do_id";
         $conn->query($sql);
         $curr_do_id = $do_id;
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
-        // [FIX] INSERT ke database kolom address
+        // MODE INSERT (Membuat DO Baru)
+        // [FIX 3] Insert payment_id menggunakan variabel $p_id_sql (tanpa kutip)
         $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
-                VALUES ('$d_num', '$d_date', '$d_stat', $p_id, '$d_pic', '$d_phone', $user_id, '$d_addr')";
-        $conn->query($sql);
-        $curr_do_id = $conn->insert_id;
+                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr')";
+        
+        if ($conn->query($sql)) {
+            $curr_do_id = $conn->insert_id;
+        } else {
+            echo "<script>alert('Error: " . addslashes($conn->error) . "');</script>";
+            exit;
+        }
     }
 
     $item_names = $_POST['item_name'];
@@ -163,6 +163,7 @@ if (isset($_POST['save_do'])) {
         <div class="card-body pt-4">
             <form method="POST">
                 <input type="hidden" name="payment_id" value="<?= $payment_id ?>">
+                
                 <div class="row">
                     <div class="col-md-6">
                         <div class="mb-3"><label class="fw-bold">DO Number</label><input type="text" name="do_number" class="form-control fw-bold" value="<?= htmlspecialchars($do_number) ?>" required></div>
