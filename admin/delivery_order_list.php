@@ -2,7 +2,23 @@
 // --- 1. LOAD CONFIG DULUAN ---
 include '../config/functions.php';
 
-// --- 2. INIT FILTER VARIABLES ---
+// --- 2. LOGIKA DELETE (BARU) ---
+if (isset($_GET['delete_id'])) {
+    $del_id = intval($_GET['delete_id']);
+    
+    // Hapus Item Detail dulu (Child)
+    $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id = $del_id");
+    
+    // Hapus Header DO (Parent)
+    if ($conn->query("DELETE FROM delivery_orders WHERE id = $del_id")) {
+        echo "<script>alert('Delivery Order berhasil dihapus!'); window.location='delivery_order_list.php';</script>";
+    } else {
+        echo "<script>alert('Gagal menghapus data: " . $conn->error . "'); window.location='delivery_order_list.php';</script>";
+    }
+    exit; // Stop eksekusi agar tidak lanjut render HTML
+}
+
+// --- 3. INIT FILTER VARIABLES ---
 $search   = isset($_REQUEST['search']) ? $_REQUEST['search'] : '';
 $f_client = isset($_REQUEST['client_id']) ? $_REQUEST['client_id'] : '';
 
@@ -19,17 +35,32 @@ if (!empty($f_client)) {
     $where .= " AND c.id = $safe_client";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (CSV) ---
+// --- 4. LOGIKA EXPORT EXCEL (CSV) DETAIL & RAPI ---
 if (isset($_POST['export_excel'])) {
     if (ob_get_length()) ob_end_clean();
     
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename=DeliveryOrders_' . date('Ymd_His') . '.csv');
+    header('Content-Disposition: attachment; filename=DeliveryOrders_Detail_' . date('Ymd_His') . '.csv');
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, array('DO Number', 'Ref Invoice', 'Delivery Date', 'Client', 'Address', 'Item Name', 'Unit (Qty)', 'Charge Mode', 'Description', 'Receiver Name', 'Receiver Phone', 'Status'));
+
+    // Header CSV
+    fputcsv($output, array(
+        'DO Number', 
+        'Ref Invoice', 
+        'DO Date', 
+        'Client Name', 
+        'Delivery Address', 
+        'Item Name', 
+        'Unit (Qty)', 
+        'Charge Mode', 
+        'Description', 
+        'Receiver Name', 
+        'Receiver Phone', 
+        'Status'
+    ));
     
-    // [FIX 1] Gunakan LEFT JOIN agar DO Draft (tanpa payment) ikut ter-export
+    // Query Data DO
     $sqlEx = "SELECT d.*, d.address as do_address_fix, 
                      c.company_name, c.address as client_address_fix, 
                      p.invoice_id, i.quotation_id, i.invoice_no
@@ -40,60 +71,90 @@ if (isset($_POST['export_excel'])) {
               LEFT JOIN clients c ON q.client_id = c.id
               WHERE $where
               ORDER BY d.do_number DESC"; 
+    
     $resEx = $conn->query($sqlEx);
     
     while($row = $resEx->fetch_assoc()) {
         $final_address = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
+        $final_address = str_replace(array("\r", "\n"), " ", $final_address); 
+
         $do_id = $row['id'];
         $itemsData = [];
 
-        // Ambil Item
+        // 1. Cek Item Edit Manual
         $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resDOItems = $conn->query($sqlDOItems);
 
         if ($resDOItems && $resDOItems->num_rows > 0) {
-            while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
+            while($itm = $resDOItems->fetch_assoc()) {
+                $itemsData[] = $itm;
+            }
         } else {
-            // [FIX 2] Cek apakah ada invoice_id sebelum query item invoice
-            $inv_id = isset($row['invoice_id']) ? $row['invoice_id'] : 0;
-            
+            // 2. Ambil dari Invoice/Quotation
+            $inv_id = $row['invoice_id'];
             if ($inv_id > 0) {
                 $items_sql = "SELECT item_name, qty, card_type as charge_mode, description FROM invoice_items WHERE invoice_id = $inv_id";
                 $resItems = $conn->query($items_sql);
+                
                 if($resItems->num_rows == 0 && isset($row['quotation_id'])) {
                     $resItems = $conn->query("SELECT item_name, qty, card_type as charge_mode, description FROM quotation_items WHERE quotation_id=".$row['quotation_id']);
                 }
-                while($itm = $resItems->fetch_assoc()) $itemsData[] = $itm;
+                
+                while($itm = $resItems->fetch_assoc()) {
+                    $itemsData[] = $itm;
+                }
             }
         }
 
+        // Loop Item (1 Baris per Item)
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
+                $itemName = trim(preg_replace('/\s+/', ' ', $item['item_name']));
+                $itemDesc = trim(preg_replace('/\s+/', ' ', $item['description']));
+
                 fputcsv($output, array(
                     $row['do_number'], 
-                    $row['invoice_no'], 
-                    $row['do_date'], $row['company_name'], 
+                    $row['invoice_no'],
+                    $row['do_date'], 
+                    $row['company_name'], 
                     $final_address,
-                    $item['item_name'], floatval($item['qty']), $item['charge_mode'], $item['description'],
-                    $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])
+                    $itemName, 
+                    floatval($item['qty']), 
+                    $item['charge_mode'], 
+                    $itemDesc,
+                    $row['pic_name'], 
+                    $row['pic_phone'], 
+                    strtoupper($row['status'])
                 ));
             }
         } else {
-            fputcsv($output, array($row['do_number'], $row['invoice_no'], $row['do_date'], $row['company_name'], $final_address, '- No Item -', '', '', '', $row['pic_name'], $row['pic_phone'], strtoupper($row['status'])));
+            fputcsv($output, array(
+                $row['do_number'], 
+                $row['invoice_no'], 
+                $row['do_date'], 
+                $row['company_name'], 
+                $final_address, 
+                '- No Item Found -', 
+                '', '', '', 
+                $row['pic_name'], 
+                $row['pic_phone'], 
+                strtoupper($row['status'])
+            ));
         }
     }
+    
     fclose($output);
     exit();
 }
 
-// --- 4. LOAD TAMPILAN HTML ---
+// --- 5. LOAD TAMPILAN HTML ---
 $page_title = "Delivery Orders";
 include 'includes/header.php';
 include 'includes/sidebar.php';
 
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
-// [FIX 3] Gunakan LEFT JOIN agar DO Draft (tanpa payment) Muncul di List
+// Query Tampilan Web (Tetap LEFT JOIN agar DO Draft Muncul)
 $sql = "SELECT d.*, d.address as do_address_fix, 
                c.company_name, c.address as client_address_fix, 
                p.invoice_id, i.quotation_id, i.invoice_no
@@ -109,12 +170,12 @@ $res = $conn->query($sql);
 
 <div class="page-heading">
     <div class="row align-items-center">
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 order-md-1 order-last">
             <h3>Delivery Orders</h3>
             <p class="text-subtitle text-muted">Daftar surat jalan pengiriman barang ke client.</p>
         </div>
-        <div class="col-12 col-md-6 text-end">
-             <a href="delivery_order_form.php" class="btn btn-primary shadow-sm"><i class="bi bi-plus-lg me-2"></i> Create New</a>
+        <div class="col-12 col-md-6 order-md-2 order-first text-end">
+            <a href="delivery_order_form.php" class="btn btn-primary shadow-sm"><i class="bi bi-plus-lg me-2"></i> Create New</a>
         </div>
     </div>
 </div>
@@ -170,7 +231,7 @@ $res = $conn->query($sql);
                                 // Alamat
                                 $displayAddress = !empty($row['do_address_fix']) ? $row['do_address_fix'] : $row['client_address_fix'];
 
-                                // Item
+                                // Item Tampilan Web
                                 $do_id = $row['id'];
                                 $itemsData = [];
                                 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode FROM delivery_order_items WHERE delivery_order_id = $do_id";
@@ -179,10 +240,8 @@ $res = $conn->query($sql);
                                 if ($resDOItems && $resDOItems->num_rows > 0) {
                                     while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
                                 } else {
-                                    // [FIX 4] Handle jika belum ada Invoice
-                                    $inv_id = isset($row['invoice_id']) ? $row['invoice_id'] : 0;
-                                    
-                                    if ($inv_id > 0) {
+                                    $inv_id = $row['invoice_id'];
+                                    if($inv_id > 0) {
                                         $items_sql = "SELECT item_name, qty, card_type as charge_mode FROM invoice_items WHERE invoice_id = $inv_id";
                                         $resItems = $conn->query($items_sql);
                                         if($resItems->num_rows == 0 && isset($row['quotation_id'])) {
@@ -196,13 +255,9 @@ $res = $conn->query($sql);
                                 <td class="fw-bold font-monospace"><?= $row['do_number'] ?></td>
                                 
                                 <td>
-                                    <?php if(!empty($row['invoice_no'])): ?>
-                                        <span class="badge bg-light text-primary border border-primary text-decoration-none">
-                                            <?= $row['invoice_no'] ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="badge bg-light text-secondary border">-</span>
-                                    <?php endif; ?>
+                                    <span class="badge bg-light text-primary border border-primary text-decoration-none">
+                                        <?= $row['invoice_no'] ?>
+                                    </span>
                                 </td>
 
                                 <td><?= date('d M Y', strtotime($row['do_date'])) ?></td>
@@ -210,7 +265,7 @@ $res = $conn->query($sql);
                                     <div class="fw-bold text-primary"><?= htmlspecialchars($row['company_name'] ?? 'Manual Client') ?></div>
                                     <div class="small text-muted" style="font-size: 0.8rem; line-height: 1.2;">
                                         <i class="bi bi-geo-alt me-1"></i>
-                                        <?= htmlspecialchars(substr($displayAddress ?? '', 0, 100)) . (strlen($displayAddress ?? '')>100 ? '...' : '') ?>
+                                        <?= htmlspecialchars(substr($displayAddress, 0, 100)) . (strlen($displayAddress)>100 ? '...' : '') ?>
                                     </div>
                                 </td>
                                 <td>
@@ -237,6 +292,7 @@ $res = $conn->query($sql);
                                     <div class="btn-group">
                                         <a href="delivery_order_print.php?id=<?= $row['id'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary">Print</a>
                                         <a href="delivery_order_form.php?edit_id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-primary">Edit</a>
+                                        <a href="delivery_order_list.php?delete_id=<?= $row['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin ingin menghapus DO ini? Data tidak bisa dikembalikan.')">Del</a>
                                     </div>
                                 </td>
                             </tr>
