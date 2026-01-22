@@ -29,14 +29,12 @@ $items_list = [];
 
 // KASUS 1: CREATE DARI INVOICE (Membuat DO Baru)
 if ($from_inv_id > 0) {
-    // Ambil Payment ID jika ada, tapi tidak wajib
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     if ($resPay->num_rows > 0) {
         $payRow = $resPay->fetch_assoc();
         $payment_id = $payRow['id'];
     } else {
-        // Jika belum ada payment, set 0 (Nanti diubah jadi NULL saat save)
         $payment_id = 0; 
     }
 
@@ -45,7 +43,7 @@ if ($from_inv_id > 0) {
                 WHERE i.id = $from_inv_id";
     $info = $conn->query($sqlInfo)->fetch_assoc();
     if ($info) {
-        $client_name = $info['company_name'];
+        $client_name = $info['company_name']; // Default dari Invoice
         $client_address = $info['address']; 
         $pic_name = $info['pic_name'];
         $pic_phone = $info['pic_phone'];
@@ -63,7 +61,10 @@ if ($from_inv_id > 0) {
 
 // KASUS 2: EDIT DO (Update data lama)
 if ($do_id > 0) {
-    $sqlData = "SELECT d.*, d.address as do_addr, c.company_name, c.address as client_addr, i.invoice_no, i.id as inv_id 
+    // [UPDATE QUERY] Ambil client_name dari tabel DO juga (jika pernah diedit manual)
+    $sqlData = "SELECT d.*, d.address as do_addr, d.client_name as do_client_name, 
+                       c.company_name, c.address as client_addr, 
+                       i.invoice_no, i.id as inv_id 
                 FROM delivery_orders d 
                 LEFT JOIN payments p ON d.payment_id = p.id 
                 LEFT JOIN invoices i ON p.invoice_id = i.id
@@ -79,8 +80,14 @@ if ($do_id > 0) {
         $pic_name = $row['pic_name'];
         $pic_phone = $row['pic_phone'];
         $payment_id = $row['payment_id'] ? $row['payment_id'] : 0;
-        $client_name = $row['company_name'];
+        
+        // [LOGIKA PRIORITAS NAMA CLIENT]
+        // Jika di DO ada nama manual (do_client_name), pakai itu. Jika tidak, pakai dari Master Client.
+        $client_name = !empty($row['do_client_name']) ? $row['do_client_name'] : $row['company_name'];
+        
+        // [LOGIKA PRIORITAS ALAMAT]
         $client_address = !empty($row['do_addr']) ? $row['do_addr'] : $row['client_addr'];
+        
         $ref_info = "Ref: Invoice #" . $row['invoice_no'];
 
         $sqlItems = "SELECT * FROM delivery_order_items WHERE delivery_order_id = $do_id";
@@ -102,30 +109,43 @@ if ($do_id > 0) {
 
 // --- PROSES SIMPAN ---
 if (isset($_POST['save_do'])) {
-    // [FIX 1] Handle Payment ID agar NULL jika 0/Kosong (Mencegah Error Foreign Key)
+    // 1. Handle Payment ID (Fix Error Foreign Key)
     $p_id_raw = intval($_POST['payment_id']);
     $p_id_sql = ($p_id_raw > 0) ? $p_id_raw : "NULL";
 
+    // 2. Ambil Inputan
     $d_num = $conn->real_escape_string($_POST['do_number']);
     $d_date = $_POST['do_date'];
     $d_stat = $_POST['status'];
     $d_pic = $conn->real_escape_string($_POST['pic_name']);
     $d_phone = $conn->real_escape_string($_POST['pic_phone']);
-    $d_addr = $conn->real_escape_string($_POST['address']); 
+    $d_addr = $conn->real_escape_string($_POST['address']);
+    
+    // [BARU] Ambil Input Client Name
+    $d_client = $conn->real_escape_string($_POST['client_name']);
+    
     $user_id = $_SESSION['user_id'];
 
     if ($do_id > 0) {
-        // MODE UPDATE (Jika Edit ID ada)
-        // [FIX 2] Update payment_id menggunakan variabel $p_id_sql (tanpa kutip)
-        $sql = "UPDATE delivery_orders SET do_number='$d_num', do_date='$d_date', status='$d_stat', payment_id=$p_id_sql, pic_name='$d_pic', pic_phone='$d_phone', address='$d_addr' WHERE id=$do_id";
+        // MODE UPDATE: Simpan client_name juga
+        $sql = "UPDATE delivery_orders SET 
+                do_number='$d_num', 
+                do_date='$d_date', 
+                status='$d_stat', 
+                payment_id=$p_id_sql, 
+                pic_name='$d_pic', 
+                pic_phone='$d_phone', 
+                address='$d_addr',
+                client_name='$d_client' 
+                WHERE id=$do_id";
+        
         $conn->query($sql);
         $curr_do_id = $do_id;
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
-        // MODE INSERT (Membuat DO Baru)
-        // [FIX 3] Insert payment_id menggunakan variabel $p_id_sql (tanpa kutip)
-        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
-                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr')";
+        // MODE INSERT: Simpan client_name juga
+        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address, client_name) 
+                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr', '$d_client')";
         
         if ($conn->query($sql)) {
             $curr_do_id = $conn->insert_id;
@@ -168,7 +188,11 @@ if (isset($_POST['save_do'])) {
                     <div class="col-md-6">
                         <div class="mb-3"><label class="fw-bold">DO Number</label><input type="text" name="do_number" class="form-control fw-bold" value="<?= htmlspecialchars($do_number) ?>" required></div>
                         <div class="mb-3"><label class="fw-bold">Date</label><input type="date" name="do_date" class="form-control" value="<?= $do_date ?>" required></div>
-                        <div class="mb-3"><label class="fw-bold">Client</label><input type="text" class="form-control bg-light" value="<?= htmlspecialchars($client_name) ?>" readonly></div>
+                        
+                        <div class="mb-3">
+                            <label class="fw-bold">Client</label>
+                            <input type="text" name="client_name" class="form-control" value="<?= htmlspecialchars($client_name) ?>" required>
+                        </div>
                         
                         <div class="mb-3">
                             <label class="fw-bold text-primary">Address (Edit Disini)</label>
