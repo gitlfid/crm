@@ -6,7 +6,6 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 $id = intval($_GET['id']);
 
 // 1. AMBIL HEADER
-// Mengambil data DO beserta data Client yang terhubung (jika ada)
 $sql = "SELECT d.*, 
                d.address as manual_address,
                d.pic_name as manual_pic,
@@ -28,41 +27,26 @@ $sql = "SELECT d.*,
 $do = $conn->query($sql)->fetch_assoc();
 if(!$do) die("DO not found");
 
-// --- LOGIKA PRIORITAS TAMPILAN (MANUAL vs LINKED) ---
-
-// 1. NAMA CLIENT (TO)
-// Cek apakah ada kolom client_name di tabel DO (Data Manual)
+// --- LOGIKA PRIORITAS TAMPILAN ---
 $manual_client_name = isset($do['client_name']) ? $do['client_name'] : '';
-// Prioritas: Input Manual > Data Client Master > Nama PIC (sebagai fallback terakhir)
+
+// 1. Nama Client
 $display_client_name = !empty($manual_client_name) ? $manual_client_name : ($do['linked_company'] ?? '');
-if (empty($display_client_name)) {
-    // Jika masih kosong, coba pakai nama PIC agar tidak blank
-    $display_client_name = $do['pic_name'] ?? '-';
-}
+if (empty($display_client_name)) $display_client_name = $do['pic_name'] ?? '-';
 
-// 2. ALAMAT
+// 2. Alamat, PIC, Phone
 $display_address = !empty($do['manual_address']) ? $do['manual_address'] : ($do['linked_address'] ?? '-');
-
-// 3. PIC / ATTN
 $display_pic = !empty($do['manual_pic']) ? $do['manual_pic'] : ($do['linked_pic'] ?? '-');
-
-// 4. PHONE
 $display_phone = !empty($do['manual_phone']) ? $do['manual_phone'] : ($do['linked_phone'] ?? '-');
-
 
 // 2. AMBIL ITEM
 $itemsData = [];
-
-// Cek tabel DO Items (Hasil Edit Manual - Prioritas Utama)
 $sqlDOItems = "SELECT item_name, unit as qty, charge_mode, description FROM delivery_order_items WHERE delivery_order_id = $id";
 $resDOItems = $conn->query($sqlDOItems);
 
 if ($resDOItems && $resDOItems->num_rows > 0) {
-    while($itm = $resDOItems->fetch_assoc()) {
-        $itemsData[] = $itm;
-    }
+    while($itm = $resDOItems->fetch_assoc()) $itemsData[] = $itm;
 } else {
-    // JIKA KOSONG, AMBIL DARI INVOICE/QUOTATION (Data Otomatis)
     $inv_id = $do['invoice_id'] ?? 0;
     $quo_id = $do['quotation_id'] ?? 0;
     
@@ -105,15 +89,25 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         }
         @page { size: A4; margin: 0.5cm; }
         .wrapper { width: 95%; margin: 0 auto; padding-top: 10px; }
+        
+        /* CSS EDITABLE: Agar user tahu bagian mana yang bisa diedit */
+        [contenteditable="true"]:hover {
+            background-color: #fff8dc; /* Warna kuning tipis saat di-hover */
+            outline: 1px dashed #ccc;
+            cursor: text;
+        }
+        
         .header-table { width: 100%; margin-bottom: 20px; }
         .logo { max-height: 60px; margin-bottom: 5px; }
         .company-addr { font-size: 10px; color: #000; max-width: 350px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 20px; font-weight: bold; text-transform: uppercase; padding-top: 20px; color: #000; }
+        
         .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; }
         .info-box { width: 48%; border: 1px solid #000; padding: 10px; vertical-align: top; height: 120px; }
         .inner-table { width: 100%; font-size: 11px; }
         .inner-table td { padding-bottom: 3px; vertical-align: top; }
         .lbl { width: 80px; font-weight: bold; } .sep { width: 10px; text-align: center; }
+        
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; border: 1px solid #000; }
         .items-table th { 
             border: 1px solid #000; background-color: #ff6b6b !important; color: white !important; 
@@ -121,23 +115,33 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
         }
         .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; text-align: center; color: #000; }
         .text-left { text-align: left !important; }
+        
         .footer-table { width: 100%; margin-top: 30px; border-collapse: collapse; page-break-inside: avoid; }
         .footer-col { vertical-align: bottom; padding: 10px; }
         .remarks-col { width: 34%; font-size: 10px; border-right: 1px solid #eee; padding-right: 15px; vertical-align: top; }
         .sender-col, .recipient-col { width: 33%; text-align: center; }
+        
         .sign-area { height: 130px; display: flex; align-items: flex-end; justify-content: center; width: 100%; }
         .sign-img { max-height: 120px; max-width: 100%; object-fit: contain; }
         .sign-name { font-weight: bold; text-decoration: underline; margin-top: 5px; font-size: 11px; }
         .sign-line { border-bottom: 1px solid #000; width: 80%; margin: 0 auto; }
-        @media print { .no-print { display: none; } }
+        
+        @media print { 
+            .no-print { display: none; } 
+            /* Hilangkan highlight edit saat print */
+            [contenteditable="true"] { background-color: transparent !important; outline: none !important; }
+        }
         .no-print { text-align: center; padding: 10px; background: #eee; border-bottom: 1px solid #ddd; }
     </style>
 </head>
 <body>
 
     <div class="no-print">
-        <button onclick="window.print()" style="padding:5px 15px; background:blue; color:white; border:none; border-radius:4px; cursor:pointer;">🖨️ Print / PDF</button>
-        <div style="font-size:10px; color:red; margin-top:5px;">* Pastikan "Background graphics" dicentang di menu print.</div>
+        <button onclick="window.print()" style="padding:8px 20px; background:blue; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">🖨️ Print / PDF</button>
+        <div style="font-size:11px; color:#333; margin-top:8px;">
+            ℹ️ <b>Tips:</b> Klik teks di bawah (Nama, Alamat, Item, dll) untuk mengedit manual sebelum dicetak.<br>
+            <span style="color:red; font-size:10px;">* Pastikan "Background graphics" dicentang di menu print.</span>
+        </div>
     </div>
 
     <div class="wrapper">
@@ -145,7 +149,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <tr>
                 <td>
                     <img src="../uploads/<?= $sets['company_logo'] ?? '' ?>" class="logo" onerror="this.style.display='none'">
-                    <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?></div>
+                    <div class="company-addr" contenteditable="true"><?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?></div>
                 </td>
                 <td align="right" valign="top"><div class="doc-title">DELIVERY ORDER</div></td>
             </tr>
@@ -155,18 +159,39 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <tr>
                 <td class="info-box">
                     <table class="inner-table">
-                        <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($display_client_name) ?></strong></td></tr>
-                        <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($display_address)) ?></td></tr>
-                        <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
+                        <tr>
+                            <td class="lbl">To</td><td class="sep">:</td>
+                            <td><strong contenteditable="true"><?= htmlspecialchars($display_client_name ?? '') ?></strong></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Address</td><td class="sep">:</td>
+                            <td><div contenteditable="true"><?= nl2br(htmlspecialchars($display_address ?? '')) ?></div></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Attn.</td><td class="sep">:</td>
+                            <td><div contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div></td>
+                        </tr>
                     </table>
                 </td>
                 <td style="width:4%"></td>
                 <td class="info-box">
                     <table class="inner-table">
-                        <tr><td class="lbl">Delivery Date</td><td class="sep">:</td><td><?= isset($do['do_date']) ? date('d/m/Y', strtotime($do['do_date'])) : '-' ?></td></tr>
-                        <tr><td class="lbl">Delivery No</td><td class="sep">:</td><td><strong><?= $do['do_number'] ?? '-' ?></strong></td></tr>
-                        <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= htmlspecialchars($display_pic) ?></td></tr>
-                        <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= htmlspecialchars($display_phone) ?></td></tr>
+                        <tr>
+                            <td class="lbl">Delivery Date</td><td class="sep">:</td>
+                            <td><div contenteditable="true"><?= isset($do['do_date']) ? date('d/m/Y', strtotime($do['do_date'])) : '-' ?></div></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Delivery No</td><td class="sep">:</td>
+                            <td><strong contenteditable="true"><?= $do['do_number'] ?? '-' ?></strong></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Contact</td><td class="sep">:</td>
+                            <td><div contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div></td>
+                        </tr>
+                        <tr>
+                            <td class="lbl">Tel</td><td class="sep">:</td>
+                            <td><div contenteditable="true"><?= htmlspecialchars($display_phone ?? '') ?></div></td>
+                        </tr>
                     </table>
                 </td>
             </tr>
@@ -192,10 +217,10 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                 ?>
                 <tr>
                     <td><?= $no++ ?></td>
-                    <td class="text-left"><?= htmlspecialchars($itm['item_name'] ?? '') ?></td>
-                    <td><?= floatval($itm['qty']) ?></td>
-                    <td><?= htmlspecialchars($itm['charge_mode'] ?? '') ?></td>
-                    <td class="text-left"><?= htmlspecialchars($itm['description'] ?? '') ?></td>
+                    <td class="text-left"><div contenteditable="true"><?= htmlspecialchars($itm['item_name'] ?? '') ?></div></td>
+                    <td><div contenteditable="true"><?= floatval($itm['qty']) ?></div></td>
+                    <td><div contenteditable="true"><?= htmlspecialchars($itm['charge_mode'] ?? '') ?></div></td>
+                    <td class="text-left"><div contenteditable="true"><?= htmlspecialchars($itm['description'] ?? '') ?></div></td>
                 </tr>
                 <?php endforeach; ?>
                 
@@ -205,7 +230,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
 
                 <tr>
                     <td colspan="2" class="text-right" style="font-weight:bold;">Total Unit</td>
-                    <td style="font-weight:bold;"><?= $finalTotal ?></td>
+                    <td style="font-weight:bold;"><div contenteditable="true"><?= $finalTotal ?></div></td>
                     <td colspan="2"></td>
                 </tr>
             </tbody>
@@ -215,11 +240,13 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
             <tr>
                 <td class="footer-col remarks-col">
                     <strong>Remarks :</strong>
-                    <ul style="padding-left:15px; margin-top:5px;">
-                        <li>Please sign and stamp this delivery order</li>
-                        <li>Please send it via email and whatsapp</li>
-                        <li>Items that have been purchased cannot be returned</li>
-                    </ul>
+                    <div contenteditable="true">
+                        <ul style="padding-left:15px; margin-top:5px;">
+                            <li>Please sign and stamp this delivery order</li>
+                            <li>Please send it via email and whatsapp</li>
+                            <li>Items that have been purchased cannot be returned</li>
+                        </ul>
+                    </div>
                 </td>
                 <td class="footer-col sender-col">
                     <div class="sign-title">Sender</div>
@@ -242,12 +269,12 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                         ?>
                         <?php if($src): ?><img src="<?= $src ?>" class="sign-img"><?php endif; ?>
                     </div>
-                    <div class="sign-name"><?= htmlspecialchars($do['sender_name'] ?? 'Admin') ?></div>
+                    <div class="sign-name" contenteditable="true"><?= htmlspecialchars($do['sender_name'] ?? 'Admin') ?></div>
                 </td>
                 <td class="footer-col recipient-col">
                     <div class="sign-title">Recipient</div>
                     <div class="sign-area"><div class="sign-line"></div></div>
-                    <div class="sign-name"><?= htmlspecialchars($display_pic) ?></div>
+                    <div class="sign-name" contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div>
                 </td>
             </tr>
         </table>
