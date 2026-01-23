@@ -372,7 +372,7 @@ $right_col_class = $is_default_page ? 'd-none d-lg-block' : 'd-block';
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label small fw-bold">Jenis Ticket</label>
-                                    <select name="type" class="form-select"><option value="support">Support</option><option value="payment">Payment</option></select>
+                                    <select name="type" class="form-select"><option value="support">Support</option><option value="information">Information</option></select>
                                 </div>
                                 <div class="col-md-6"><label class="form-label small fw-bold">Email</label><input type="email" name="email" class="form-control" required></div>
                                 <div class="col-md-6"><label class="form-label small fw-bold">Perusahaan</label><input type="text" name="company" class="form-control" required></div>
