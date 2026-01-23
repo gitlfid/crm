@@ -127,7 +127,7 @@ $result = $conn->query($sql);
                                         <?php 
                                             $typeColor = 'secondary';
                                             if($row['type'] == 'support') $typeColor = 'info';
-                                            // elseif($row['type'] == 'payment') $typeColor = 'warning';
+                                            elseif($row['type'] == 'payment') $typeColor = 'warning';
                                             elseif($row['type'] == 'info') $typeColor = 'primary';
                                         ?>
                                         <span class="badge bg-<?= $typeColor ?> bg-opacity-25 text-<?= $typeColor ?> mb-1" style="font-size: 0.7rem;">
