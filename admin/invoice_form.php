@@ -24,7 +24,7 @@ if (isset($_GET['source_id'])) {
     
     if(!$source_data) die("Data Quotation tidak ditemukan.");
 
-    // Ambil Item Quotation untuk ditampilkan sebagai DEFAULT VALUE (Editable)
+    // Ambil Item Quotation
     $resItems = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = $q_id");
     while($itm = $resItems->fetch_assoc()) {
         $source_items[] = $itm;
@@ -38,25 +38,20 @@ $clients = $conn->query("SELECT * FROM clients ORDER BY company_name ASC");
 // --- PROSES SIMPAN INVOICE ---
 if (isset($_POST['save_invoice'])) {
     $inv_no = $conn->real_escape_string($_POST['invoice_no']);
-    
-    // [BARU] TANGKAP INVOICE TYPE
     $inv_type = $conn->real_escape_string($_POST['invoice_type']);
-    
     $inv_date = $_POST['invoice_date'];
     $due_date = $_POST['due_date'];
     $pymt_method = $conn->real_escape_string($_POST['payment_method_col']);
     
-    // Ambil Mata Uang untuk Logika Format Angka
     $curr = isset($_POST['currency']) ? $_POST['currency'] : 'IDR';
 
-    // Ambil Data Form Item
     $items = $_POST['item_name'];
     $qtys  = $_POST['qty'];
-    $prices= $_POST['unit_price']; // Format TEXT (bisa titik/koma)
+    $prices= $_POST['unit_price']; 
     $descs = $_POST['description'];
     $cards = isset($_POST['card_type']) ? $_POST['card_type'] : [];
     
-    // Tentukan Quotation ID yang akan direferensikan oleh Invoice
+    // Tentukan Quotation ID
     if ($is_manual) {
         $client_id = intval($_POST['client_id']);
         $po_ref = isset($_POST['po_ref']) ? $conn->real_escape_string($_POST['po_ref']) : '';
@@ -73,7 +68,6 @@ if (isset($_POST['save_invoice'])) {
             for ($i = 0; $i < count($items); $i++) {
                 if (!empty($items[$i])) {
                     $it_name = $conn->real_escape_string($items[$i]);
-                    // [UPDATE] Gunakan floatval agar desimal tersimpan jika ada input manual
                     $raw_qty = str_replace(',', '.', $qtys[$i]);
                     $it_qty  = floatval($raw_qty);
                     
@@ -82,10 +76,10 @@ if (isset($_POST['save_invoice'])) {
                     $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
                     
                     if ($curr == 'IDR') {
-                        $clean_price = str_replace('.', '', $clean_price); 
-                        $clean_price = str_replace(',', '.', $clean_price); 
+                        $clean_price = str_replace('.', '', $clean_price); // Hapus ribuan
+                        $clean_price = str_replace(',', '.', $clean_price); // Ubah desimal
                     } else {
-                        $clean_price = str_replace(',', '', $clean_price); 
+                        $clean_price = str_replace(',', '', $clean_price); // Hapus ribuan USD
                     }
                     $it_prc = floatval($clean_price);
                     // ------------------------------------
@@ -106,7 +100,6 @@ if (isset($_POST['save_invoice'])) {
     }
 
     // --- INSERT INVOICE ---
-    // [UPDATE] Tambahkan invoice_type ke INSERT
     $sqlInv = "INSERT INTO invoices (invoice_no, invoice_type, quotation_id, invoice_date, due_date, status, payment_method, created_by_user_id) 
                VALUES ('$inv_no', '$inv_type', $quot_id_ref, '$inv_date', '$due_date', 'draft', '$pymt_method', $my_id)";
     
@@ -118,7 +111,6 @@ if (isset($_POST['save_invoice'])) {
             for ($i = 0; $i < count($items); $i++) {
                 if (!empty($items[$i])) {
                     $it_name = $conn->real_escape_string($items[$i]);
-                    // [UPDATE] Gunakan floatval agar desimal tersimpan
                     $raw_qty = str_replace(',', '.', $qtys[$i]);
                     $it_qty  = floatval($raw_qty);
                     
@@ -144,7 +136,6 @@ if (isset($_POST['save_invoice'])) {
             }
         }
         
-        // Update status quotation asli
         if (!$is_manual) {
             $conn->query("UPDATE quotations SET status='invoiced' WHERE id=$quot_id_ref");
         }
@@ -302,12 +293,26 @@ if (isset($_POST['save_invoice'])) {
                         </thead>
                         <tbody>
                             <?php if(!$is_manual): ?>
-                                <?php foreach($source_items as $itm): ?>
+                                <?php foreach($source_items as $itm): 
+                                    // [FIX LOGIKA] Format harga sesuai mata uang SEBELUM ditampilkan di input
+                                    $db_price = floatval($itm['unit_price']);
+                                    $curr_src = $source_data['currency'] ?? 'IDR';
+                                    
+                                    if ($curr_src == 'IDR') {
+                                        // IDR: 100000.00 -> 100.000
+                                        $display_price = number_format($db_price, 0, ',', '.');
+                                    } else {
+                                        // USD: 1000.00 -> 1,000.00
+                                        $display_price = number_format($db_price, 2, '.', ',');
+                                    }
+                                ?>
                                 <tr>
                                     <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($itm['item_name']) ?>" required></td>
                                     <td><input type="text" name="card_type[]" class="form-control" value="<?= htmlspecialchars($itm['card_type']) ?>"></td>
                                     <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="<?= $itm['qty'] ?>" required></td>
-                                    <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $itm['unit_price'] ?>" required></td>
+                                    
+                                    <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $display_price ?>" required></td>
+                                    
                                     <td><input type="text" name="description[]" class="form-control" value="<?= htmlspecialchars($itm['description']) ?>"></td>
                                     <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                                 </tr>
@@ -338,12 +343,9 @@ if (isset($_POST['save_invoice'])) {
 <?php include 'includes/footer.php'; ?>
 
 <script>
-    // [BARU] FUNGSI AUTO SET CURRENCY BERDASARKAN TIPE
     function autoSetCurrency() {
         var type = document.getElementById('invoice_type').value;
         var curr = document.getElementById('currency');
-        
-        // Hanya ubah jika elemen currency ada (manual mode)
         if(curr) {
             if(type === 'International') {
                 curr.value = 'USD';
@@ -389,7 +391,7 @@ if (isset($_POST['save_invoice'])) {
             inputs[i].value = ""; 
             if(inputs[i].name == "qty[]") {
                 inputs[i].value="1"; 
-                inputs[i].setAttribute("step", "any"); // Pastikan baris baru support desimal
+                inputs[i].setAttribute("step", "any"); 
             }
         }
         table.appendChild(newRow);
