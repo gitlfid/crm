@@ -76,10 +76,10 @@ if (isset($_POST['save_invoice'])) {
                     $clean_price = str_replace(['Rp', '$', ' '], '', $raw_price);
                     
                     if ($curr == 'IDR') {
-                        $clean_price = str_replace('.', '', $clean_price); // Hapus ribuan
-                        $clean_price = str_replace(',', '.', $clean_price); // Ubah desimal
+                        $clean_price = str_replace('.', '', $clean_price); 
+                        $clean_price = str_replace(',', '.', $clean_price); 
                     } else {
-                        $clean_price = str_replace(',', '', $clean_price); // Hapus ribuan USD
+                        $clean_price = str_replace(',', '', $clean_price); 
                     }
                     $it_prc = floatval($clean_price);
                     // ------------------------------------
@@ -132,6 +132,33 @@ if (isset($_POST['save_invoice'])) {
                     
                     $conn->query("INSERT INTO invoice_items (invoice_id, item_name, qty, unit_price, description, card_type) 
                                   VALUES ($invoice_id, '$it_name', $it_qty, $it_prc, '$it_dsc', '$it_card')");
+                }
+            }
+        }
+
+        // --- [FITUR BARU] INSERT ADJUSTMENTS (MULTIPLE ROWS) ---
+        if (isset($_POST['adj_label']) && isset($_POST['adj_amount'])) {
+            $adj_labels = $_POST['adj_label'];
+            $adj_amounts = $_POST['adj_amount'];
+
+            for ($j = 0; $j < count($adj_labels); $j++) {
+                if (!empty($adj_labels[$j])) {
+                    $lbl = $conn->real_escape_string($adj_labels[$j]);
+                    $raw_amt = $adj_amounts[$j];
+                    
+                    // Bersihkan Format Uang Adjustment
+                    $clean_amt = str_replace(['Rp', '$', ' '], '', $raw_amt);
+                    if ($curr == 'IDR') {
+                        $clean_amt = str_replace('.', '', $clean_amt); 
+                        $clean_amt = str_replace(',', '.', $clean_amt); 
+                    } else {
+                        $clean_amt = str_replace(',', '', $clean_amt); 
+                    }
+                    $amt_db = floatval($clean_amt);
+
+                    if ($amt_db != 0) {
+                        $conn->query("INSERT INTO invoice_adjustments (invoice_id, label, amount) VALUES ($invoice_id, '$lbl', '$amt_db')");
+                    }
                 }
             }
         }
@@ -226,7 +253,7 @@ if (isset($_POST['save_invoice'])) {
                     <div class="card-body pt-3">
                         <div class="mb-2">
                             <label class="fw-bold">Invoice No</label>
-                            <input type="text" name="invoice_no" class="form-control fw-bold fs-5" value="<?= $auto_inv ?>">
+                            <input type="text" name="invoice_no" class="form-control fw-bold fs-5" value="<?= $auto_inv ?>" readonly>
                         </div>
                         
                         <div class="mb-3">
@@ -268,6 +295,20 @@ if (isset($_POST['save_invoice'])) {
                             <label>Payment Method Label (Table)</label>
                             <input type="text" name="payment_method_col" class="form-control" value="Prepaid">
                         </div>
+
+                        <div class="mt-4 pt-3 border-top">
+                            <label class="fw-bold text-success mb-2">Adjustments (Optional)</label>
+                            <table class="table table-sm table-borderless mb-2" id="adjTable">
+                                <tr>
+                                    <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)"></td>
+                                    <td width="40%"><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount"></td>
+                                    <td width="10%"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
+                                </tr>
+                            </table>
+                            <button type="button" class="btn btn-sm btn-outline-success w-100 border-dashed" onclick="addAdjRow()">+ Add Adjustment Row</button>
+                            <div class="text-muted small mt-1 fst-italic">* Gunakan tanda minus (-) untuk pengurangan/diskon.</div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -397,13 +438,31 @@ if (isset($_POST['save_invoice'])) {
         table.appendChild(newRow);
     }
 
+    // [BARU] FUNGSI TAMBAH BARIS ADJUSTMENT
+    function addAdjRow() {
+        var table = document.getElementById("adjTable");
+        var newRow = table.insertRow();
+        newRow.innerHTML = `
+            <td><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label"></td>
+            <td><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
+        `;
+    }
+
     function removeRow(btn) {
         var row = btn.parentNode.parentNode;
         var table = row.parentNode;
-        if(table.rows.length > 1) {
-            table.removeChild(row);
-        } else {
+        
+        // Cek apakah ini tabel Item atau Adjustment
+        if (table.closest('#itemTable') && table.rows.length <= 1) {
             alert("Invoice minimal harus memiliki 1 item.");
+        } else {
+            // Jika adjustment, bisa dihapus meski tinggal 1
+            if (table.closest('#adjTable')) {
+                row.remove();
+            } else {
+                table.removeChild(row);
+            }
         }
     }
 </script>

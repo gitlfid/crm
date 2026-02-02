@@ -30,7 +30,18 @@ if ($check_items && $check_items->num_rows > 0) {
     while($row = $resQ->fetch_assoc()) { $itemsData[] = $row; }
 }
 
-// 3. AMBIL SETTINGS
+// 3. [BARU] AMBIL ADJUSTMENTS (Multiple Rows)
+$adjData = [];
+// Cek tabel exist dulu jaga-jaga
+$checkTable = $conn->query("SHOW TABLES LIKE 'invoice_adjustments'");
+if ($checkTable && $checkTable->num_rows > 0) {
+    $resAdj = $conn->query("SELECT * FROM invoice_adjustments WHERE invoice_id = $id");
+    if ($resAdj) {
+        while($row = $resAdj->fetch_assoc()) { $adjData[] = $row; }
+    }
+}
+
+// 4. AMBIL SETTINGS
 $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
@@ -137,7 +148,10 @@ function format_money($num, $is_intl) {
 
     <div class="no-print">
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
-        <div style="margin-top:5px; color:red; font-size:11px;">* Mode: <strong><?= $inv_type ?></strong> (Currency: <?= $inv['currency'] ?>)</div>
+        <div style="margin-top:5px; color:red; font-size:11px;">
+            * Mode: <strong><?= $inv_type ?></strong> (Currency: <?= $inv['currency'] ?>)<br>
+            * Adjustment (DP, Fee, dll) akan muncul otomatis jika sudah diinput.
+        </div>
     </div>
 
     <table class="header-table">
@@ -197,8 +211,6 @@ function format_money($num, $is_intl) {
                 $lineTotal = $qty * $price;
                 $grandTotal += $lineTotal;
                 
-                // [FIX] PRIORITASKAN PAYMENT METHOD DARI HEADER INVOICE (PREPAID)
-                // Jika Header kosong, baru ambil dari Item Card Type, jika kosong lagi baru default Prepaid.
                 $payMethod = !empty($inv['payment_method']) ? $inv['payment_method'] : (!empty($item['card_type']) ? $item['card_type'] : 'Prepaid');
             ?>
             <tr>
@@ -219,7 +231,7 @@ function format_money($num, $is_intl) {
             <?php endforeach; ?>
             
             <?php 
-                // PERHITUNGAN TOTAL
+                // PERHITUNGAN TOTAL DENGAN ADJUSTMENT
                 if ($is_international) {
                     $vatAmount = 0;
                     $grandTotal = round($grandTotal, 2); 
@@ -227,7 +239,15 @@ function format_money($num, $is_intl) {
                     $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
                 }
+                
                 $totalAll = $grandTotal + $vatAmount;
+                
+                // Tambahkan Adjustment ke Kalkulasi Total
+                $totalAdj = 0;
+                foreach ($adjData as $adj) {
+                    $totalAdj += floatval($adj['amount']);
+                }
+                $totalAll += $totalAdj;
             ?>
             
             <tr class="summary-row">
@@ -243,6 +263,14 @@ function format_money($num, $is_intl) {
                 <td class="value-cell" contenteditable="true"><?= format_money($vatAmount, $is_international) ?></td>
             </tr>
             <?php endif; ?>
+
+            <?php foreach($adjData as $adj): ?>
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell" contenteditable="true"><?= htmlspecialchars($adj['label']) ?></td>
+                <td class="value-cell" contenteditable="true"><?= format_money($adj['amount'], $is_international) ?></td>
+            </tr>
+            <?php endforeach; ?>
 
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
@@ -280,12 +308,11 @@ function format_money($num, $is_intl) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    // LOGIKA SIGNATURE (Force Niawati jika di set)
+                    // LOGIKA SIGNATURE (Tetap dipertahankan)
                     $signPath = '';
                     $signerName = 'Niawati'; 
                     $baseDir = dirname(__DIR__);
 
-                    // Cari User Niawati
                     $sqlNia = "SELECT id, username, signature_file FROM users WHERE username LIKE '%Niawati%' OR email LIKE '%nia@%' LIMIT 1";
                     $resNia = $conn->query($sqlNia);
                     $nia = $resNia->fetch_assoc();
