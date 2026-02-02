@@ -82,7 +82,7 @@ function sendEmailNotification($to, $subject, $body) {
 }
 
 // ==========================================
-// [RESTORED] FUNGSI GENERATE ID TICKET (EKSTERNAL)
+// [PENTING] FUNGSI TIKET DIKEMBALIKAN (AGAR TIDAK ERROR)
 // ==========================================
 function generateTicketID($type, $conn) {
     $prefixMap = ['support' => 'LFID-SUP', 'payment' => 'LFID-PAY', 'info' => 'LFID-INFO'];
@@ -101,9 +101,6 @@ function generateTicketID($type, $conn) {
     return "$prefix-$date-$newNum";
 }
 
-// ==========================================
-// [RESTORED] FUNGSI GENERATE ID TICKET (INTERNAL)
-// ==========================================
 function generateInternalTicketID($target_division_id, $conn) {
     $res = $conn->query("SELECT code FROM divisions WHERE id = $target_division_id");
     $divCode = ($res->num_rows > 0) ? $res->fetch_object()->code : 'GEN';
@@ -126,72 +123,7 @@ function generateInternalTicketID($target_division_id, $conn) {
 }
 
 // ==========================================
-// FUNGSI GENERATE NOMOR QUOTATION (CONTINUOUS)
-// Format: QLF + YYYYMM + 4 Digit Urut (Tidak Reset)
-// ==========================================
-function generateQuotationNo($conn) {
-    $prefixToday = "QLF" . date('Ym'); 
-    
-    // Cari nomor terakhir (tanpa filter tanggal agar urutan lanjut terus)
-    $sql = "SELECT quotation_no FROM quotations WHERE quotation_no LIKE 'QLF%' ORDER BY id DESC LIMIT 1";
-    $res = $conn->query($sql);
-    
-    $newSeq = 1;
-    if ($res && $res->num_rows > 0) {
-        $lastNo = $res->fetch_assoc()['quotation_no'];
-        // Ambil 4 digit terakhir
-        $lastSeq = intval(substr($lastNo, -4));
-        $newSeq = $lastSeq + 1;
-    }
-    
-    return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
-}
-
-// ==========================================
-// FUNGSI GENERATE NOMOR INVOICE (CONTINUOUS)
-// Format: INVLF + YYYYMM + 4 Digit Urut (Tidak Reset)
-// ==========================================
-function generateInvoiceNo($conn) {
-    $prefixToday = "INVLF" . date('Ym'); 
-    
-    // Cari nomor terakhir (tanpa filter tanggal agar urutan lanjut terus)
-    $sql = "SELECT invoice_no FROM invoices WHERE invoice_no LIKE 'INVLF%' ORDER BY id DESC LIMIT 1";
-    $res = $conn->query($sql);
-    
-    $newSeq = 1;
-    if ($res && $res->num_rows > 0) {
-        $lastNo = $res->fetch_assoc()['invoice_no'];
-        // Ambil 4 digit terakhir
-        $lastSeq = intval(substr($lastNo, -4));
-        $newSeq = $lastSeq + 1;
-    }
-    
-    return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
-}
-
-// ==========================================
-// FUNGSI GENERATE NOMOR DO (CONTINUOUS)
-// Format: DO + YYYYMM + 4 Digit Urut (Tidak Reset)
-// ==========================================
-function generateDONumber($conn) {
-    $prefixToday = "DO" . date('Ym'); 
-    
-    // Cari nomor terakhir
-    $sql = "SELECT do_number FROM delivery_orders WHERE do_number LIKE 'DO%' ORDER BY id DESC LIMIT 1";
-    $res = $conn->query($sql);
-    
-    $newSeq = 1;
-    if ($res && $res->num_rows > 0) {
-        $lastNo = $res->fetch_assoc()['do_number'];
-        $lastSeq = intval(substr($lastNo, -4));
-        $newSeq = $lastSeq + 1;
-    }
-    
-    return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
-}
-
-// ==========================================
-// FUNGSI BANTUAN (CURL & DISCORD)
+// FUNGSI DISCORD & CURL
 // ==========================================
 function executeCurl($url, $payload) {
     $ch = curl_init($url);
@@ -267,5 +199,66 @@ function sendInternalDiscord($title, $message, $fields = [], $thread_id = null) 
     
     $url = $webhookurl . "?wait=true" . ($thread_id ? "&thread_id=$thread_id" : "");
     return executeCurl($url, $payload);
+}
+
+// ==========================================
+// 1. GENERATE NOMOR QUOTATION (CONTINUOUS)
+// ==========================================
+function generateQuotationNo($conn) {
+    $prefixToday = "QLF" . date('Ym'); 
+    
+    $sql = "SELECT quotation_no FROM quotations WHERE quotation_no LIKE 'QLF%' ORDER BY id DESC LIMIT 1";
+    $res = $conn->query($sql);
+    
+    $newSeq = 1;
+    if ($res && $res->num_rows > 0) {
+        $lastNo = $res->fetch_assoc()['quotation_no'];
+        $lastSeq = intval(substr($lastNo, -4));
+        $newSeq = $lastSeq + 1;
+    }
+    
+    return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
+}
+
+// ==========================================
+// 2. GENERATE NOMOR INVOICE (CONTINUOUS)
+// ==========================================
+function generateInvoiceNo($conn) {
+    $prefixToday = "INVLF" . date('Ym'); 
+    
+    $sql = "SELECT invoice_no FROM invoices WHERE invoice_no LIKE 'INVLF%' ORDER BY id DESC LIMIT 1";
+    $res = $conn->query($sql);
+    
+    $newSeq = 1;
+    if ($res && $res->num_rows > 0) {
+        $lastNo = $res->fetch_assoc()['invoice_no'];
+        $lastSeq = intval(substr($lastNo, -4));
+        $newSeq = $lastSeq + 1;
+    }
+    
+    return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
+}
+
+// ==========================================
+// 3. GENERATE NOMOR DO (CONTINUOUS - UPDATED)
+// ==========================================
+function generateDONumber($conn) {
+    // Format Prefix: DO + YYYYMM (Sesuai Permintaan)
+    $prefixToday = "DO" . date('Ym'); 
+    
+    // Cari nomor terakhir yang depannya 'DO' 
+    // (Tanpa filter tanggal spesifik agar sequence jalan terus)
+    $sql = "SELECT do_number FROM delivery_orders WHERE do_number LIKE 'DO%' ORDER BY id DESC LIMIT 1";
+    $res = $conn->query($sql);
+    
+    $newSeq = 1;
+    if ($res && $res->num_rows > 0) {
+        $lastNo = $res->fetch_assoc()['do_number'];
+        // Ambil 4 digit terakhir
+        $lastSeq = intval(substr($lastNo, -4));
+        $newSeq = $lastSeq + 1;
+    }
+    
+    return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
 }
 ?>
