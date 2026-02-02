@@ -226,7 +226,7 @@ if (isset($_POST['save_invoice'])) {
                     <div class="card-body pt-3">
                         <div class="mb-2">
                             <label class="fw-bold">Invoice No</label>
-                            <input type="text" name="invoice_no" class="form-control fw-bold fs-5" value="<?= $auto_inv ?>" readonly>
+                            <input type="text" name="invoice_no" class="form-control fw-bold fs-5" value="<?= $auto_inv ?>">
                         </div>
                         
                         <div class="mb-3">
