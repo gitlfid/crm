@@ -122,13 +122,11 @@ if (isset($_POST['export_excel'])) {
         $tax_rate = $is_international ? 0 : 0.11;
         $vat = $calcSub * $tax_rate;
 
-        // Logika Rounding Excel (Disamakan dengan List)
+        // Logika Rounding Excel
         if (!$is_international) {
             $calcSub = round($calcSub, 0, PHP_ROUND_HALF_DOWN);
             $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
         } else {
-            // Untuk Excel International, biasanya tetap butuh desimal untuk akurasi data
-            // Tapi jika ingin sama persis dengan list, bisa diubah jadi round($..., 0)
             $calcSub = round($calcSub, 2);
             $vat = round($vat, 2);
         }
@@ -191,16 +189,18 @@ include 'includes/sidebar.php';
 
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
-// --- LOGIKA ACTION: PAYMENT ---
+// --- LOGIKA ACTION: PAYMENT (DENGAN DP & NOTE) ---
 if (isset($_POST['confirm_payment'])) {
     $inv_id = intval($_POST['invoice_id']);
     $pay_date = $_POST['payment_date'];
     $amount_input = floatval(str_replace(['.', ','], '', $_POST['amount']));
     $grand_total_system = floatval($_POST['grand_total_system']);
+    $notes = isset($_POST['payment_notes']) ? $conn->real_escape_string($_POST['payment_notes']) : '';
     $user_id = $_SESSION['user_id'];
 
-    if (abs($amount_input - $grand_total_system) > 1) {
-        echo "<script>alert('GAGAL: Nominal pembayaran tidak sesuai dengan Total Tagihan!'); window.location='invoice_list.php';</script>";
+    // [UPDATE] Validasi dilonggarkan: Mengizinkan DP (kurang dari total), tapi menolak Overpayment
+    if ($amount_input > ($grand_total_system + 100)) { // Tolerance 100 perak
+        echo "<script>alert('GAGAL: Nominal pembayaran melebihi total tagihan!'); window.location='invoice_list.php';</script>";
         exit;
     }
 
@@ -219,10 +219,21 @@ if (isset($_POST['confirm_payment'])) {
     }
 
     if ($proof_file) {
-        $sqlPay = "INSERT INTO payments (invoice_id, payment_date, amount, proof_file, created_by) 
-                   VALUES ($inv_id, '$pay_date', $amount_input, '$proof_file', $user_id)";
+        // [UPDATE] Insert dengan Notes
+        $sqlPay = "INSERT INTO payments (invoice_id, payment_date, amount, proof_file, created_by, notes) 
+                   VALUES ($inv_id, '$pay_date', $amount_input, '$proof_file', $user_id, '$notes')";
+        
         if ($conn->query($sqlPay)) {
-            $conn->query("UPDATE invoices SET status='paid' WHERE id=$inv_id");
+            // Update Status Invoice
+            // Jika Lunas (Total bayar >= Total tagihan), set Paid. Jika kurang, biarkan Partial/Sent (tergantung kebutuhan).
+            // Di sini kita set 'paid' jika sudah lunas/mendekati lunas.
+            if ($amount_input >= ($grand_total_system - 100)) {
+                $conn->query("UPDATE invoices SET status='paid' WHERE id=$inv_id");
+            } else {
+                // Opsional: Anda bisa menambah status 'partial' di enum database jika mau
+                // $conn->query("UPDATE invoices SET status='partial' WHERE id=$inv_id");
+            }
+            
             echo "<script>alert('Pembayaran berhasil disimpan!'); window.location='payment_list.php';</script>";
         }
     } else {
@@ -259,7 +270,7 @@ if (isset($_POST['upload_tax_invoice'])) {
     }
 }
 
-// --- LOGIKA ACTION: DELETE (ADMIN) & STATUS ---
+// --- LOGIKA ACTION: DELETE & STATUS ---
 if (isset($_GET['action']) && isset($_GET['id'])) {
     $id = intval($_GET['id']);
     $act = $_GET['action'];
@@ -297,7 +308,11 @@ $sql = "SELECT i.*, c.company_name, q.quotation_no, q.currency,
             (SELECT SUM(qty * unit_price) FROM invoice_items WHERE invoice_id = i.id),
             (SELECT SUM(qty * unit_price) FROM quotation_items WHERE quotation_id = i.quotation_id)
         ) as sub_total,
-        (SELECT COUNT(*) FROM delivery_orders do JOIN payments pay ON do.payment_id = pay.id WHERE pay.invoice_id = i.id) as do_count
+        COALESCE(
+            (SELECT SUM(amount) FROM invoice_adjustments WHERE invoice_id = i.id), 0
+        ) as total_adjustment,
+        (SELECT COUNT(*) FROM delivery_orders do JOIN payments pay ON do.payment_id = pay.id WHERE pay.invoice_id = i.id) as do_count,
+        (SELECT SUM(amount) FROM payments WHERE invoice_id = i.id) as total_paid
         FROM invoices i 
         JOIN quotations q ON i.quotation_id=q.id 
         JOIN clients c ON q.client_id=c.id 
@@ -309,30 +324,11 @@ $res = $conn->query($sql);
 
 <style>
     .table-responsive { overflow: visible !important; }
-    
     .table-compact { font-size: 0.85rem; }
-    .table-compact thead th { 
-        font-size: 0.8rem; 
-        text-transform: uppercase; 
-        letter-spacing: 0.5px; 
-        background-color: #f8f9fa;
-        color: #6c757d;
-        padding: 10px 12px;
-    }
-    .table-compact tbody td { 
-        padding: 8px 12px; 
-        vertical-align: middle; 
-    }
-    
+    .table-compact thead th { font-size: 0.8rem; text-transform: uppercase; background-color: #f8f9fa; color: #6c757d; padding: 10px 12px; }
+    .table-compact tbody td { padding: 8px 12px; vertical-align: middle; }
     .badge-status { font-size: 0.7rem; padding: 5px 8px; }
-    
-    .btn-note-icon {
-        border: none;
-        background: transparent;
-        padding: 4px;
-        color: #adb5bd; 
-        transition: all 0.2s;
-    }
+    .btn-note-icon { border: none; background: transparent; padding: 4px; color: #adb5bd; transition: all 0.2s; }
     .btn-note-icon:hover { color: #0d6efd; transform: scale(1.1); }
     .btn-note-icon.has-note { color: #ffc107; }
 </style>
@@ -352,7 +348,6 @@ $res = $conn->query($sql);
 </div>
 
 <div class="page-content">
-    
     <div class="card shadow-sm mb-3">
         <div class="card-body py-3 px-4">
             <form method="GET">
@@ -366,9 +361,7 @@ $res = $conn->query($sql);
                     <div class="col-md-4">
                         <select name="client_id" class="form-select form-select-sm">
                             <option value="">- Semua Perusahaan -</option>
-                            <?php if($clients->num_rows > 0) {
-                                $clients->data_seek(0);
-                                while($c = $clients->fetch_assoc()): ?>
+                            <?php if($clients->num_rows > 0) { $clients->data_seek(0); while($c = $clients->fetch_assoc()): ?>
                                 <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($c['company_name']) ?>
                                 </option>
@@ -386,12 +379,8 @@ $res = $conn->query($sql);
                     </div>
                 </div>
                 <div class="row g-2">
-                    <div class="col-md-2">
-                        <input type="date" name="start_date" class="form-control form-control-sm" value="<?= htmlspecialchars($f_start_date) ?>">
-                    </div>
-                    <div class="col-md-2">
-                        <input type="date" name="end_date" class="form-control form-control-sm" value="<?= htmlspecialchars($f_end_date) ?>">
-                    </div>
+                    <div class="col-md-2"><input type="date" name="start_date" class="form-control form-control-sm" value="<?= htmlspecialchars($f_start_date) ?>"></div>
+                    <div class="col-md-2"><input type="date" name="end_date" class="form-control form-control-sm" value="<?= htmlspecialchars($f_end_date) ?>"></div>
                     <div class="col-md-3">
                         <select name="tax_status" class="form-select form-select-sm">
                             <option value="">- Filter Faktur Pajak -</option>
@@ -399,9 +388,7 @@ $res = $conn->query($sql);
                             <option value="pending" <?= $f_tax=='pending'?'selected':'' ?>>Pending</option>
                         </select>
                     </div>
-                    <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary btn-sm w-100">Apply Filter</button>
-                    </div>
+                    <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Apply Filter</button></div>
                     <div class="col-md-3 text-end">
                         <button type="submit" formaction="invoice_list.php" formmethod="POST" name="export_excel" class="btn btn-success btn-sm w-100 text-white">
                             <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Excel
@@ -423,9 +410,11 @@ $res = $conn->query($sql);
                             <th>Client</th>
                             <th class="text-center">Type</th>
                             <th class="text-end">Sub Total</th>
+                            <th class="text-end">Adj</th>
                             <th class="text-end">VAT</th>
                             <th class="text-end">Grand Total</th>
-                            <th class="text-center">Note</th> <th class="text-center">Status</th>
+                            <th class="text-center">Note</th> 
+                            <th class="text-center">Status</th>
                             <th class="text-end pe-4">Action</th>
                         </tr>
                     </thead>
@@ -434,37 +423,46 @@ $res = $conn->query($sql);
                             <?php while($row = $res->fetch_assoc()): ?>
                             <?php
                                 $subTotal = floatval($row['sub_total'] ?? 0);
+                                $adjTotal = floatval($row['total_adjustment'] ?? 0);
+                                $totalPaid = floatval($row['total_paid'] ?? 0);
                                 $curr = $row['currency'];
                                 
                                 $is_international = ($row['invoice_type'] == 'International');
                                 $tax_rate = $is_international ? 0 : 0.11;
                                 $vat = $subTotal * $tax_rate;
 
-                                // LOGIKA PEMBULATAN KALKULASI
                                 if (!$is_international) {
-                                    // IDR: 0.5 ke bawah
                                     $subTotal = round($subTotal, 0, PHP_ROUND_HALF_DOWN);
                                     $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
                                 } else {
-                                    // USD: 2 desimal
                                     $subTotal = round($subTotal, 2);
                                     $vat = round($vat, 2);
                                 }
-                                $grandTotal = $subTotal + $vat;
+                                // Grand Total tidak ditambah adjustment di sini karena adjustment hanya info termin
+                                // Tapi jika adjustment berupa biaya tambahan, harusnya ditambah.
+                                // Sesuai diskusi sebelumnya, Adjustment = DP/Termin, jadi tidak mengubah total tagihan dasar.
+                                $grandTotal = $subTotal + $vat; 
                                 
-                                // [UPDATE] LOGIKA FORMAT TAMPILAN
-                                // International sekarang 0 desimal di List View, tapi format USD (koma)
+                                $remaining = $grandTotal - $totalPaid;
+
                                 $fmt = function($n) use ($is_international) {
                                     if ($is_international) return number_format($n, 0, '.', ','); 
                                     return number_format($n, 0, ',', '.');
                                 };
 
                                 $st = $row['status'];
-                                $bg = ($st=='paid')?'success':(($st=='cancel')?'danger':(($st=='sent')?'info':'secondary'));
+                                // Logika Status Tampilan (Bisa Partial)
+                                if ($st != 'cancel' && $totalPaid > 0 && $remaining > 100) {
+                                    $displayStatus = 'PARTIAL';
+                                    $bg = 'warning text-dark';
+                                } else {
+                                    $displayStatus = strtoupper($st);
+                                    $bg = ($st=='paid')?'success':(($st=='cancel')?'danger':(($st=='sent')?'info':'secondary'));
+                                }
+
                                 $hasTax = !empty($row['tax_invoice_file']);
                                 $hasNote = !empty($row['general_notes']);
                                 $noteClass = $hasNote ? 'has-note' : '';
-                                $noteTooltip = $hasNote ? 'Lihat Catatan' : 'Buat Catatan';
                                 $doCount = intval($row['do_count']);
                             ?>
                             <tr>
@@ -472,91 +470,71 @@ $res = $conn->query($sql);
                                     <?= $row['invoice_no'] ?>
                                     <div class="text-muted small fw-normal" style="font-size: 0.7rem;">Ref: <?= $row['quotation_no'] ?></div>
                                     <?php if($hasTax): ?>
-                                        <span class="badge bg-light text-primary border mt-1" style="font-size: 0.6rem;">
-                                            <i class="bi bi-check-circle-fill"></i> Tax Invoice
-                                        </span>
+                                        <span class="badge bg-light text-primary border mt-1" style="font-size: 0.6rem;"><i class="bi bi-check-circle-fill"></i> Tax Invoice</span>
                                     <?php endif; ?>
                                 </td>
                                 <td><?= date('d/m/Y', strtotime($row['invoice_date'])) ?></td>
                                 <td><div class="fw-bold text-truncate" style="max-width: 200px;"><?= htmlspecialchars($row['company_name']) ?></div></td>
-                                
-                                <td class="text-center">
-                                    <span class="badge bg-light text-dark border"><?= $row['invoice_type'] ?></span>
-                                </td>
-                                
+                                <td class="text-center"><span class="badge bg-light text-dark border"><?= $row['invoice_type'] ?></span></td>
                                 <td class="text-end text-muted"><?= $fmt($subTotal) ?></td>
+                                <td class="text-end text-success"><?= $adjTotal != 0 ? $fmt($adjTotal) : '-' ?></td>
                                 <td class="text-end text-muted"><?= $fmt($vat) ?></td>
                                 <td class="text-end fw-bold text-primary">
                                     <small class="text-muted me-1"><?= $curr ?></small><?= $fmt($grandTotal) ?>
-                                </td>
-
-                                <td class="text-center">
-                                    <button class="btn-note-icon <?= $noteClass ?>" 
-                                            onclick="openNoteModal('<?= $row['invoice_no'] ?>')" 
-                                            title="<?= $noteTooltip ?>"
-                                            id="btn-note-<?= $row['invoice_no'] ?>">
-                                        <i class="bi bi-sticky-fill fs-5"></i>
-                                    </button>
-                                </td>
-
-                                <td class="text-center">
-                                    <span class="badge bg-<?= $bg ?> badge-status rounded-pill"><?= strtoupper($st) ?></span>
-                                    <?php if($st == 'paid' && $doCount > 0): ?>
-                                        <div class="mt-1">
-                                            <span class="badge bg-light text-dark border" style="font-size: 0.6rem;"><i class="bi bi-truck me-1"></i> DO Created</span>
-                                        </div>
+                                    <?php if($totalPaid > 0): ?>
+                                        <div class="small text-success mt-1" style="font-size:0.7rem;">Paid: <?= $fmt($totalPaid) ?></div>
                                     <?php endif; ?>
                                 </td>
-                                
+                                <td class="text-center">
+                                    <button class="btn-note-icon <?= $noteClass ?>" onclick="openNoteModal('<?= $row['invoice_no'] ?>')" id="btn-note-<?= $row['invoice_no'] ?>"><i class="bi bi-sticky-fill fs-5"></i></button>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-<?= $bg ?> badge-status rounded-pill"><?= $displayStatus ?></span>
+                                    <?php if($doCount > 0): ?>
+                                        <div class="mt-1"><span class="badge bg-light text-dark border" style="font-size: 0.6rem;"><i class="bi bi-truck me-1"></i> DO Created</span></div>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="text-end pe-4">
                                     <div class="dropdown">
                                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle py-0" style="font-size:0.8rem;" type="button" data-bs-toggle="dropdown">Act</button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 small">
                                             <li><a class="dropdown-item text-primary" href="invoice_print.php?id=<?= $row['id'] ?>" target="_blank"><i class="bi bi-printer me-2"></i> Print PDF</a></li>
                                             <li><button class="dropdown-item" onclick="openTaxModal(<?= $row['id'] ?>, '<?= $row['invoice_no'] ?>')"><i class="bi bi-file-earmark-arrow-up me-2"></i> <?= $hasTax ? 'Update Tax' : 'Upload Tax' ?></button></li>
-                                            
                                             <?php if($hasTax): ?>
                                             <li><a href="../uploads/<?= $row['tax_invoice_file'] ?>" target="_blank" class="dropdown-item"><i class="bi bi-eye me-2"></i> View Tax</a></li>
                                             <?php endif; ?>
-
-                                            <?php if($st == 'paid'): ?>
+                                            
+                                            <?php if($st == 'paid' || $totalPaid > 0): ?>
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li><a class="dropdown-item fw-bold text-dark" href="delivery_order_form.php?from_invoice_id=<?= $row['id'] ?>"><i class="bi bi-truck me-2 text-warning"></i> Create DO</a></li>
                                             <?php endif; ?>
 
                                             <?php if($st != 'paid' && $st != 'cancel'): ?>
                                                 <li><hr class="dropdown-divider"></li>
-                                                
                                                 <?php if($st == 'draft'): ?>
                                                 <li><a class="dropdown-item text-warning" href="invoice_edit.php?id=<?= $row['id'] ?>"><i class="bi bi-pencil me-2"></i> Edit Invoice</a></li>
                                                 <li><a class="dropdown-item text-info" href="?action=sent&id=<?= $row['id'] ?>"><i class="bi bi-send me-2"></i> Mark Sent</a></li>
                                                 <?php endif; ?>
                                                 
-                                                <?php if($st == 'sent'): ?>
-                                                <li><a class="dropdown-item text-secondary" href="?action=draft&id=<?= $row['id'] ?>"><i class="bi bi-arrow-counterclockwise me-2"></i> Revert to Draft</a></li>
-                                                <?php endif; ?>
-                                                
-                                                <li><button class="dropdown-item text-success" onclick="openPayModal(<?= $row['id'] ?>, '<?= $row['invoice_no'] ?>', <?= $grandTotal ?>)"><i class="bi bi-check-circle me-2"></i> Mark Paid</button></li>
+                                                <li><button class="dropdown-item text-success" onclick="openPayModal(<?= $row['id'] ?>, '<?= $row['invoice_no'] ?>', <?= $grandTotal ?>)"><i class="bi bi-check-circle me-2"></i> Add Payment / DP</button></li>
                                                 <li><a class="dropdown-item text-danger" href="?action=cancel&id=<?= $row['id'] ?>" onclick="return confirm('Batalkan Invoice?')"><i class="bi bi-x-circle me-2"></i> Cancel</a></li>
                                             <?php endif; ?>
-
+                                            
                                             <?php if($user_role == 'admin'): ?>
                                                 <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger fw-bold" href="?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('PERINGATAN: Menghapus Invoice akan menghapus Payment dan DO terkait secara permanen. Lanjutkan?')"><i class="bi bi-trash-fill me-2"></i> Delete (Admin)</a></li>
+                                                <li><a class="dropdown-item text-danger fw-bold" href="?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')"><i class="bi bi-trash-fill me-2"></i> Delete</a></li>
                                             <?php endif; ?>
-
                                         </ul>
                                     </div>
                                 </td>
                             </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="9" class="text-center py-5 text-muted small">Tidak ada data invoice.</td></tr>
+                            <tr><td colspan="11" class="text-center py-5 text-muted small">Tidak ada data invoice.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </div>
-            
             <?php if($res->num_rows > 20): ?>
                 <div class="card-footer bg-white border-top text-center py-2 text-muted small">Menampilkan hasil pencarian</div>
             <?php endif; ?>
@@ -567,23 +545,14 @@ $res = $conn->query($sql);
 <div class="modal fade" id="noteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-light py-2">
-                <h6 class="modal-title fw-bold"><i class="bi bi-journal-text me-2 text-primary"></i> Catatan Invoice</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+            <div class="modal-header bg-light py-2"><h6 class="modal-title fw-bold">Catatan Invoice</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <input type="hidden" id="noteInvoiceNo">
-                <div class="mb-2">
-                    <label class="form-label small fw-bold text-muted">Nomor Invoice</label>
-                    <input type="text" id="noteTitle" class="form-control form-control-sm bg-light fw-bold" readonly>
-                </div>
-                <div>
-                    <label class="form-label small fw-bold text-muted">Isi Catatan</label>
-                    <textarea id="generalNotes" class="form-control" rows="8" placeholder="Tulis catatan internal di sini..."></textarea>
-                </div>
+                <input type="text" id="noteTitle" class="form-control form-control-sm bg-light fw-bold mb-2" readonly>
+                <textarea id="generalNotes" class="form-control" rows="8" placeholder="Tulis catatan internal di sini..."></textarea>
             </div>
             <div class="modal-footer bg-light py-2">
-                <span id="saveStatus" class="me-auto small text-success fw-bold" style="display:none;"><i class="bi bi-check-circle"></i> Tersimpan!</span>
+                <span id="saveStatus" class="me-auto small text-success fw-bold" style="display:none;">Tersimpan!</span>
                 <button type="button" class="btn btn-primary btn-sm px-4" onclick="saveNote()">Simpan</button>
             </div>
         </div>
@@ -594,35 +563,44 @@ $res = $conn->query($sql);
     <div class="modal-dialog">
         <form method="POST" enctype="multipart/form-data" class="modal-content" onsubmit="return validatePayment()">
             <div class="modal-header bg-success text-white py-2">
-                <h6 class="modal-title"><i class="bi bi-wallet2 me-2"></i> Konfirmasi Pembayaran</h6>
+                <h6 class="modal-title"><i class="bi bi-wallet2 me-2"></i> Pembayaran / DP</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" name="invoice_id" id="modal_inv_id">
                 <input type="hidden" name="grand_total_system" id="modal_grand_total">
+                
                 <div class="alert alert-light-success border-success text-center py-2 mb-3">
                     <strong id="modal_inv_no" class="d-block"></strong>
-                    <small>Tagihan: <strong class="text-success">Rp <span id="display_total"></span></strong></small>
+                    <small>Total Tagihan: <strong class="text-success">Rp <span id="display_total"></span></strong></small>
                 </div>
+                
                 <div class="mb-2">
                     <label class="form-label small fw-bold">Tanggal Bayar</label>
                     <input type="date" name="payment_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required>
                 </div>
+                
                 <div class="mb-2">
-                    <label class="form-label small fw-bold">Nominal (Harus Sesuai)</label>
+                    <label class="form-label small fw-bold">Nominal Pembayaran (Bisa DP/Partial)</label>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text">Rp</span>
                         <input type="number" name="amount" id="input_amount" class="form-control" required>
                     </div>
-                    <div id="err_msg" class="text-danger small mt-1 fw-bold" style="display:none;">Nominal tidak sesuai!</div>
+                    <div id="err_msg" class="text-danger small mt-1 fw-bold" style="display:none;">Nominal tidak boleh melebihi tagihan!</div>
                 </div>
+                
+                <div class="mb-2">
+                    <label class="form-label small fw-bold">Catatan (Optional)</label>
+                    <textarea name="payment_notes" class="form-control form-control-sm" rows="2" placeholder="Contoh: DP 50%, Termin 1, Pelunasan"></textarea>
+                </div>
+
                 <div class="mb-2">
                     <label class="form-label small fw-bold">Bukti Transfer</label>
                     <input type="file" name="proof_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
                 </div>
             </div>
             <div class="modal-footer py-2">
-                <button type="submit" name="confirm_payment" class="btn btn-success btn-sm w-100">Proses Pembayaran</button>
+                <button type="submit" name="confirm_payment" class="btn btn-success btn-sm w-100">Simpan Pembayaran</button>
             </div>
         </form>
     </div>
@@ -631,24 +609,13 @@ $res = $conn->query($sql);
 <div class="modal fade" id="taxModal" tabindex="-1">
     <div class="modal-dialog">
         <form method="POST" enctype="multipart/form-data" class="modal-content">
-            <div class="modal-header bg-warning text-dark py-2">
-                <h6 class="modal-title"><i class="bi bi-cloud-upload me-2"></i> Upload Faktur Pajak</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+            <div class="modal-header bg-warning text-dark py-2"><h6 class="modal-title">Upload Faktur Pajak</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <input type="hidden" name="tax_invoice_id" id="tax_invoice_id">
-                <div class="mb-2">
-                    <label class="form-label small fw-bold">No. Invoice</label>
-                    <input type="text" id="tax_inv_no" class="form-control form-control-sm bg-light" readonly>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label small fw-bold">File (PDF/JPG/PNG)</label>
-                    <input type="file" name="tax_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
-                </div>
+                <input type="text" id="tax_inv_no" class="form-control form-control-sm bg-light mb-2" readonly>
+                <input type="file" name="tax_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
             </div>
-            <div class="modal-footer py-2">
-                <button type="submit" name="upload_tax_invoice" class="btn btn-warning btn-sm w-100">Upload</button>
-            </div>
+            <div class="modal-footer py-2"><button type="submit" name="upload_tax_invoice" class="btn btn-warning btn-sm w-100">Upload</button></div>
         </form>
     </div>
 </div>
@@ -663,19 +630,14 @@ $res = $conn->query($sql);
         document.getElementById('noteTitle').value = invoiceNo;
         document.getElementById('generalNotes').value = "Loading...";
         document.getElementById('saveStatus').style.display = 'none';
-
+        
         const formData = new FormData();
         formData.append('action', 'load');
         formData.append('invoice_no', invoiceNo);
-
         fetch('ajax_scratchpad.php', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(res => {
-            if(res.status === 'success' && res.data) {
-                document.getElementById('generalNotes').value = res.data.general_notes || '';
-            } else {
-                document.getElementById('generalNotes').value = '';
-            }
+            document.getElementById('generalNotes').value = (res.status === 'success' && res.data) ? (res.data.general_notes || '') : '';
             new bootstrap.Modal(document.getElementById('noteModal')).show();
         });
     }
@@ -684,32 +646,16 @@ $res = $conn->query($sql);
         const inv = document.getElementById('noteInvoiceNo').value;
         const notes = document.getElementById('generalNotes').value;
         const btn = document.getElementById('btn-note-' + inv);
-
         const formData = new FormData();
-        formData.append('action', 'save');
-        formData.append('invoice_no', inv);
-        formData.append('notes', notes);
-        formData.append('calc_data', '[]'); 
-
-        fetch('ajax_scratchpad.php', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(res => {
+        formData.append('action', 'save'); formData.append('invoice_no', inv); formData.append('notes', notes); formData.append('calc_data', '[]'); 
+        
+        fetch('ajax_scratchpad.php', { method: 'POST', body: formData }).then(res => res.json()).then(res => {
             if(res.status === 'success') {
                 const s = document.getElementById('saveStatus');
                 s.style.display = 'inline-block';
-                setTimeout(() => { 
-                    s.style.display = 'none'; 
-                    bootstrap.Modal.getInstance(document.getElementById('noteModal')).hide();
-                }, 1000);
-
-                if(notes.trim() !== "") {
-                    btn.classList.add('has-note');
-                } else {
-                    btn.classList.remove('has-note');
-                }
-            } else {
-                alert('Gagal simpan: ' + res.message);
-            }
+                setTimeout(() => { s.style.display = 'none'; bootstrap.Modal.getInstance(document.getElementById('noteModal')).hide(); }, 1000);
+                if(notes.trim() !== "") btn.classList.add('has-note'); else btn.classList.remove('has-note');
+            } else alert('Gagal simpan: ' + res.message);
         });
     }
 
@@ -732,7 +678,8 @@ $res = $conn->query($sql);
 
     function validatePayment() {
         let inputVal = parseFloat(document.getElementById('input_amount').value);
-        if (isNaN(inputVal) || Math.abs(inputVal - systemTotal) > 1) {
+        // Validasi: Nominal tidak boleh melebihi total tagihan (tapi boleh kurang/DP)
+        if (isNaN(inputVal) || inputVal > (systemTotal + 100)) { 
             document.getElementById('err_msg').style.display = 'block';
             return false;
         }
