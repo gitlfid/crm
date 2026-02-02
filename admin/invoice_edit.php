@@ -17,18 +17,34 @@ if (isset($_POST['update_invoice'])) {
     $due_date = $_POST['due_date'];
     $pymt_method = $conn->real_escape_string($_POST['payment_method_col']);
     
-    // [BARU] TANGKAP INVOICE TYPE
+    // [BARU] TANGKAP INVOICE TYPE & ADJUSTMENT
     $inv_type = $conn->real_escape_string($_POST['invoice_type']);
+    $adj_label = $conn->real_escape_string($_POST['adj_label']);
+    $raw_adj   = $_POST['adj_amount']; // Perlu dibersihkan formatnya
     
     // TENTUKAN CURRENCY BERDASARKAN TYPE (Agar sinkron)
     $new_currency = ($inv_type == 'International') ? 'USD' : 'IDR';
+    
+    // Bersihkan Format Angka Adjustment Sesuai Currency
+    $clean_adj = str_replace(['Rp', '$', ' '], '', $raw_adj);
+    if ($new_currency == 'IDR') {
+        // IDR: 100.000 -> Hapus titik, ubah koma jadi titik desimal (jika ada)
+        $clean_adj = str_replace('.', '', $clean_adj); 
+        $clean_adj = str_replace(',', '.', $clean_adj); 
+    } else {
+        // USD: 1,000.00 -> Hapus koma
+        $clean_adj = str_replace(',', '', $clean_adj); 
+    }
+    $adj_amount_db = floatval($clean_adj);
 
-    // 1. Update Table Invoice Header (Termasuk Type)
+    // 1. Update Table Invoice Header (Termasuk Type & Adjustment)
     $sqlUpdate = "UPDATE invoices SET 
                   invoice_date='$inv_date', 
                   due_date='$due_date', 
                   payment_method='$pymt_method', 
-                  invoice_type='$inv_type' 
+                  invoice_type='$inv_type',
+                  adjustment_label='$adj_label',
+                  adjustment_amount='$adj_amount_db'
                   WHERE id=$inv_id";
     $conn->query($sqlUpdate);
 
@@ -38,7 +54,6 @@ if (isset($_POST['update_invoice'])) {
 
     if (isset($_POST['client_id'])) {
         $new_client_id = intval($_POST['client_id']);
-        // [UPDATE] Update juga Currency di Quotation agar konsisten
         $conn->query("UPDATE quotations SET client_id=$new_client_id, currency='$new_currency' WHERE id=$q_id");
     }
 
@@ -47,7 +62,7 @@ if (isset($_POST['update_invoice'])) {
         $conn->query("UPDATE quotations SET po_number_client='$po_ref' WHERE id=$q_id");
     }
 
-    // Gunakan currency baru untuk logika pembersihan harga
+    // Gunakan currency baru untuk logika pembersihan harga item
     $curr = $new_currency;
 
     // 4. Update Items: Hapus lama, Insert baru
@@ -63,7 +78,7 @@ if (isset($_POST['update_invoice'])) {
         if (!empty($items[$i])) {
             $it_name = $conn->real_escape_string($items[$i]);
             
-            // Handle Desimal Qty (Ubah koma jadi titik)
+            // Handle Desimal Qty
             $raw_qty = $qtys[$i];
             $clean_qty = str_replace(',', '.', $raw_qty);
             $it_qty  = floatval($clean_qty); 
@@ -92,7 +107,6 @@ if (isset($_POST['update_invoice'])) {
 }
 
 // --- AMBIL DATA UNTUK TAMPILAN ---
-// [BARU] Ambil invoice_type di SELECT
 $sql = "SELECT i.*, c.id as current_client_id, c.company_name, c.address, c.pic_name, q.po_number_client, q.currency
         FROM invoices i 
         JOIN quotations q ON i.quotation_id = q.id 
@@ -120,17 +134,21 @@ if ($resItems->num_rows > 0) {
         $invoice_items[] = $itm;
     }
 }
+
+// FORMAT TAMPILAN ADJUSTMENT
+$adj_val = floatval($invoice['adjustment_amount'] ?? 0);
+if ($invoice['currency'] == 'IDR') {
+    $display_adj = number_format($adj_val, 0, ',', '.');
+} else {
+    $display_adj = number_format($adj_val, 2, '.', ',');
+}
 ?>
 
 <div class="page-heading">
     <h3>Edit Invoice: <?= $invoice['invoice_no'] ?></h3>
     <div class="alert alert-light-warning border-warning">
         <i class="bi bi-pencil-square me-2"></i>
-        <strong>Mode Edit:</strong>
-        <ul class="mb-0 ps-3">
-            <li>Type <strong>International</strong> akan otomatis mengubah mata uang ke <strong>USD</strong>.</li>
-            <li>Anda dapat mengubah Qty dengan desimal (misal: 1.5).</li>
-        </ul>
+        <strong>Mode Edit:</strong> Adjustment bersifat opsional. Kosongkan atau isi 0 jika tidak ada. Gunakan tanda minus (-) untuk pengurangan/diskon.
     </div>
 </div>
 
@@ -208,6 +226,18 @@ if ($resItems->num_rows > 0) {
                             <label>Payment Method Label</label>
                             <input type="text" name="payment_method_col" class="form-control" value="<?= htmlspecialchars($invoice['payment_method']) ?>">
                         </div>
+
+                        <div class="row mt-3 pt-3 border-top">
+                            <div class="col-12"><label class="fw-bold text-success">Adjustment (Optional)</label></div>
+                            <div class="col-6">
+                                <input type="text" name="adj_label" class="form-control form-control-sm" placeholder="Label (e.g. Rounding)" value="<?= htmlspecialchars($invoice['adjustment_label'] ?? '') ?>">
+                            </div>
+                            <div class="col-6">
+                                <input type="text" name="adj_amount" class="form-control form-control-sm text-end" placeholder="Amount" value="<?= $display_adj ?>">
+                            </div>
+                            <div class="col-12"><small class="text-muted fst-italic">Gunakan tanda minus (-) untuk diskon/pengurangan.</small></div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -232,14 +262,21 @@ if ($resItems->num_rows > 0) {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach($invoice_items as $itm): ?>
+                            <?php foreach($invoice_items as $itm): 
+                                $db_price = floatval($itm['unit_price']);
+                                if ($invoice['currency'] == 'IDR') {
+                                    $display_price = number_format($db_price, 0, ',', '.');
+                                } else {
+                                    $display_price = number_format($db_price, 2, '.', ',');
+                                }
+                            ?>
                             <tr>
                                 <td><input type="text" name="item_name[]" class="form-control" value="<?= htmlspecialchars($itm['item_name']) ?>" required></td>
                                 <td><input type="text" name="card_type[]" class="form-control" value="<?= htmlspecialchars($itm['card_type']) ?>"></td>
                                 
                                 <td><input type="number" step="any" name="qty[]" class="form-control text-center" value="<?= floatval($itm['qty']) ?>" required></td>
                                 
-                                <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $itm['unit_price'] ?>" required></td>
+                                <td><input type="text" name="unit_price[]" class="form-control text-end" value="<?= $display_price ?>" required></td>
                                 <td><input type="text" name="description[]" class="form-control" value="<?= htmlspecialchars($itm['description']) ?>"></td>
                                 <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
                             </tr>
@@ -259,7 +296,6 @@ if ($resItems->num_rows > 0) {
 <?php include 'includes/footer.php'; ?>
 
 <script>
-    // [BARU] FUNGSI AUTO UPDATE TAMPILAN CURRENCY
     function autoSetCurrency() {
         var type = document.getElementById('invoice_type').value;
         var disp = document.getElementById('currency_display');
