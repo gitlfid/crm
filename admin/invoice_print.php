@@ -30,9 +30,9 @@ if ($check_items && $check_items->num_rows > 0) {
     while($row = $resQ->fetch_assoc()) { $itemsData[] = $row; }
 }
 
-// 3. [BARU] AMBIL ADJUSTMENTS (Multiple Rows)
+// 3. [BARU] AMBIL ADJUSTMENTS (Data Tambahan: DP, Fee, dll)
 $adjData = [];
-// Cek tabel exist dulu jaga-jaga
+// Cek tabel ada atau tidak untuk keamanan
 $checkTable = $conn->query("SHOW TABLES LIKE 'invoice_adjustments'");
 if ($checkTable && $checkTable->num_rows > 0) {
     $resAdj = $conn->query("SELECT * FROM invoice_adjustments WHERE invoice_id = $id");
@@ -150,7 +150,7 @@ function format_money($num, $is_intl) {
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
         <div style="margin-top:5px; color:red; font-size:11px;">
             * Mode: <strong><?= $inv_type ?></strong> (Currency: <?= $inv['currency'] ?>)<br>
-            * Adjustment (DP, Fee, dll) akan muncul otomatis jika sudah diinput.
+            * Adjustment (DP, Fee, dll) ditampilkan di bawah Total sebagai rincian.
         </div>
     </div>
 
@@ -231,7 +231,7 @@ function format_money($num, $is_intl) {
             <?php endforeach; ?>
             
             <?php 
-                // PERHITUNGAN TOTAL DENGAN ADJUSTMENT
+                // PERHITUNGAN TOTAL (TIDAK TERMASUK ADJUSTMENT)
                 if ($is_international) {
                     $vatAmount = 0;
                     $grandTotal = round($grandTotal, 2); 
@@ -239,15 +239,7 @@ function format_money($num, $is_intl) {
                     $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
                 }
-                
-                $totalAll = $grandTotal + $vatAmount;
-                
-                // Tambahkan Adjustment ke Kalkulasi Total
-                $totalAdj = 0;
-                foreach ($adjData as $adj) {
-                    $totalAdj += floatval($adj['amount']);
-                }
-                $totalAll += $totalAdj;
+                $totalInvoice = $grandTotal + $vatAmount;
             ?>
             
             <tr class="summary-row">
@@ -264,19 +256,20 @@ function format_money($num, $is_intl) {
             </tr>
             <?php endif; ?>
 
-            <?php foreach($adjData as $adj): ?>
-            <tr class="summary-row">
-                <td colspan="4" class="border-none"></td>
-                <td class="label-cell" contenteditable="true"><?= htmlspecialchars($adj['label']) ?></td>
-                <td class="value-cell" contenteditable="true"><?= format_money($adj['amount'], $is_international) ?></td>
-            </tr>
-            <?php endforeach; ?>
-
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
                 <td class="label-cell">Total</td>
-                <td class="value-cell" contenteditable="true"><?= format_money($totalAll, $is_international) ?></td>
+                <td class="value-cell" contenteditable="true"><?= format_money($totalInvoice, $is_international) ?></td>
             </tr>
+
+            <?php foreach($adjData as $adj): ?>
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell text-muted" contenteditable="true"><?= htmlspecialchars($adj['label']) ?></td>
+                <td class="value-cell text-muted" contenteditable="true"><?= format_money($adj['amount'], $is_international) ?></td>
+            </tr>
+            <?php endforeach; ?>
+
         </tbody>
     </table>
 
@@ -308,7 +301,6 @@ function format_money($num, $is_intl) {
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    // LOGIKA SIGNATURE (Tetap dipertahankan)
                     $signPath = '';
                     $signerName = 'Niawati'; 
                     $baseDir = dirname(__DIR__);

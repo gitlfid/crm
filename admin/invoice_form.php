@@ -136,7 +136,7 @@ if (isset($_POST['save_invoice'])) {
             }
         }
 
-        // --- [FITUR BARU] INSERT ADJUSTMENTS (MULTIPLE ROWS) ---
+        // --- [BARU] INSERT ADJUSTMENTS (MULTIPLE ROWS) ---
         if (isset($_POST['adj_label']) && isset($_POST['adj_amount'])) {
             $adj_labels = $_POST['adj_label'];
             $adj_amounts = $_POST['adj_amount'];
@@ -253,7 +253,7 @@ if (isset($_POST['save_invoice'])) {
                     <div class="card-body pt-3">
                         <div class="mb-2">
                             <label class="fw-bold">Invoice No</label>
-                            <input type="text" name="invoice_no" class="form-control fw-bold fs-5" value="<?= $auto_inv ?>" readonly>
+                            <input type="text" name="invoice_no" class="form-control fw-bold fs-5" value="<?= $auto_inv ?>">
                         </div>
                         
                         <div class="mb-3">
@@ -297,7 +297,7 @@ if (isset($_POST['save_invoice'])) {
                         </div>
 
                         <div class="mt-4 pt-3 border-top">
-                            <label class="fw-bold text-success mb-2">Adjustments (Optional)</label>
+                            <label class="fw-bold text-success mb-2">Adjustments / Payment Term</label>
                             <table class="table table-sm table-borderless mb-2" id="adjTable">
                                 <tr>
                                     <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)"></td>
@@ -306,7 +306,6 @@ if (isset($_POST['save_invoice'])) {
                                 </tr>
                             </table>
                             <button type="button" class="btn btn-sm btn-outline-success w-100 border-dashed" onclick="addAdjRow()">+ Add Adjustment Row</button>
-                            <div class="text-muted small mt-1 fst-italic">* Gunakan tanda minus (-) untuk pengurangan/diskon.</div>
                         </div>
 
                     </div>
@@ -452,17 +451,12 @@ if (isset($_POST['save_invoice'])) {
     function removeRow(btn) {
         var row = btn.parentNode.parentNode;
         var table = row.parentNode;
-        
-        // Cek apakah ini tabel Item atau Adjustment
-        if (table.closest('#itemTable') && table.rows.length <= 1) {
+        // Cek tabel mana (Item atau Adjustment)
+        if(table.closest('#itemTable') && table.rows.length <= 1) {
             alert("Invoice minimal harus memiliki 1 item.");
         } else {
-            // Jika adjustment, bisa dihapus meski tinggal 1
-            if (table.closest('#adjTable')) {
-                row.remove();
-            } else {
-                table.removeChild(row);
-            }
+            if(table.closest('#adjTable')) row.remove();
+            else table.removeChild(row);
         }
     }
 </script>
