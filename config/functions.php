@@ -88,38 +88,34 @@ function generateQuotationNo($conn) {
     // Format Prefix: QLF + YYYYMMDD
     $prefixToday = "QLF" . date('Ymd'); 
     
-    // Cari nomor terakhir di database (Tanpa filter tanggal, agar sequence jalan terus)
-    // Kita filter 'QLF' saja untuk memastikan mengambil jenis dokumen yang benar
     $sql = "SELECT quotation_no FROM quotations WHERE quotation_no LIKE 'QLF%' ORDER BY id DESC LIMIT 1";
     $res = $conn->query($sql);
     
     $newSeq = 1;
     if ($res && $res->num_rows > 0) {
         $lastNo = $res->fetch_assoc()['quotation_no'];
-        // Ambil 4 digit terakhir dari nomor sebelumnya
         $lastSeq = intval(substr($lastNo, -4));
         $newSeq = $lastSeq + 1;
     }
     
-    // Gabung Prefix Hari Ini + Sequence yang terus berlanjut
     return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
 }
 
 // ==========================================
-// 2. GENERATE NOMOR INVOICE (CONTINUOUS)
+// 2. GENERATE NOMOR INVOICE (FIX: TANPA HARI)
 // ==========================================
 function generateInvoiceNo($conn) {
-    // Format Prefix: INVLF + YYYYMMDD
-    $prefixToday = "INVLF" . date('Ymd'); 
+    // [UPDATE] Format Prefix: INVLF + YYYYMM (Tanpa Tanggal/Hari)
+    $prefixToday = "INVLF" . date('Ym'); 
     
-    // Cari nomor terakhir (Sequence lanjut terus tidak peduli ganti hari/bulan)
+    // Cari nomor invoice terakhir (tanpa peduli tanggal)
     $sql = "SELECT invoice_no FROM invoices WHERE invoice_no LIKE 'INVLF%' ORDER BY id DESC LIMIT 1";
     $res = $conn->query($sql);
     
     $newSeq = 1;
     if ($res && $res->num_rows > 0) {
         $lastNo = $res->fetch_assoc()['invoice_no'];
-        // Ambil 4 digit terakhir
+        // Ambil 4 digit terakhir sebagai sequence yang terus berlanjut
         $lastSeq = intval(substr($lastNo, -4));
         $newSeq = $lastSeq + 1;
     }
@@ -134,7 +130,6 @@ function generateDONumber($conn) {
     // Format Prefix: DL + YYYYMMDD
     $prefixToday = "DL" . date('Ymd'); 
     
-    // Cari nomor terakhir
     $sql = "SELECT do_number FROM delivery_orders WHERE do_number LIKE 'DL%' ORDER BY id DESC LIMIT 1";
     $res = $conn->query($sql);
     
