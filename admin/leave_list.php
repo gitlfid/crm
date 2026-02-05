@@ -117,14 +117,17 @@ $msg = "";
 // A. UPDATE QUOTA (HR ONLY)
 if (isset($_POST['update_quota']) && $is_hr) {
     $target_uid = intval($_POST['quota_user_id']);
+    $new_name   = $conn->real_escape_string($_POST['username']); // Tambahan: Ambil nama baru
     $new_quota  = intval($_POST['new_quota']);
     $valid_from = !empty($_POST['valid_from']) ? $_POST['valid_from'] : NULL;
     $valid_until= !empty($_POST['valid_until']) ? $_POST['valid_until'] : NULL;
     
-    $stmt = $conn->prepare("UPDATE users SET leave_quota=?, quota_valid_from=?, quota_valid_until=? WHERE id=?");
-    $stmt->bind_param("issi", $new_quota, $valid_from, $valid_until, $target_uid);
+    // Update Query menambahkan kolom username
+    $stmt = $conn->prepare("UPDATE users SET username=?, leave_quota=?, quota_valid_from=?, quota_valid_until=? WHERE id=?");
+    $stmt->bind_param("sissi", $new_name, $new_quota, $valid_from, $valid_until, $target_uid);
+    
     if ($stmt->execute()) {
-        $msg = "<div class='alert alert-success alert-dismissible fade show'>Kuota berhasil diperbarui.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        $msg = "<div class='alert alert-success alert-dismissible fade show'>Data karyawan berhasil diperbarui.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
     }
 }
 
@@ -760,12 +763,17 @@ if (isset($_POST['revise_leave_request'])) {
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <form method="POST" class="modal-content">
             <div class="modal-header border-0 bg-primary text-white py-2">
-                <h6 class="modal-title fw-bold">Adjust Kuota</h6>
+                <h6 class="modal-title fw-bold">Adjust Data Karyawan</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <input type="hidden" name="quota_user_id" id="q_uid">
-                <div class="mb-2 text-center fw-bold" id="q_uname"></div>
+                
+                <div class="mb-2">
+                    <label class="form-label small">Nama Karyawan</label>
+                    <input type="text" name="username" id="q_uname" class="form-control" required>
+                </div>
+
                 <div class="mb-2">
                     <label class="form-label small">Jumlah Kuota</label>
                     <input type="number" name="new_quota" id="q_val" class="form-control" required>
@@ -780,7 +788,7 @@ if (isset($_POST['revise_leave_request'])) {
                 </div>
             </div>
             <div class="modal-footer border-0 py-2">
-                <button type="submit" name="update_quota" class="btn btn-primary btn-sm w-100">Simpan</button>
+                <button type="submit" name="update_quota" class="btn btn-primary btn-sm w-100">Simpan Perubahan</button>
             </div>
         </form>
     </div>
@@ -826,7 +834,7 @@ if (isset($_POST['revise_leave_request'])) {
 
     function openQuotaModal(id, name, quota, from, until) {
         document.getElementById('q_uid').value = id;
-        document.getElementById('q_uname').innerText = name;
+        document.getElementById('q_uname').value = name; // Ubah ke .value agar masuk ke input
         document.getElementById('q_val').value = quota;
         document.getElementById('q_from').value = from;
         document.getElementById('q_until').value = until;
