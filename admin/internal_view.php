@@ -122,7 +122,13 @@ $chat_sql = "SELECT r.*, u.username
 $chats = $conn->query($chat_sql);
 
 // Helper Functions
-function formatText($text) { return nl2br(htmlspecialchars($text)); }
+// [FIXED] Menambahkan replace untuk mengubah \r\n (teks literal) menjadi baris baru HTML
+function formatText($text) {
+    if (empty($text)) return "";
+    $text = str_replace(array('\r\n', '\n', '\r'), "\n", $text);
+    return nl2br(htmlspecialchars($text));
+}
+
 function isImg($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg','jpeg','png','gif','webp']); }
 ?>
 
