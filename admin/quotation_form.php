@@ -10,9 +10,9 @@ $my_id = $_SESSION['user_id'];
 $is_edit = false;
 $edit_id = 0;
 $q_items = [];
-$q_adjustments = []; // [BARU] Variable penampung adjustment
+$q_adjustments = []; 
 
-// Generate Nomor Baru (Pakai Fungsi Pusat)
+// Generate Nomor Baru (Default Auto, tapi bisa diedit)
 $display_quote_no = generateQuotationNo($conn);
 
 // Default Values
@@ -54,7 +54,7 @@ if (isset($_GET['edit_id']) && !empty($_GET['edit_id'])) {
             $q_items[] = $row;
         }
 
-        // [BARU] Load Adjustments
+        // Load Adjustments
         $checkTbl = $conn->query("SHOW TABLES LIKE 'quotation_adjustments'");
         if ($checkTbl && $checkTbl->num_rows > 0) {
             $resAdj = $conn->query("SELECT * FROM quotation_adjustments WHERE quotation_id = $edit_id");
@@ -80,12 +80,18 @@ if (isset($_POST['save_quotation'])) {
     
     if ($post_id > 0) {
         // UPDATE MODE
-        $conn->query("UPDATE quotations SET quotation_date='$q_date', client_id=$client, currency='$curr', po_number_client='$po_ref' WHERE id=$post_id");
+        // Cek jika nomor diubah manual, pastikan tidak bentrok dengan ID lain
+        $cekDup = $conn->query("SELECT id FROM quotations WHERE quotation_no = '$q_no' AND id != $post_id");
+        if($cekDup->num_rows > 0) {
+            echo "<script>alert('Gagal: Nomor Quotation $q_no sudah digunakan!'); history.back();</script>"; exit;
+        }
+
+        $conn->query("UPDATE quotations SET quotation_no='$q_no', quotation_date='$q_date', client_id=$client, currency='$curr', po_number_client='$po_ref' WHERE id=$post_id");
         
         // Hapus item lama, insert ulang
         $conn->query("DELETE FROM quotation_items WHERE quotation_id=$post_id"); 
         
-        // [BARU] Hapus adjustment lama
+        // Hapus adjustment lama
         $conn->query("DELETE FROM quotation_adjustments WHERE quotation_id=$post_id"); 
 
         $quot_id = $post_id;
@@ -95,8 +101,7 @@ if (isset($_POST['save_quotation'])) {
         // Cek duplikat nomor manual
         $chk = $conn->query("SELECT id FROM quotations WHERE quotation_no='$q_no'");
         if($chk->num_rows > 0) { 
-            // Jika duplikat, generate baru lagi
-            $q_no = generateQuotationNo($conn); 
+            echo "<script>alert('Gagal: Nomor Quotation $q_no sudah ada. Gunakan nomor lain.'); history.back();</script>"; exit;
         }
         
         $conn->query("INSERT INTO quotations (quotation_no, client_id, created_by_user_id, quotation_date, currency, status, po_number_client) VALUES ('$q_no', $client, $my_id, '$q_date', '$curr', 'draft', '$po_ref')");
@@ -133,7 +138,7 @@ if (isset($_POST['save_quotation'])) {
         }
     }
 
-    // 2. [BARU] ADJUSTMENT PROCESSING
+    // 2. ADJUSTMENT PROCESSING
     if (isset($_POST['adj_label']) && isset($_POST['adj_amount'])) {
         $adj_labels = $_POST['adj_label'];
         $adj_amounts = $_POST['adj_amount'];
@@ -215,8 +220,9 @@ if (isset($_POST['save_quotation'])) {
                     <div class="card-body pt-3">
                         <div class="mb-2">
                             <label class="fw-bold">Quotation No</label>
-                            <input type="text" name="quotation_no" class="form-control fw-bold fs-5 bg-light" value="<?= $display_quote_no ?>" readonly>
+                            <input type="text" name="quotation_no" class="form-control fw-bold fs-5" value="<?= $display_quote_no ?>">
                         </div>
+                        
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="fw-bold">Date</label>
@@ -418,7 +424,7 @@ if (isset($_POST['save_quotation'])) {
         table.appendChild(newRow);
     }
 
-    // [BARU] FUNGSI TAMBAH BARIS ADJUSTMENT
+    // FUNGSI TAMBAH BARIS ADJUSTMENT
     function addAdjRow() {
         var table = document.getElementById("adjTable");
         var newRow = table.insertRow();
@@ -432,7 +438,6 @@ if (isset($_POST['save_quotation'])) {
     function removeRow(btn) {
         var row = btn.parentNode.parentNode;
         var table = row.parentNode;
-        // Deteksi tabel item vs tabel adjustment
         if(table.closest('#itemTable') && table.rows.length <= 1) {
             alert("Minimal harus ada 1 item.");
         } else {
@@ -441,7 +446,7 @@ if (isset($_POST['save_quotation'])) {
         }
     }
 
-    // Logic Dropdown Duration (TETAP)
+    // Logic Dropdown Duration
     function updateDuration(selectElem) {
         let row = selectElem.closest('tr');
         let inputGroup = row.querySelector('.duration-input-group');
