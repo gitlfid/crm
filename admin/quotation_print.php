@@ -20,6 +20,16 @@ if(!$quot) die("Quotation not found");
 
 $items = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = $id");
 
+// [BARU] AMBIL ADJUSTMENT
+$adjData = [];
+$checkTbl = $conn->query("SHOW TABLES LIKE 'quotation_adjustments'");
+if ($checkTbl && $checkTbl->num_rows > 0) {
+    $resAdj = $conn->query("SELECT * FROM quotation_adjustments WHERE quotation_id = $id");
+    while($row = $resAdj->fetch_assoc()) {
+        $adjData[] = $row;
+    }
+}
+
 $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
@@ -70,6 +80,11 @@ function smart_format($num, $curr = 'IDR') {
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         
+        .summary-row td { border: 1px solid #000; padding: 6px 8px; font-weight: bold; }
+        .label-cell { background-color: #fff; text-align: right; }
+        .value-cell { text-align: right; }
+        .border-none { border: none !important; }
+
         .remark-box { margin-top: 15px; font-size: 10px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 10px; }
         .remark-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; display: block; }
         
@@ -147,7 +162,13 @@ function smart_format($num, $curr = 'IDR') {
             </tr>
         </thead>
         <tbody>
-            <?php $no = 1; while($item = $items->fetch_assoc()): ?>
+            <?php 
+                $no = 1; 
+                $totalQuot = 0;
+                while($item = $items->fetch_assoc()): 
+                    $sub = $item['qty'] * $item['unit_price'];
+                    $totalQuot += $sub;
+            ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
                 <td><div contenteditable="true"><?= htmlspecialchars($item['item_name']) ?></div></td>
@@ -157,6 +178,21 @@ function smart_format($num, $curr = 'IDR') {
                 <td class="text-center" contenteditable="true"><?= htmlspecialchars($item['card_type']) ?></td>
             </tr>
             <?php endwhile; ?>
+
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell">Total</td>
+                <td class="value-cell" contenteditable="true"><?= smart_format($totalQuot, $quot['currency']) ?></td>
+            </tr>
+
+            <?php foreach($adjData as $adj): ?>
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell" style="font-weight:normal; font-style:italic;" contenteditable="true"><?= htmlspecialchars($adj['label']) ?></td>
+                <td class="value-cell" style="font-weight:normal;" contenteditable="true"><?= smart_format($adj['amount'], $quot['currency']) ?></td>
+            </tr>
+            <?php endforeach; ?>
+
         </tbody>
     </table>
 
@@ -181,29 +217,20 @@ function smart_format($num, $curr = 'IDR') {
                 <div style="margin-bottom: 10px;">PT. Linksfield Networks Indonesia</div>
                 
                 <?php 
-                    // LOGIKA "AUTO-SEARCH" SIGNATURE
-                    // Script ini akan mengabaikan nama file dari DB jika file tidak ada,
-                    // dan akan mencari file apapun di folder signatures milik User ID ini.
-                    
                     $signPath = '';
                     $dbFile = $quot['sales_sign'];
-                    $userId = $quot['created_by_user_id']; // ID User Pembuat (Contoh: 7)
+                    $userId = $quot['created_by_user_id']; 
 
-                    // 1. Cek file dari Database (Prioritas)
                     if (!empty($dbFile) && file_exists('../uploads/signatures/' . $dbFile)) {
                         $signPath = '../uploads/signatures/' . $dbFile;
                     } 
-                    // 2. Jika Gagal, CARI PAKSA file apapun milik user ini di folder signatures
-                    // Pola pencarian: SIG_*_USERID_*.png (Sesuai format di screenshot Anda)
                     elseif (!empty($userId)) {
                         $files = glob('../uploads/signatures/SIG_*_' . $userId . '_*.png');
                         if ($files && count($files) > 0) {
-                            // Ambil file terakhir yang ditemukan
                             $signPath = $files[0]; 
                         }
                     }
 
-                    // 3. Fallback ke folder Uploads biasa (siapa tau nyasar)
                     if (empty($signPath) && !empty($userId)) {
                         $files = glob('../uploads/SIG_*_' . $userId . '_*.png');
                         if ($files && count($files) > 0) {
@@ -211,7 +238,6 @@ function smart_format($num, $curr = 'IDR') {
                         }
                     }
 
-                    // 4. Fallback Terakhir ke Assets
                     if (empty($signPath) && file_exists('../assets/images/signature.png')) {
                         $signPath = '../assets/images/signature.png';
                     }

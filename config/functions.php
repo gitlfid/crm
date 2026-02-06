@@ -82,7 +82,7 @@ function sendEmailNotification($to, $subject, $body) {
 }
 
 // ==========================================
-// [PENTING] FUNGSI TIKET DIKEMBALIKAN (AGAR TIDAK ERROR)
+// FUNGSI TIKET (DIKEMBALIKAN AGAR TIDAK ERROR)
 // ==========================================
 function generateTicketID($type, $conn) {
     $prefixMap = ['support' => 'LFID-SUP', 'payment' => 'LFID-PAY', 'info' => 'LFID-INFO'];
@@ -202,17 +202,21 @@ function sendInternalDiscord($title, $message, $fields = [], $thread_id = null) 
 }
 
 // ==========================================
-// 1. GENERATE NOMOR QUOTATION (CONTINUOUS)
+// 1. GENERATE NOMOR QUOTATION (CONTINUOUS - UPDATED)
 // ==========================================
 function generateQuotationNo($conn) {
+    // Format Prefix: QLF + YYYYMM (Tanpa Tanggal/Hari)
     $prefixToday = "QLF" . date('Ym'); 
     
+    // Cari nomor terakhir yang depannya QLF
+    // Tanpa filter tanggal spesifik agar sequence jalan terus selamanya
     $sql = "SELECT quotation_no FROM quotations WHERE quotation_no LIKE 'QLF%' ORDER BY id DESC LIMIT 1";
     $res = $conn->query($sql);
     
     $newSeq = 1;
     if ($res && $res->num_rows > 0) {
         $lastNo = $res->fetch_assoc()['quotation_no'];
+        // Ambil 4 digit terakhir
         $lastSeq = intval(substr($lastNo, -4));
         $newSeq = $lastSeq + 1;
     }
@@ -225,40 +229,30 @@ function generateQuotationNo($conn) {
 // ==========================================
 function generateInvoiceNo($conn) {
     $prefixToday = "INVLF" . date('Ym'); 
-    
     $sql = "SELECT invoice_no FROM invoices WHERE invoice_no LIKE 'INVLF%' ORDER BY id DESC LIMIT 1";
     $res = $conn->query($sql);
-    
     $newSeq = 1;
     if ($res && $res->num_rows > 0) {
         $lastNo = $res->fetch_assoc()['invoice_no'];
         $lastSeq = intval(substr($lastNo, -4));
         $newSeq = $lastSeq + 1;
     }
-    
     return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
 }
 
 // ==========================================
-// 3. GENERATE NOMOR DO (CONTINUOUS - UPDATED)
+// 3. GENERATE NOMOR DO (CONTINUOUS)
 // ==========================================
 function generateDONumber($conn) {
-    // Format Prefix: DO + YYYYMM (Sesuai Permintaan)
     $prefixToday = "DO" . date('Ym'); 
-    
-    // Cari nomor terakhir yang depannya 'DO' 
-    // (Tanpa filter tanggal spesifik agar sequence jalan terus)
     $sql = "SELECT do_number FROM delivery_orders WHERE do_number LIKE 'DO%' ORDER BY id DESC LIMIT 1";
     $res = $conn->query($sql);
-    
     $newSeq = 1;
     if ($res && $res->num_rows > 0) {
         $lastNo = $res->fetch_assoc()['do_number'];
-        // Ambil 4 digit terakhir
         $lastSeq = intval(substr($lastNo, -4));
         $newSeq = $lastSeq + 1;
     }
-    
     return $prefixToday . str_pad($newSeq, 4, '0', STR_PAD_LEFT);
 }
 ?>

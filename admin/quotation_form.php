@@ -10,6 +10,10 @@ $my_id = $_SESSION['user_id'];
 $is_edit = false;
 $edit_id = 0;
 $q_items = [];
+$q_adjustments = []; // [BARU] Variable penampung adjustment
+
+// Generate Nomor Baru (Pakai Fungsi Pusat)
+$display_quote_no = generateQuotationNo($conn);
 
 // Default Values
 $current_date     = date('Y-m-d');
@@ -19,18 +23,10 @@ $client_pic       = "";
 $po_ref_val       = "";
 $client_id_val    = ""; 
 
-// Generate Nomor Baru (Auto)
-$prefix = "QLF" . date('Ym'); 
-$sqlNum = "SELECT quotation_no FROM quotations WHERE quotation_no LIKE '$prefix%' ORDER BY quotation_no DESC LIMIT 1";
-$resNum = $conn->query($sqlNum);
-$newUrut = ($resNum && $resNum->num_rows > 0) ? ((int)substr($resNum->fetch_assoc()['quotation_no'], -4) + 1) : 1;
-$display_quote_no = $prefix . str_pad($newUrut, 4, "0", STR_PAD_LEFT);
-
 // --- EDIT MODE (LOAD DATA) ---
 if (isset($_GET['edit_id']) && !empty($_GET['edit_id'])) {
     $edit_id = intval($_GET['edit_id']);
     
-    // [SYNC FIX] Ambil data Address & PIC langsung dari tabel CLIENTS (Join), bukan field statis
     $sqlHeader = "SELECT q.*, c.address, c.pic_name, c.company_name 
                   FROM quotations q 
                   JOIN clients c ON q.client_id = c.id 
@@ -47,15 +43,24 @@ if (isset($_GET['edit_id']) && !empty($_GET['edit_id'])) {
         $po_ref_val       = $q_data['po_number_client'];
         $client_id_val    = $q_data['client_id'];
         
-        // Data ini diambil dari master client, jadi selalu update/sync
         $client_addr      = $q_data['address'];
         $client_pic       = $q_data['pic_name'];
         
         $page_title = "Edit Quotation: " . $display_quote_no;
 
+        // Load Items
         $resItems = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = $edit_id");
         while($row = $resItems->fetch_assoc()) {
             $q_items[] = $row;
+        }
+
+        // [BARU] Load Adjustments
+        $checkTbl = $conn->query("SHOW TABLES LIKE 'quotation_adjustments'");
+        if ($checkTbl && $checkTbl->num_rows > 0) {
+            $resAdj = $conn->query("SELECT * FROM quotation_adjustments WHERE quotation_id = $edit_id");
+            while($rowAdj = $resAdj->fetch_assoc()) {
+                $q_adjustments[] = $rowAdj;
+            }
         }
     } else {
         echo "<script>alert('Data tidak ditemukan!'); window.location='quotation_list.php';</script>"; exit;
@@ -76,26 +81,34 @@ if (isset($_POST['save_quotation'])) {
     if ($post_id > 0) {
         // UPDATE MODE
         $conn->query("UPDATE quotations SET quotation_date='$q_date', client_id=$client, currency='$curr', po_number_client='$po_ref' WHERE id=$post_id");
-        // Hapus item lama, insert ulang (Full Edit)
+        
+        // Hapus item lama, insert ulang
         $conn->query("DELETE FROM quotation_items WHERE quotation_id=$post_id"); 
+        
+        // [BARU] Hapus adjustment lama
+        $conn->query("DELETE FROM quotation_adjustments WHERE quotation_id=$post_id"); 
+
         $quot_id = $post_id;
         $msg = "Quotation Updated Successfully!";
     } else {
         // INSERT MODE
+        // Cek duplikat nomor manual
         $chk = $conn->query("SELECT id FROM quotations WHERE quotation_no='$q_no'");
-        if($chk->num_rows > 0) { $newUrut++; $q_no = $prefix . str_pad($newUrut, 4, "0", STR_PAD_LEFT); }
+        if($chk->num_rows > 0) { 
+            // Jika duplikat, generate baru lagi
+            $q_no = generateQuotationNo($conn); 
+        }
         
         $conn->query("INSERT INTO quotations (quotation_no, client_id, created_by_user_id, quotation_date, currency, status, po_number_client) VALUES ('$q_no', $client, $my_id, '$q_date', '$curr', 'draft', '$po_ref')");
         $quot_id = $conn->insert_id;
         $msg = "Quotation Created Successfully!";
     }
 
-    // ITEM PROCESSING
+    // 1. ITEM PROCESSING
     $items = $_POST['item_name'];
     $qtys  = $_POST['qty']; 
     $prices= $_POST['unit_price']; 
     $descs = $_POST['description'];
-    // Ambil text duration (hasil olahan javascript)
     $dur_texts = $_POST['duration_text']; 
 
     for ($i = 0; $i < count($items); $i++) {
@@ -116,10 +129,37 @@ if (isset($_POST['save_quotation'])) {
             }
             $it_prc = floatval($clean_price);
             
-            // Simpan ke card_type (Duration)
             $conn->query("INSERT INTO quotation_items (quotation_id, item_name, qty, unit_price, description, card_type) VALUES ($quot_id, '$db_item_name', $it_qty, $it_prc, '$it_dsc', '$text_duration')");
         }
     }
+
+    // 2. [BARU] ADJUSTMENT PROCESSING
+    if (isset($_POST['adj_label']) && isset($_POST['adj_amount'])) {
+        $adj_labels = $_POST['adj_label'];
+        $adj_amounts = $_POST['adj_amount'];
+
+        for ($j = 0; $j < count($adj_labels); $j++) {
+            if (!empty($adj_labels[$j])) {
+                $lbl = $conn->real_escape_string($adj_labels[$j]);
+                $raw_amt = $adj_amounts[$j];
+                
+                // Format Harga Adjustment
+                $clean_amt = str_replace(['Rp', '$', ' '], '', $raw_amt);
+                if ($curr == 'IDR') {
+                    $clean_amt = str_replace('.', '', $clean_amt); 
+                    $clean_amt = str_replace(',', '.', $clean_amt); 
+                } else {
+                    $clean_amt = str_replace(',', '', $clean_amt); 
+                }
+                $amt_db = floatval($clean_amt);
+
+                if ($amt_db != 0) {
+                    $conn->query("INSERT INTO quotation_adjustments (quotation_id, label, amount) VALUES ($quot_id, '$lbl', '$amt_db')");
+                }
+            }
+        }
+    }
+
     echo "<script>alert('$msg'); window.location='quotation_list.php';</script>"; exit;
 }
 ?>
@@ -190,6 +230,33 @@ if (isset($_POST['save_quotation'])) {
                                 </select>
                             </div>
                         </div>
+
+                        <div class="mt-4 pt-3 border-top">
+                            <label class="fw-bold text-success mb-2">Adjustments (DP, Termin, dll)</label>
+                            <table class="table table-sm table-borderless mb-2" id="adjTable">
+                                <?php if($is_edit && count($q_adjustments) > 0): ?>
+                                    <?php foreach($q_adjustments as $adj): 
+                                        $val = floatval($adj['amount']);
+                                        $dispVal = ($current_curr=='IDR') ? number_format($val,0,',','.') : number_format($val,2,'.',',');
+                                    ?>
+                                    <tr>
+                                        <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)" value="<?= htmlspecialchars($adj['label']) ?>"></td>
+                                        <td width="40%"><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount" value="<?= $dispVal ?>"></td>
+                                        <td width="10%"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)"></td>
+                                        <td width="40%"><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount"></td>
+                                        <td width="10%"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
+                                    </tr>
+                                <?php endif; ?>
+                            </table>
+                            <button type="button" class="btn btn-sm btn-outline-success w-100 border-dashed" onclick="addAdjRow()">+ Add Adjustment Row</button>
+                            <div class="text-muted small mt-1 fst-italic">* Gunakan tanda minus (-) jika ingin mengurangi total.</div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -219,7 +286,6 @@ if (isset($_POST['save_quotation'])) {
                                     $db_name = $itm['item_name'];
                                     $duration_text_db = $itm['card_type'];
                                     
-                                    // Logika deteksi dropdown duration
                                     $sel_one = ($duration_text_db == 'One Time') ? 'selected' : '';
                                     $sel_mon = ($duration_text_db == 'Monthly') ? 'selected' : '';
                                     $sel_3mo = ($duration_text_db == '3 Months') ? 'selected' : '';
@@ -352,17 +418,30 @@ if (isset($_POST['save_quotation'])) {
         table.appendChild(newRow);
     }
 
+    // [BARU] FUNGSI TAMBAH BARIS ADJUSTMENT
+    function addAdjRow() {
+        var table = document.getElementById("adjTable");
+        var newRow = table.insertRow();
+        newRow.innerHTML = `
+            <td><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label"></td>
+            <td><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount"></td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
+        `;
+    }
+
     function removeRow(btn) {
         var row = btn.parentNode.parentNode;
         var table = row.parentNode;
-        if(table.rows.length > 1) {
-            table.removeChild(row);
-        } else {
+        // Deteksi tabel item vs tabel adjustment
+        if(table.closest('#itemTable') && table.rows.length <= 1) {
             alert("Minimal harus ada 1 item.");
+        } else {
+            if(table.closest('#adjTable')) row.remove();
+            else table.removeChild(row);
         }
     }
 
-    // Logic Dropdown Duration
+    // Logic Dropdown Duration (TETAP)
     function updateDuration(selectElem) {
         let row = selectElem.closest('tr');
         let inputGroup = row.querySelector('.duration-input-group');
