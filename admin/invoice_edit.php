@@ -134,9 +134,12 @@ if ($resItems->num_rows > 0) {
 
 // Ambil Adjustments [BARU]
 $adjustments = [];
-$resAdj = $conn->query("SELECT * FROM invoice_adjustments WHERE invoice_id = $inv_id");
-if ($resAdj) {
-    while($row = $resAdj->fetch_assoc()) $adjustments[] = $row;
+$checkTbl = $conn->query("SHOW TABLES LIKE 'invoice_adjustments'");
+if ($checkTbl && $checkTbl->num_rows > 0) {
+    $resAdj = $conn->query("SELECT * FROM invoice_adjustments WHERE invoice_id = $inv_id");
+    if ($resAdj) {
+        while($row = $resAdj->fetch_assoc()) $adjustments[] = $row;
+    }
 }
 ?>
 
@@ -181,14 +184,17 @@ if ($resAdj) {
                             </select>
                         </div>
                         <div class="row">
-                            <div class="col-6 mb-3"><label class="fw-bold">Invoice Date</label><input type="date" name="invoice_date" class="form-control" value="<?= $invoice['invoice_date'] ?>" required></div>
-                            <div class="col-6 mb-3"><label class="fw-bold">Due Date</label><input type="date" name="due_date" class="form-control" value="<?= $invoice['due_date'] ?>" required></div>
+                            <div class="col-6 mb-3">
+                                <label class="fw-bold">Invoice Date</label>
+                                <input type="date" name="invoice_date" class="form-control" value="<?= $invoice['invoice_date'] ?>" required onchange="updateDueDate()">
+                            </div>
+                            <div class="col-6 mb-3"><label class="fw-bold">Due Date (+5 Work Days)</label><input type="date" name="due_date" class="form-control" value="<?= $invoice['due_date'] ?>" required></div>
                         </div>
                         <div class="mb-3"><label class="fw-bold">Currency (Auto)</label><input type="text" id="currency_display" class="form-control bg-light" value="<?= $invoice['currency'] ?>" readonly></div>
                         <div class="mt-2"><label>Payment Method Label</label><input type="text" name="payment_method_col" class="form-control" value="<?= htmlspecialchars($invoice['payment_method']) ?>"></div>
 
                         <div class="mt-4 pt-3 border-top">
-                            <label class="fw-bold text-success mb-2">Additional Adjustments (Fee, DP, etc)</label>
+                            <label class="fw-bold text-success mb-2">Adjustments / Payment Term</label>
                             <table class="table table-sm table-borderless mb-2" id="adjTable">
                                 <?php if(count($adjustments) > 0): ?>
                                     <?php foreach($adjustments as $adj): 
@@ -209,7 +215,7 @@ if ($resAdj) {
                                     </tr>
                                 <?php endif; ?>
                             </table>
-                            <button type="button" class="btn btn-sm btn-outline-success w-100 border-dashed" onclick="addAdjRow()">+ Add Another Line</button>
+                            <button type="button" class="btn btn-sm btn-outline-success w-100 border-dashed" onclick="addAdjRow()">+ Add Adjustment Row</button>
                             <div class="text-muted small mt-2 fst-italic">* Gunakan tanda minus (-) untuk pengurangan (misal: -500.000).</div>
                         </div>
                     </div>
@@ -268,6 +274,32 @@ if ($resAdj) {
         var type = document.getElementById('invoice_type').value;
         var disp = document.getElementById('currency_display');
         if(disp) disp.value = (type === 'International') ? 'USD' : 'IDR';
+    }
+
+    // [UPDATE] LOGIKA JS DUE DATE (5 Working Days)
+    function updateDueDate() {
+        var invDateInput = document.getElementsByName("invoice_date")[0];
+        var dueDateInput = document.getElementsByName("due_date")[0];
+        
+        if (invDateInput.value) {
+            var date = new Date(invDateInput.value);
+            var addedDays = 0;
+            var targetDays = 5;
+
+            while (addedDays < targetDays) {
+                date.setDate(date.getDate() + 1);
+                var dayOfWeek = date.getDay(); // 0 = Minggu, 6 = Sabtu
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    addedDays++;
+                }
+            }
+            
+            var yyyy = date.getFullYear();
+            var mm = String(date.getMonth() + 1).padStart(2, '0');
+            var dd = String(date.getDate()).padStart(2, '0');
+            
+            dueDateInput.value = yyyy + '-' + mm + '-' + dd;
+        }
     }
 
     // Fungsi Tambah Baris Item

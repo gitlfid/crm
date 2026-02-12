@@ -264,14 +264,29 @@ if (isset($_POST['save_invoice'])) {
                             </select>
                         </div>
 
+                        <?php
+                            // [LOGIKA PHP] HITUNG DEFAULT DUE DATE (+5 Working Days)
+                            $startDate = new DateTime(); // Hari ini
+                            $addDays = 0;
+                            while ($addDays < 5) {
+                                $startDate->modify('+1 day');
+                                $dayOfWeek = $startDate->format('N'); // 1=Senin, 7=Minggu
+                                // Jika bukan Sabtu (6) dan bukan Minggu (7), hitung sebagai hari kerja
+                                if ($dayOfWeek < 6) {
+                                    $addDays++;
+                                }
+                            }
+                            $default_due_date = $startDate->format('Y-m-d');
+                        ?>
+
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="fw-bold">Invoice Date</label>
                                 <input type="date" name="invoice_date" class="form-control" value="<?= date('Y-m-d') ?>" required onchange="updateDueDate()">
                             </div>
                             <div class="col-6 mb-3">
-                                <label class="fw-bold">Due Date (+5 Days)</label>
-                                <input type="date" name="due_date" class="form-control" value="<?= date('Y-m-d', strtotime('+5 days')) ?>" required>
+                                <label class="fw-bold">Due Date (+5 Work Days)</label>
+                                <input type="date" name="due_date" class="form-control" value="<?= $default_due_date ?>" required>
                             </div>
                         </div>
                         
@@ -407,13 +422,26 @@ if (isset($_POST['save_invoice'])) {
         }
     }
 
+    // [UPDATE] LOGIKA JS DUE DATE (5 Working Days)
     function updateDueDate() {
         var invDateInput = document.getElementsByName("invoice_date")[0];
         var dueDateInput = document.getElementsByName("due_date")[0];
         
         if (invDateInput.value) {
             var date = new Date(invDateInput.value);
-            date.setDate(date.getDate() + 5);
+            var addedDays = 0;
+            var targetDays = 5;
+
+            // Loop sampai mendapatkan 5 hari kerja
+            while (addedDays < targetDays) {
+                date.setDate(date.getDate() + 1);
+                var dayOfWeek = date.getDay(); // 0 = Minggu, 6 = Sabtu
+                
+                // Jika bukan Sabtu (6) dan bukan Minggu (0), hitung
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    addedDays++;
+                }
+            }
             
             var yyyy = date.getFullYear();
             var mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -437,7 +465,7 @@ if (isset($_POST['save_invoice'])) {
         table.appendChild(newRow);
     }
 
-    // [BARU] FUNGSI TAMBAH BARIS ADJUSTMENT
+    // [NEW] FUNGSI TAMBAH BARIS ADJUSTMENT
     function addAdjRow() {
         var table = document.getElementById("adjTable");
         var newRow = table.insertRow();
