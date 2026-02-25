@@ -30,9 +30,8 @@ if ($check_items && $check_items->num_rows > 0) {
     while($row = $resQ->fetch_assoc()) { $itemsData[] = $row; }
 }
 
-// 3. [BARU] AMBIL ADJUSTMENTS (Data Tambahan: DP, Fee, dll)
+// 3. AMBIL ADJUSTMENTS (Data Tambahan: DP, Fee, dll)
 $adjData = [];
-// Cek tabel ada atau tidak untuk keamanan
 $checkTable = $conn->query("SHOW TABLES LIKE 'invoice_adjustments'");
 if ($checkTable && $checkTable->num_rows > 0) {
     $resAdj = $conn->query("SELECT * FROM invoice_adjustments WHERE invoice_id = $id");
@@ -55,10 +54,8 @@ $tax_rate = $is_international ? 0 : 0.11;
 
 // B. SETTING PAYMENT DETAILS & NOTE
 if ($is_international) {
-    // USD
     $payment_title = "Payment Method (USD)";
     $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
-    
     $payment_details = "Banking Nation : Indonesia\n" .
                        "Bank Name : PT. Bank Central Asia (BCA)\n" .
                        "Bank Address : Jl. M. H. Thamrin No. 1 Kec. Menteng, Kota Jakarta Pusat, DKI Jakarta\n" .
@@ -67,14 +64,9 @@ if ($is_international) {
                        "Acc Name : PT Linksfield Networks Indonesia\n" .
                        "Settlement Currency : USD";
 } else {
-    // IDR
     $payment_title = "Payment Method (IDR)";
-    
-    // Note Default dari Database
     $final_note = isset($sets['invoice_note_default']) ? $sets['invoice_note_default'] : '';
-    
     $special_note_usd = ""; 
-    
     $payment_details = "Acc Name : PT. LINKSFIELD NETWORKS INDONESIA\n" .
                        "Bank Name : BCA (Bank Central Asia)\n" .
                        "Acc No : 2060752705\n" .
@@ -150,7 +142,7 @@ function format_money($num, $is_intl) {
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
         <div style="margin-top:5px; color:red; font-size:11px;">
             * Mode: <strong><?= $inv_type ?></strong> (Currency: <?= $inv['currency'] ?>)<br>
-            * Adjustment (DP, Fee, dll) ditampilkan di bawah Total sebagai rincian.
+            * Adjustment (DP, Fee, dll) akan muncul di atas Total.
         </div>
     </div>
 
@@ -231,7 +223,7 @@ function format_money($num, $is_intl) {
             <?php endforeach; ?>
             
             <?php 
-                // PERHITUNGAN TOTAL (TIDAK TERMASUK ADJUSTMENT)
+                // Kalkulasi Dasar (Subtotal + VAT saja)
                 if ($is_international) {
                     $vatAmount = 0;
                     $grandTotal = round($grandTotal, 2); 
@@ -239,6 +231,8 @@ function format_money($num, $is_intl) {
                     $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
                 }
+                
+                // Total tidak ditambah Adjustment karena Adjustment hanya info Termin / DP
                 $totalInvoice = $grandTotal + $vatAmount;
             ?>
             
@@ -256,12 +250,6 @@ function format_money($num, $is_intl) {
             </tr>
             <?php endif; ?>
 
-            <tr class="summary-row">
-                <td colspan="4" class="border-none"></td>
-                <td class="label-cell">Total</td>
-                <td class="value-cell" contenteditable="true"><?= format_money($totalInvoice, $is_international) ?></td>
-            </tr>
-
             <?php foreach($adjData as $adj): ?>
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
@@ -269,6 +257,12 @@ function format_money($num, $is_intl) {
                 <td class="value-cell text-muted" contenteditable="true"><?= format_money($adj['amount'], $is_international) ?></td>
             </tr>
             <?php endforeach; ?>
+
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell">Total</td>
+                <td class="value-cell" contenteditable="true"><?= format_money($totalInvoice, $is_international) ?></td>
+            </tr>
 
         </tbody>
     </table>
@@ -299,19 +293,13 @@ function format_money($num, $is_intl) {
 
             <td class="footer-right">
                 <div class="sign-company">PT. Linksfield Networks Indonesia</div>
-                
                 <?php 
-                    $signPath = '';
-                    $signerName = 'Niawati'; 
-                    $baseDir = dirname(__DIR__);
-
+                    $signPath = ''; $signerName = 'Niawati'; $baseDir = dirname(__DIR__);
                     $sqlNia = "SELECT id, username, signature_file FROM users WHERE username LIKE '%Niawati%' OR email LIKE '%nia@%' LIMIT 1";
                     $resNia = $conn->query($sqlNia);
                     $nia = $resNia->fetch_assoc();
-
                     if ($nia) {
-                        $signerName = $nia['username'];
-                        $niaId = $nia['id'];
+                        $signerName = $nia['username']; $niaId = $nia['id'];
                         if (!empty($nia['signature_file']) && file_exists($baseDir . '/uploads/signatures/' . $nia['signature_file'])) {
                             $signPath = '../uploads/signatures/' . $nia['signature_file'];
                         } elseif (count(glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png')) > 0) {
@@ -319,22 +307,18 @@ function format_money($num, $is_intl) {
                             $signPath = '../uploads/signatures/' . basename($files[0]);
                         }
                     }
-
                     if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
                         $signPath = '../assets/images/signature.png';
                     }
                 ?>
-
                 <?php if (!empty($signPath)): ?>
                     <img src="<?= $signPath ?>" class="sign-img">
                 <?php else: ?>
                     <div class="no-sign-box"><span style="font-size:9px; color:red;">(Signature Not Found)</span></div>
                 <?php endif; ?>
-
                 <div class="sign-name" contenteditable="true"><?= htmlspecialchars($signerName) ?></div>
             </td>
         </tr>
     </table>
-
 </body>
 </html>

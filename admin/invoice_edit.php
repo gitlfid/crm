@@ -76,7 +76,7 @@ if (isset($_POST['update_invoice'])) {
         }
     }
 
-    // 4. UPDATE ADJUSTMENTS (Delete All & Re-insert) - [FITUR BARU]
+    // 4. UPDATE ADJUSTMENTS (Delete All & Re-insert)
     $conn->query("DELETE FROM invoice_adjustments WHERE invoice_id=$inv_id");
     
     if (isset($_POST['adj_label'])) {
@@ -132,7 +132,7 @@ if ($resItems->num_rows > 0) {
     while($itm = $resQItems->fetch_assoc()) $invoice_items[] = $itm;
 }
 
-// Ambil Adjustments [BARU]
+// Ambil Adjustments
 $adjustments = [];
 $checkTbl = $conn->query("SHOW TABLES LIKE 'invoice_adjustments'");
 if ($checkTbl && $checkTbl->num_rows > 0) {
@@ -192,32 +192,6 @@ if ($checkTbl && $checkTbl->num_rows > 0) {
                         </div>
                         <div class="mb-3"><label class="fw-bold">Currency (Auto)</label><input type="text" id="currency_display" class="form-control bg-light" value="<?= $invoice['currency'] ?>" readonly></div>
                         <div class="mt-2"><label>Payment Method Label</label><input type="text" name="payment_method_col" class="form-control" value="<?= htmlspecialchars($invoice['payment_method']) ?>"></div>
-
-                        <div class="mt-4 pt-3 border-top">
-                            <label class="fw-bold text-success mb-2">Adjustments / Payment Term</label>
-                            <table class="table table-sm table-borderless mb-2" id="adjTable">
-                                <?php if(count($adjustments) > 0): ?>
-                                    <?php foreach($adjustments as $adj): 
-                                        $val = floatval($adj['amount']);
-                                        $dispVal = ($invoice['currency']=='IDR') ? number_format($val,0,',','.') : number_format($val,2,'.',',');
-                                    ?>
-                                    <tr>
-                                        <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)" value="<?= htmlspecialchars($adj['label']) ?>"></td>
-                                        <td width="40%"><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount" value="<?= $dispVal ?>"></td>
-                                        <td width="10%"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)"></td>
-                                        <td width="40%"><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount"></td>
-                                        <td width="10%"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
-                                    </tr>
-                                <?php endif; ?>
-                            </table>
-                            <button type="button" class="btn btn-sm btn-outline-success w-100 border-dashed" onclick="addAdjRow()">+ Add Adjustment Row</button>
-                            <div class="text-muted small mt-2 fst-italic">* Gunakan tanda minus (-) untuk pengurangan (misal: -500.000).</div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -258,6 +232,33 @@ if ($checkTbl && $checkTbl->num_rows > 0) {
                         </tbody>
                     </table>
                 </div>
+                
+                <div class="p-4 bg-light border-top">
+                    <label class="fw-bold text-success mb-2">Adjustments / Payment Term</label>
+                    <table class="table table-sm table-borderless mb-2" id="adjTable">
+                        <?php if(count($adjustments) > 0): ?>
+                            <?php foreach($adjustments as $adj): 
+                                $val = floatval($adj['amount']);
+                                $dispVal = ($invoice['currency']=='IDR') ? number_format($val,0,',','.') : number_format($val,2,'.',',');
+                            ?>
+                            <tr>
+                                <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)" value="<?= htmlspecialchars($adj['label']) ?>"></td>
+                                <td width="40%"><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount" value="<?= $dispVal ?>"></td>
+                                <td width="10%"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td width="50%"><input type="text" name="adj_label[]" class="form-control form-control-sm" placeholder="Label (e.g. DP 50%)"></td>
+                                <td width="40%"><input type="text" name="adj_amount[]" class="form-control form-control-sm text-end" placeholder="Amount"></td>
+                                <td width="10%"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">x</button></td>
+                            </tr>
+                        <?php endif; ?>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-outline-success w-100 border-dashed" onclick="addAdjRow()">+ Add Adjustment Row</button>
+                    <div class="text-muted small mt-2 fst-italic">* Gunakan tanda minus (-) untuk pengurangan (misal: -500.000).</div>
+                </div>
+
             </div>
             <div class="card-footer bg-white text-end">
                 <a href="invoice_list.php" class="btn btn-light border me-2">Cancel</a>
@@ -276,7 +277,7 @@ if ($checkTbl && $checkTbl->num_rows > 0) {
         if(disp) disp.value = (type === 'International') ? 'USD' : 'IDR';
     }
 
-    // [UPDATE] LOGIKA JS DUE DATE (5 Working Days)
+    // LOGIKA JS DUE DATE (5 Working Days)
     function updateDueDate() {
         var invDateInput = document.getElementsByName("invoice_date")[0];
         var dueDateInput = document.getElementsByName("due_date")[0];
@@ -332,8 +333,6 @@ if ($checkTbl && $checkTbl->num_rows > 0) {
         if (table.closest('#itemTable') && table.rows.length <= 1) {
             alert("Minimal 1 item harus ada.");
         } else {
-            // Jika adjustment, bisa dihapus sampai habis
-            // Jika item, sisakan 1
             if (table.closest('#adjTable')) {
                 row.remove();
             } else {
