@@ -179,11 +179,11 @@ function smart_format($num, $curr = 'IDR') {
             </tr>
             <?php endwhile; ?>
 
-            <tr class="summary-row">
+            <!-- <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
                 <td class="label-cell">Total</td>
                 <td class="value-cell" contenteditable="true"><?= smart_format($totalQuot, $quot['currency']) ?></td>
-            </tr>
+            </tr> -->
 
             <?php foreach($adjData as $adj): ?>
             <tr class="summary-row">
