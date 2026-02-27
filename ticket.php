@@ -130,11 +130,6 @@ function formatTextOutput($text) {
 }
 
 function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg','jpeg','png','gif','webp']); }
-
-// --- [OPTIMASI MOBILE] LOGIKA TAMPILAN BERBASIS TAILWIND ---
-$is_default_page = ($current_view == 'default');
-$left_col_class  = $is_default_page ? 'flex' : 'hidden lg:flex';
-$right_col_class = $is_default_page ? 'hidden lg:flex' : 'flex';
 ?>
 
 <!DOCTYPE html>
@@ -151,363 +146,476 @@ $right_col_class = $is_default_page ? 'hidden lg:flex' : 'flex';
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'], },
                     colors: {
-                        primary: '#435ebe',
-                        primaryDark: '#25396f',
+                        primary: '#4F46E5', // Indigo 600
+                        primaryDark: '#3730A3', // Indigo 800
+                        secondary: '#0EA5E9', // Indigo-blue alternative
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(30px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        }
                     }
                 }
             }
         }
     </script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <style>
-        /* Custom scrollbar untuk Tailwind */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+        }
+        
         .chat-scroll-area::-webkit-scrollbar { width: 6px; }
         .chat-scroll-area::-webkit-scrollbar-track { background: transparent; }
-        .chat-scroll-area::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.2); border-radius: 10px; }
+        .chat-scroll-area::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.15); border-radius: 10px; }
         
-        /* Animasi */
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
+        /* Utility delay classes */
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+        .delay-2000 { animation-delay: 2000ms; }
+        .delay-4000 { animation-delay: 4000ms; }
     </style>
 </head>
 
-<body class="h-screen w-full bg-slate-50 font-sans text-slate-800 overflow-hidden selection:bg-primary selection:text-white">
+<body class="min-h-screen w-full bg-slate-50 font-sans text-slate-800 overflow-x-hidden selection:bg-primary selection:text-white relative flex items-center justify-center p-4 lg:p-8">
     
-    <div class="flex flex-col lg:flex-row h-full w-full">
-        
-        <div class="lg:w-5/12 w-full h-full bg-white shadow-[10px_0_30px_rgba(0,0,0,0.05)] z-20 flex-col justify-center p-8 lg:p-16 overflow-y-auto <?= $left_col_class ?>">
+    <div class="fixed inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div class="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-primary/20 mix-blend-multiply filter blur-[80px] animate-blob"></div>
+        <div class="absolute top-[20%] right-[-10%] w-[35vw] h-[35vw] rounded-full bg-secondary/20 mix-blend-multiply filter blur-[80px] animate-blob delay-2000"></div>
+        <div class="absolute bottom-[-20%] left-[20%] w-[45vw] h-[45vw] rounded-full bg-purple-400/20 mix-blend-multiply filter blur-[80px] animate-blob delay-4000"></div>
+        <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23000000\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+    </div>
+
+    <div class="w-full max-w-5xl z-10 relative">
+
+        <?php if($current_view == 'default'): ?>
+        <div class="flex flex-col items-center justify-center animate-slide-up">
             
-            <div class="mb-10">
-                <h3 class="font-bold text-primary text-2xl flex items-center gap-3">
-                    <i class="ph-fill ph-lifebuoy text-3xl"></i> Helpdesk System
-                </h3>
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 backdrop-blur-md border border-white/50 shadow-sm text-primary font-semibold text-sm mb-6">
+                <i class="ph-fill ph-sparkle"></i> Support Portal
             </div>
 
-            <h1 class="text-4xl font-extrabold text-slate-900 mb-2 tracking-tight">Welcome</h1>
-            <p class="text-slate-500 text-lg mb-10">Silakan pilih menu bantuan di bawah ini.</p>
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold text-slate-900 tracking-tight text-center mb-4 leading-tight">
+                Bagaimana kami bisa <br class="hidden md:block" />
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">membantu Anda hari ini?</span>
+            </h1>
+            
+            <p class="text-lg text-slate-500 text-center max-w-xl mx-auto mb-12">
+                Pilih layanan di bawah ini. Laporkan masalah baru atau pantau perkembangan tiket Anda secara real-time.
+            </p>
 
-            <div class="grid gap-4">
-                <a href="?view=create" class="group flex items-center p-5 rounded-2xl border-2 transition-all duration-300 <?= ($current_view=='create') ? 'bg-primary border-primary text-white shadow-lg shadow-primary/30' : 'bg-white border-slate-200 text-slate-700 hover:border-primary hover:bg-slate-50' ?>">
-                    <div class="flex items-center justify-center w-12 h-12 rounded-full <?= ($current_view=='create') ? 'bg-white/20 text-white' : 'bg-indigo-100 text-primary group-hover:bg-primary group-hover:text-white transition-colors' ?>">
-                        <i class="ph-bold ph-plus-circle text-2xl"></i>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
+                <a href="?view=create" class="group relative p-8 glass-card rounded-[2rem] hover:-translate-y-2 hover:shadow-[0_30px_60px_-15px_rgba(79,70,229,0.3)] transition-all duration-300 overflow-hidden cursor-pointer">
+                    <div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div class="relative z-10">
+                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-indigo-500 text-white flex items-center justify-center text-3xl mb-6 shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform duration-300">
+                            <i class="ph-bold ph-plus"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-900 mb-2">Buat Tiket Baru</h3>
+                        <p class="text-slate-500 leading-relaxed">Ajukan pertanyaan, laporkan bug, atau request layanan baru ke tim support kami.</p>
+                        <div class="mt-6 flex items-center font-bold text-primary opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                            Mulai Sekarang <i class="ph-bold ph-arrow-right ml-2"></i>
+                        </div>
                     </div>
-                    <span class="ml-4 font-bold text-lg">Buat Ticket Baru</span>
                 </a>
-                
-                <a href="?view=track_search" class="group flex items-center p-5 rounded-2xl border-2 transition-all duration-300 <?= ($current_view=='track_search' || $current_view=='track_result') ? 'bg-primary border-primary text-white shadow-lg shadow-primary/30' : 'bg-white border-slate-200 text-slate-700 hover:border-primary hover:bg-slate-50' ?>">
-                    <div class="flex items-center justify-center w-12 h-12 rounded-full <?= ($current_view=='track_search' || $current_view=='track_result') ? 'bg-white/20 text-white' : 'bg-indigo-100 text-primary group-hover:bg-primary group-hover:text-white transition-colors' ?>">
-                        <i class="ph-bold ph-magnifying-glass text-2xl"></i>
+
+                <a href="?view=track_search" class="group relative p-8 glass-card rounded-[2rem] hover:-translate-y-2 hover:shadow-[0_30px_60px_-15px_rgba(14,165,233,0.3)] transition-all duration-300 overflow-hidden cursor-pointer">
+                    <div class="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div class="relative z-10">
+                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-secondary to-cyan-500 text-white flex items-center justify-center text-3xl mb-6 shadow-lg shadow-secondary/30 group-hover:scale-110 transition-transform duration-300">
+                            <i class="ph-bold ph-magnifying-glass"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-900 mb-2">Lacak Status Tiket</h3>
+                        <p class="text-slate-500 leading-relaxed">Cek update terbaru, progress pengerjaan, dan balas pesan dari teknisi kami.</p>
+                        <div class="mt-6 flex items-center font-bold text-secondary opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                            Lacak Sekarang <i class="ph-bold ph-arrow-right ml-2"></i>
+                        </div>
                     </div>
-                    <span class="ml-4 font-bold text-lg">Lacak Status Ticket</span>
                 </a>
             </div>
 
-            <div class="mt-auto pt-12 text-center">
-                <p class="text-slate-500 text-sm">Staff Administrator? <a href="login.php" class="font-bold text-primary hover:underline">Login Disini</a>.</p>
+            <div class="mt-16">
+                <a href="login.php" class="text-slate-400 hover:text-primary font-semibold flex items-center gap-2 transition-colors">
+                    <i class="ph-fill ph-lock-key text-lg"></i> Admin Panel Login
+                </a>
             </div>
         </div>
-        
-        <div class="lg:w-7/12 w-full h-full bg-gradient-to-br from-primary to-primaryDark flex items-center justify-center p-4 lg:p-8 relative overflow-y-auto <?= $right_col_class ?>">
+        <?php endif; ?>
+
+        <?php if($current_view == 'create'): ?>
+        <div class="glass-card rounded-[2rem] p-6 md:p-10 animate-slide-up mx-auto max-w-3xl">
             
-            <?php if($current_view == 'default'): ?>
-            <div class="text-center text-white animate-slide-up">
-                <div class="mb-6 flex justify-center"><i class="ph-fill ph-chats-circle text-white/80 text-8xl"></i></div>
-                <h2 class="text-4xl font-extrabold mb-3 tracking-tight">Halo! Ada yang bisa kami bantu?</h2>
-                <p class="text-xl text-white/80">Pilih menu di sebelah kiri untuk memulai.</p>
+            <div class="flex items-center justify-between border-b border-slate-200/60 pb-6 mb-6">
+                <div>
+                    <h2 class="text-3xl font-extrabold text-slate-900">Tiket Baru</h2>
+                    <p class="text-slate-500 mt-1">Kami siap membantu memecahkan masalah Anda.</p>
+                </div>
+                <a href="ticket.php" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-primary hover:text-white transition-all shadow-sm">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </a>
             </div>
-            <?php endif; ?>
 
-            <?php if($current_view == 'create'): ?>
-            <div class="w-full max-w-2xl bg-white rounded-[1.5rem] shadow-2xl p-6 lg:p-10 animate-slide-up relative">
-                
-                <div class="lg:hidden mb-6">
-                    <a href="ticket.php" class="inline-flex items-center gap-2 text-sm font-bold text-primary bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100">
-                        <i class="ph-bold ph-arrow-left"></i> Kembali
-                    </a>
-                </div>
-
-                <div class="border-b border-slate-200 pb-5 mb-6">
-                    <h4 class="text-2xl font-bold text-primary">Buat Ticket Baru</h4>
-                    <p class="text-slate-500 text-sm mt-1">Isi formulir di bawah ini untuk melaporkan masalah Anda.</p>
-                </div>
-
-                <form action="process_ticket.php" method="POST" enctype="multipart/form-data" class="space-y-5">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Jenis Ticket</label>
-                            <select name="type" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-sm">
-                                <option value="support">Support</option>
-                                <option value="information">Information</option>
+            <form action="process_ticket.php" method="POST" enctype="multipart/form-data" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700">Jenis Layanan</label>
+                        <div class="relative">
+                            <i class="ph-fill ph-stack absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                            <select name="type" class="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all appearance-none cursor-pointer">
+                                <option value="support">Technical Support</option>
+                                <option value="information">General Information</option>
                             </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Email</label>
-                            <input type="email" name="email" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-sm" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Perusahaan</label>
-                            <input type="text" name="company" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-sm" required>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Nama Anda</label>
-                            <input type="text" name="name" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-sm" required>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">No. Telepon / WhatsApp</label>
-                            <input type="text" name="phone" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-sm" required>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Judul (Subject)</label>
-                            <input type="text" name="subject" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-sm" required>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Deskripsi Masalah</label>
-                            <textarea name="description" rows="4" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition-all text-sm resize-none" required></textarea>
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Lampiran <span class="text-slate-400 font-normal">(Opsional, Max 2MB)</span></label>
-                            <input type="file" name="attachment" class="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-primary hover:file:bg-indigo-100 transition-all border border-slate-200 rounded-xl bg-slate-50">
+                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                         </div>
                     </div>
-                    <div class="pt-4">
-                        <button type="submit" name="submit_ticket" class="w-full bg-primary hover:bg-primaryDark text-white font-bold py-3.5 px-4 rounded-xl transition-colors shadow-lg shadow-primary/30 flex justify-center items-center gap-2">
-                            <i class="ph-bold ph-paper-plane-right text-lg"></i> Kirim Ticket
-                        </button>
+
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700">Email Anda</label>
+                        <div class="relative">
+                            <i class="ph-fill ph-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                            <input type="email" name="email" class="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="email@perusahaan.com" required>
+                        </div>
                     </div>
-                </form>
+
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700">Nama Lengkap</label>
+                        <div class="relative">
+                            <i class="ph-fill ph-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                            <input type="text" name="name" class="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="John Doe" required>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-bold text-slate-700">Perusahaan</label>
+                        <div class="relative">
+                            <i class="ph-fill ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                            <input type="text" name="company" class="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="PT. ABC Maju" required>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5 md:col-span-2">
+                        <label class="text-sm font-bold text-slate-700">No. WhatsApp / Telepon</label>
+                        <div class="relative flex">
+                            <span class="inline-flex items-center px-4 py-3.5 bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl text-slate-500 font-semibold">+62</span>
+                            <input type="text" name="phone" class="w-full px-4 py-3.5 bg-white/50 border border-slate-200 rounded-r-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="81234567890" required>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5 md:col-span-2">
+                        <label class="text-sm font-bold text-slate-700">Judul Kendala (Subject)</label>
+                        <input type="text" name="subject" class="w-full px-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="Singkat, padat, jelas" required>
+                    </div>
+
+                    <div class="space-y-1.5 md:col-span-2">
+                        <label class="text-sm font-bold text-slate-700">Deskripsi Lengkap</label>
+                        <textarea name="description" rows="4" class="w-full px-4 py-3.5 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none" placeholder="Ceritakan detail masalah yang Anda alami..." required></textarea>
+                    </div>
+
+                    <div class="space-y-1.5 md:col-span-2">
+                        <label class="text-sm font-bold text-slate-700">Lampiran <span class="text-slate-400 font-normal">(Screenshot/Error - Max 2MB)</span></label>
+                        <input type="file" name="attachment" class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all border border-slate-200 rounded-xl bg-white/50 cursor-pointer">
+                    </div>
+
+                </div>
+
+                <div class="pt-6 border-t border-slate-200/60 mt-8">
+                    <button type="submit" name="submit_ticket" class="w-full bg-gradient-to-r from-primary to-secondary hover:from-primaryDark hover:to-primary text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-primary/30 flex justify-center items-center gap-2 transform hover:-translate-y-1">
+                        <i class="ph-bold ph-paper-plane-right text-xl"></i> Submit Tiket Sekarang
+                    </button>
+                </div>
+            </form>
+        </div>
+        <?php endif; ?>
+
+        <?php if($current_view == 'track_search'): ?>
+        <div class="glass-card rounded-[2rem] p-8 md:p-14 text-center animate-slide-up mx-auto max-w-2xl relative">
+            
+            <a href="ticket.php" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-primary hover:text-white transition-all shadow-sm">
+                <i class="ph-bold ph-x text-lg"></i>
+            </a>
+
+            <div class="w-24 h-24 bg-gradient-to-br from-secondary/20 to-primary/20 rounded-full flex items-center justify-center mx-auto mb-8 animate-pulse">
+                <i class="ph-fill ph-radar text-5xl text-primary"></i>
             </div>
-            <?php endif; ?>
-
-            <?php if($current_view == 'track_search'): ?>
-            <div class="w-full max-w-lg bg-white rounded-[1.5rem] shadow-2xl p-8 lg:p-12 text-center animate-slide-up relative">
+            
+            <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Lacak Tiket Anda</h2>
+            <p class="text-slate-500 mb-10 text-lg">Masukkan nomor resi / ID tiket untuk melihat status terkini.</p>
+            
+            <form action="ticket.php" method="GET" class="relative">
+                <div class="relative group">
+                    <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                        <i class="ph-bold ph-magnifying-glass text-slate-400 group-focus-within:text-primary text-2xl transition-colors"></i>
+                    </div>
+                    <input type="text" name="track_id" class="w-full pl-14 pr-4 py-5 bg-white border-2 border-slate-200 rounded-2xl focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all text-center font-mono text-xl font-bold text-slate-800 placeholder:font-sans placeholder:text-slate-400 placeholder:font-normal uppercase shadow-inner" placeholder="LFID-SUP-XXXX" required autocomplete="off">
+                </div>
                 
-                <div class="lg:hidden mb-8 text-left">
-                    <a href="ticket.php" class="inline-flex items-center gap-2 text-sm font-bold text-primary bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100">
-                        <i class="ph-bold ph-arrow-left"></i> Kembali
+                <?php if($track_error): ?>
+                    <div class="mt-4 bg-red-50 text-red-600 border border-red-200 text-sm px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium animate-fade-in">
+                        <i class="ph-fill ph-warning-circle text-lg"></i> 
+                        <span><?= $track_error ?></span>
+                    </div>
+                <?php endif; ?>
+
+                <button type="submit" class="mt-6 w-full bg-slate-900 hover:bg-primary text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-primary/30 text-lg flex items-center justify-center gap-2">
+                    Lacak Sekarang <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+        <?php endif; ?>
+
+        <?php if($current_view == 'track_result' && $ticket): ?>
+        <div class="glass-card rounded-[2rem] w-full max-w-5xl h-[95vh] md:h-[85vh] flex flex-col overflow-hidden animate-slide-up shadow-2xl relative border border-white/60">
+            
+            <div class="bg-white/80 backdrop-blur-lg px-4 md:px-8 py-5 border-b border-slate-200/80 z-20 shrink-0 flex items-center justify-between">
+                <div class="flex items-center gap-4 min-w-0">
+                    <a href="?view=track_search" class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors shrink-0">
+                        <i class="ph-bold ph-arrow-left text-lg"></i>
                     </a>
+                    <div class="min-w-0">
+                        <h2 class="font-extrabold text-slate-900 text-lg md:text-xl truncate leading-tight"><?= htmlspecialchars($ticket['subject']) ?></h2>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="font-mono text-xs font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">#<?= $ticket['ticket_code'] ?></span>
+                            <span class="text-xs text-slate-400 hidden sm:inline-flex items-center gap-1"><i class="ph-fill ph-calendar-blank"></i> <?= date('d M Y, H:i', strtotime($ticket['created_at'])) ?></span>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="mb-6 flex justify-center text-primary">
-                    <div class="bg-indigo-50 p-5 rounded-full">
-                        <i class="ph-bold ph-magnifying-glass text-6xl"></i>
-                    </div>
-                </div>
-                <h3 class="text-3xl font-extrabold text-slate-900 tracking-tight">Lacak Status</h3>
-                <p class="text-slate-500 mt-2 mb-8">Masukkan Nomor ID Ticket Anda untuk melihat progres dan update terbaru.</p>
-                
-                <form action="ticket.php" method="GET">
-                    <div class="mb-5 text-left">
-                        <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider pl-1">Nomor Ticket</label>
-                        <input type="text" name="track_id" class="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-primary focus:ring-0 transition-all text-center font-mono text-lg font-semibold text-slate-800 placeholder:font-sans placeholder:text-slate-400 placeholder:font-normal" placeholder="Contoh: LFID-SUP-xxxx" required>
-                    </div>
-                    <?php if($track_error): ?>
-                        <div class="bg-red-50 text-red-600 border border-red-200 text-sm px-4 py-3 rounded-xl mb-5 flex items-center justify-center gap-2 font-medium">
-                            <i class="ph-fill ph-warning-circle text-lg"></i> 
-                            <span><?= $track_error ?></span>
+                <div class="flex items-center gap-3 shrink-0">
+                    <?php if(!empty($currentQueue)): ?>
+                        <div class="hidden md:flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-primary px-3 py-1.5 rounded-full text-xs font-bold">
+                            <i class="ph-fill ph-users"></i> Antrian: <?= $currentQueue ?>
                         </div>
                     <?php endif; ?>
-                    <button type="submit" class="w-full bg-primary hover:bg-primaryDark text-white font-bold py-4 rounded-xl transition-colors shadow-lg shadow-primary/30 text-lg">
-                        Cari Ticket
-                    </button>
-                </form>
-            </div>
-            <?php endif; ?>
 
-            <?php if($current_view == 'track_result' && $ticket): ?>
-            <div class="w-full max-w-4xl h-[90vh] lg:h-[85vh] bg-slate-100 rounded-[1.5rem] shadow-2xl flex flex-col overflow-hidden animate-slide-up relative">
-                
-                <div class="bg-white px-5 py-4 lg:px-6 lg:py-5 border-b border-slate-200 z-10 shrink-0 shadow-sm">
-                    <div class="flex flex-wrap md:flex-nowrap justify-between items-start md:items-center gap-4">
-                        <div class="flex items-center gap-4 min-w-0">
-                            <a href="?view=track_search" class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-primary hover:text-white transition-colors shrink-0">
-                                <i class="ph-bold ph-arrow-left text-lg"></i>
-                            </a>
-                            <div class="min-w-0">
-                                <h5 class="font-bold text-slate-900 text-lg leading-tight truncate pr-4"><?= htmlspecialchars($ticket['subject']) ?></h5>
-                                <div class="flex items-center gap-3 mt-1">
-                                    <span class="font-mono text-xs font-semibold text-slate-500">#<?= $ticket['ticket_code'] ?></span>
-                                    <span class="text-xs text-slate-400 flex items-center gap-1 hidden md:flex"><i class="ph-fill ph-clock"></i> <?= date('d M Y, H:i', strtotime($ticket['created_at'])) ?></span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <?php if(!empty($currentQueue)): ?>
-                                <span class="bg-white border border-primary text-primary px-3 py-1.5 rounded-full text-xs font-bold shadow-sm flex items-center gap-1.5">
-                                    <i class="ph-fill ph-users text-sm"></i> <span class="hidden sm:inline">Antrian:</span> <?= $currentQueue ?>
-                                </span>
-                            <?php endif; ?>
-
-                            <?php 
-                                $st = strtolower($ticket['status']); 
-                                $bgClass = '';
-                                if($st == 'open') $bgClass = 'bg-emerald-100 text-emerald-700 border-emerald-200';
-                                elseif($st == 'progress') $bgClass = 'bg-amber-100 text-amber-700 border-amber-200';
-                                elseif($st == 'closed') $bgClass = 'bg-slate-200 text-slate-600 border-slate-300';
-                                else $bgClass = 'bg-rose-100 text-rose-700 border-rose-200';
-                            ?>
-                            <span class="px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wide <?= $bgClass ?>">
-                                <?= $st ?>
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 pt-4 border-t border-slate-100 pl-[3.5rem]">
-                        <details class="group">
-                            <summary class="flex items-center cursor-pointer list-none text-sm font-semibold text-primary select-none">
-                                <span>Lihat Detail Laporan</span>
-                                <span class="transition group-open:rotate-180 ml-1"><i class="ph-bold ph-caret-down"></i></span>
-                            </summary>
-                            <div class="mt-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600">
-                                <div class="mb-2"><strong class="text-slate-800">Pelapor:</strong> <?= htmlspecialchars($ticket['name']) ?> (<?= htmlspecialchars($ticket['company']) ?>)</div>
-                                <div class="mb-3"><strong class="text-slate-800">Kontak:</strong> <?= htmlspecialchars($ticket['email']) ?> / <?= htmlspecialchars($ticket['phone']) ?></div>
-                                <div class="font-medium text-slate-800 mb-1">Deskripsi Masalah:</div>
-                                <div class="opacity-90 max-h-32 overflow-y-auto text-sm leading-relaxed"><?= formatTextOutput($ticket['description']) ?></div>
-                            </div>
-                        </details>
+                    <?php 
+                        $st = strtolower($ticket['status']); 
+                        $bgClass = ''; $iconClass = '';
+                        if($st == 'open') { $bgClass = 'bg-emerald-100 text-emerald-700'; $iconClass = 'ph-check-circle'; }
+                        elseif($st == 'progress') { $bgClass = 'bg-amber-100 text-amber-700'; $iconClass = 'ph-spinner gap-1 animate-spin-slow'; }
+                        elseif($st == 'closed') { $bgClass = 'bg-slate-200 text-slate-600'; $iconClass = 'ph-lock-key'; }
+                        else { $bgClass = 'bg-rose-100 text-rose-700'; $iconClass = 'ph-x-circle'; }
+                    ?>
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide <?= $bgClass ?>">
+                        <i class="ph-bold <?= $iconClass ?>"></i> <?= $st ?>
                     </div>
                 </div>
+            </div>
 
-                <div class="chat-scroll-area flex-1 p-4 lg:p-6" id="chatContainer" style="background-color: #f1f5f9; background-image: url('data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z\' fill=\'%23e2e8f0\' fill-opacity=\'0.5\' fill-rule=\'evenodd\'/%3E%3C/svg%3E');">
-                    
-                    <?php if(count($replies) > 0): ?>
-                        <?php foreach($replies as $reply): $isAdmin = ($reply['user'] == 'Admin'); ?>
-                            
-                            <div class="flex items-end w-full mb-6 <?= $isAdmin ? 'justify-start' : 'justify-end' ?>">
+            <div class="bg-slate-50/80 border-b border-slate-200/60 px-4 md:px-8 py-3 shrink-0 z-10">
+                <details class="group">
+                    <summary class="flex items-center justify-between cursor-pointer list-none text-sm font-semibold text-slate-600 hover:text-primary select-none transition-colors">
+                        <span class="flex items-center gap-2"><i class="ph-fill ph-info"></i> Tampilkan Detail Masalah Awal</span>
+                        <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center transition-transform duration-300 group-open:rotate-180">
+                            <i class="ph-bold ph-caret-down text-xs"></i>
+                        </div>
+                    </summary>
+                    <div class="mt-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-sm text-slate-600 animate-fade-in">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div><strong class="text-slate-800 block mb-1 text-xs uppercase tracking-wider opacity-70">Pelapor</strong> <div class="font-medium"><?= htmlspecialchars($ticket['name']) ?> (<?= htmlspecialchars($ticket['company']) ?>)</div></div>
+                            <div><strong class="text-slate-800 block mb-1 text-xs uppercase tracking-wider opacity-70">Kontak</strong> <div class="font-medium"><?= htmlspecialchars($ticket['email']) ?> / <?= htmlspecialchars($ticket['phone']) ?></div></div>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl text-slate-700 leading-relaxed border border-slate-100">
+                            <?= formatTextOutput($ticket['description']) ?>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="chat-scroll-area flex-1 p-4 md:p-8 overflow-y-auto bg-[#F8FAFC]" id="chatContainer">
+                
+                <?php if(count($replies) > 0): ?>
+                    <div class="space-y-6">
+                    <?php foreach($replies as $reply): $isAdmin = ($reply['user'] == 'Admin'); ?>
+                        
+                        <div class="flex w-full <?= $isAdmin ? 'justify-start' : 'justify-end' ?> animate-fade-in">
+                            <div class="flex max-w-[85%] md:max-w-[70%] <?= $isAdmin ? 'flex-row' : 'flex-row-reverse' ?> items-end gap-2 md:gap-3">
                                 
-                                <?php if($isAdmin): ?>
-                                    <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 mr-3 bg-white text-primary shadow-sm border border-slate-100 z-10">
-                                        <i class="ph-fill ph-headset text-xl"></i>
-                                    </div>
-                                <?php endif; ?>
+                                <div class="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm <?= $isAdmin ? 'bg-gradient-to-br from-primary to-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600' ?>">
+                                    <?php if($isAdmin): ?>
+                                        <i class="ph-fill ph-headset text-lg md:text-xl"></i>
+                                    <?php else: ?>
+                                        <i class="ph-fill ph-user text-lg md:text-xl"></i>
+                                    <?php endif; ?>
+                                </div>
 
-                                <div class="max-w-[80%] flex flex-col <?= $isAdmin ? 'items-start' : 'items-end' ?>">
-                                    <div class="px-5 py-3.5 shadow-sm text-[0.95rem] leading-relaxed relative <?= $isAdmin ? 'bg-white text-slate-800 rounded-2xl rounded-bl-none border border-slate-100' : 'bg-primary text-white rounded-2xl rounded-br-none' ?>">
+                                <div class="flex flex-col <?= $isAdmin ? 'items-start' : 'items-end' ?>">
+                                    <span class="text-[0.65rem] md:text-xs font-bold text-slate-400 mb-1 px-1">
+                                        <?= $isAdmin ? 'Tim Support' : 'Anda' ?> &bull; <?= date('H:i', strtotime($reply['created_at'])) ?>
+                                    </span>
+                                    
+                                    <div class="px-5 py-3.5 shadow-sm text-sm md:text-[0.95rem] leading-relaxed relative <?= $isAdmin ? 'bg-white text-slate-800 rounded-[1.5rem] rounded-bl-sm border border-slate-100' : 'bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-[1.5rem] rounded-br-sm' ?>">
                                         
-                                        <div class="font-bold text-xs mb-1.5 <?= $isAdmin ? 'text-primary' : 'text-indigo-200' ?>">
-                                            <?= $isAdmin ? 'Support Team' : 'Anda' ?>
-                                        </div>
-                                        
-                                        <div class="<?= $isAdmin ? '' : 'text-indigo-50' ?> break-words">
+                                        <div class="break-words [&>a]:underline [&>a]:font-medium <?= $isAdmin ? '[&>a]:text-primary' : '[&>a]:text-indigo-300' ?>">
                                             <?= formatTextOutput($reply['message']) ?>
                                         </div>
 
                                         <?php if($reply['attachment']): ?>
-                                            <div class="mt-3 pt-3 border-t <?= $isAdmin ? 'border-slate-100' : 'border-indigo-500/50' ?>">
+                                            <div class="mt-3 pt-3 border-t <?= $isAdmin ? 'border-slate-100' : 'border-white/10' ?>">
                                                 <?php if(isImage($reply['attachment'])): ?>
-                                                    <a href="uploads/<?= $reply['attachment'] ?>" target="_blank" class="block">
-                                                        <img src="uploads/<?= $reply['attachment'] ?>" class="rounded-lg max-h-48 object-cover border <?= $isAdmin ? 'border-slate-200' : 'border-indigo-400' ?> bg-white/10 p-0.5 hover:opacity-90 transition">
+                                                    <a href="uploads/<?= $reply['attachment'] ?>" target="_blank" class="block group relative overflow-hidden rounded-xl bg-black/5">
+                                                        <img src="uploads/<?= $reply['attachment'] ?>" class="max-h-48 md:max-h-64 object-cover w-full transition-transform duration-300 group-hover:scale-105">
+                                                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <i class="ph-bold ph-arrows-out-simple text-white text-2xl"></i>
+                                                        </div>
                                                     </a>
                                                 <?php else: ?>
-                                                    <a href="uploads/<?= $reply['attachment'] ?>" target="_blank" class="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg transition-colors <?= $isAdmin ? 'bg-slate-50 text-slate-700 hover:bg-slate-100' : 'bg-indigo-700 text-white hover:bg-indigo-800' ?>">
-                                                        <i class="ph-bold ph-download-simple text-base"></i> Download File
+                                                    <a href="uploads/<?= $reply['attachment'] ?>" target="_blank" class="inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-colors <?= $isAdmin ? 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200' : 'bg-white/10 text-white hover:bg-white/20' ?>">
+                                                        <i class="ph-fill ph-file-arrow-down text-lg"></i> Unduh Lampiran
                                                     </a>
                                                 <?php endif; ?>
                                             </div>
                                         <?php endif; ?>
                                     </div>
-                                    <span class="text-[0.7rem] text-slate-400 mt-1 font-medium px-1"><?= date('H:i', strtotime($reply['created_at'])) ?></span>
                                 </div>
-
                             </div>
-
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="h-full flex flex-col items-center justify-center text-slate-400">
-                            <i class="ph-fill ph-chat-circle-dots text-6xl mb-3 opacity-30"></i>
-                            <p class="text-sm font-medium">Belum ada percakapan dimulai.</p>
                         </div>
-                    <?php endif; ?>
-                </div>
 
-                <div class="bg-white border-t border-slate-200 p-4 shrink-0">
-                    <?php if($ticket['status'] == 'closed' || $ticket['status'] == 'canceled'): ?>
-                        <div class="text-center py-3">
-                            <span class="inline-flex items-center gap-2 bg-slate-100 text-slate-500 font-bold px-4 py-2 rounded-full text-sm border border-slate-200">
-                                <i class="ph-fill ph-lock-key"></i> Tiket Ditutup
-                            </span>
+                    <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="h-full flex flex-col items-center justify-center text-slate-400">
+                        <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+                            <i class="ph-fill ph-chats-teardrop text-4xl text-slate-300"></i>
                         </div>
-                    <?php elseif($ticket['status'] == 'open'): ?>
-                        <div class="text-center py-2 flex flex-col items-center justify-center">
-                            <i class="ph-fill ph-hourglass-high text-primary text-2xl mb-1 animate-pulse"></i>
-                            <h6 class="font-bold text-slate-800 text-sm">Menunggu Antrian</h6>
-                            <p class="text-xs text-slate-500 mt-0.5">Chat akan terbuka otomatis saat petugas memulai pengerjaan.</p>
-                        </div>
-                    <?php else: ?>
-                        
-                        <?php if($msg_error): ?>
-                            <div class="bg-red-50 text-red-600 text-xs p-2 rounded mb-2 border border-red-100 font-medium"><?= $msg_error ?></div>
-                        <?php endif; ?>
-                        
-                        <form action="ticket.php?track_id=<?= htmlspecialchars($track_id) ?>&view=track_result" method="POST" enctype="multipart/form-data">
-                            <div class="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                                
-                                <label id="attachBtn" class="flex items-center justify-center w-10 h-10 shrink-0 text-slate-400 hover:text-primary hover:bg-indigo-50 rounded-xl cursor-pointer transition relative">
-                                    <i class="ph-bold ph-paperclip text-xl"></i>
-                                    <span class="file-indicator absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full hidden"></span>
-                                    <input type="file" name="reply_attachment" id="fileInput" class="hidden" accept=".jpg,.jpeg,.png,.pdf">
-                                </label>
-                                
-                                <textarea name="reply_message" rows="1" class="flex-1 bg-transparent border-none focus:ring-0 text-sm px-3 py-2.5 resize-none max-h-24 min-h-[44px]" placeholder="Ketik balasan Anda..." required></textarea>
-                                
-                                <button type="submit" name="submit_reply" class="flex items-center justify-center w-10 h-10 shrink-0 bg-primary text-white rounded-xl shadow-sm hover:bg-primaryDark transition-colors">
-                                    <i class="ph-fill ph-paper-plane-right text-lg"></i>
-                                </button>
-                            </div>
-                            <div class="flex justify-between items-center mt-2 px-2">
-                                <span id="fileNameDisplay" class="text-[0.65rem] font-medium text-slate-400 truncate max-w-[200px]">*Max 2MB (JPG/PNG/PDF)</span>
-                            </div>
-                        </form>
-                    <?php endif; ?>
-                </div>
-
+                        <p class="text-sm font-medium">Belum ada balasan. Tim kami akan segera merespon.</p>
+                    </div>
+                <?php endif; ?>
             </div>
-            <?php endif; ?>
+
+            <div class="bg-white px-4 py-4 md:px-8 md:py-5 border-t border-slate-200 shrink-0 z-20">
+                <?php if($ticket['status'] == 'closed' || $ticket['status'] == 'canceled'): ?>
+                    <div class="flex justify-center">
+                        <div class="inline-flex items-center gap-2 bg-slate-100 text-slate-500 font-bold px-6 py-3 rounded-2xl text-sm border border-slate-200">
+                            <i class="ph-fill ph-lock-key text-lg"></i> Tiket ini telah ditutup
+                        </div>
+                    </div>
+                <?php elseif($ticket['status'] == 'open'): ?>
+                    <div class="flex items-center justify-center gap-3 text-amber-600 bg-amber-50 border border-amber-200 p-4 rounded-2xl">
+                        <i class="ph-fill ph-hourglass-high text-2xl animate-pulse"></i>
+                        <div>
+                            <h6 class="font-bold text-sm">Menunggu Tim Support</h6>
+                            <p class="text-xs opacity-80">Kolom chat akan terbuka otomatis saat tiket berstatus In Progress.</p>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    
+                    <?php if($msg_error): ?>
+                        <div class="bg-red-50 text-red-600 text-xs p-3 rounded-xl mb-3 border border-red-100 font-bold flex items-center gap-2">
+                            <i class="ph-bold ph-warning-circle text-base"></i> <?= $msg_error ?>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <form action="ticket.php?track_id=<?= htmlspecialchars($track_id) ?>&view=track_result" method="POST" enctype="multipart/form-data" class="relative">
+                        
+                        <div id="filePreview" class="hidden absolute -top-10 left-0 bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-2">
+                            <i class="ph-fill ph-file"></i> <span id="fileNameDisplay" class="truncate max-w-[200px]"></span>
+                            <button type="button" id="removeFileBtn" class="text-slate-300 hover:text-white ml-1"><i class="ph-bold ph-x"></i></button>
+                        </div>
+
+                        <div class="flex items-end gap-3 bg-slate-50 border-2 border-slate-200 rounded-[1.5rem] p-2 focus-within:border-primary focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(79,70,229,0.1)] transition-all">
+                            
+                            <label id="attachBtn" class="flex items-center justify-center w-12 h-12 shrink-0 text-slate-400 bg-white shadow-sm border border-slate-200 hover:text-primary hover:border-primary hover:bg-indigo-50 rounded-[1rem] cursor-pointer transition-all relative">
+                                <i class="ph-bold ph-paperclip text-xl"></i>
+                                <input type="file" name="reply_attachment" id="fileInput" class="hidden" accept=".jpg,.jpeg,.png,.pdf">
+                            </label>
+                            
+                            <textarea name="reply_message" rows="1" class="flex-1 bg-transparent border-none focus:ring-0 text-sm md:text-base px-2 py-3.5 resize-none max-h-32 min-h-[52px]" placeholder="Ketik pesan balasan Anda di sini..." required></textarea>
+                            
+                            <button type="submit" name="submit_reply" class="flex items-center justify-center w-12 h-12 shrink-0 bg-primary text-white rounded-[1rem] shadow-md shadow-primary/30 hover:bg-primaryDark hover:scale-105 transition-all">
+                                <i class="ph-fill ph-paper-plane-right text-xl"></i>
+                            </button>
+                        </div>
+                    </form>
+                <?php endif; ?>
+            </div>
 
         </div>
+        <?php endif; ?>
+
     </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            // Auto Scroll Chat to bottom
+            // 1. Auto Scroll Chat to bottom smooth
             const chatBox = document.getElementById("chatContainer");
-            if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+            if(chatBox) {
+                setTimeout(() => {
+                    chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+                }, 100);
+            }
 
-            // Auto-resize textarea
+            // 2. Auto-resize textarea
             const tx = document.querySelector('textarea[name="reply_message"]');
             if (tx) {
                 tx.addEventListener("input", function() {
-                    this.style.height = "44px"; // reset base height
-                    const newHeight = Math.min(this.scrollHeight, 96); // max height 96px
+                    this.style.height = "52px"; 
+                    const newHeight = Math.min(this.scrollHeight, 128); 
                     this.style.height = newHeight + "px";
+                });
+                
+                // Submit on Enter (without Shift)
+                tx.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.closest('form').submit();
+                    }
                 });
             }
 
-            // File Upload Indicator Logic
+            // 3. File Upload Custom UI Logic
             const fileInput = document.getElementById('fileInput');
             const attachBtn = document.getElementById('attachBtn');
+            const filePreview = document.getElementById('filePreview');
             const fileNameDisplay = document.getElementById('fileNameDisplay');
-            const fileIndicator = document.querySelector('.file-indicator');
+            const removeFileBtn = document.getElementById('removeFileBtn');
 
             if(fileInput && attachBtn && fileNameDisplay) {
                 fileInput.addEventListener('change', function() {
                     if (this.files && this.files.length > 0) {
-                        attachBtn.classList.add('text-primary', 'bg-indigo-50');
-                        attachBtn.classList.remove('text-slate-400');
-                        if(fileIndicator) fileIndicator.classList.remove('hidden');
-                        
+                        attachBtn.classList.add('ring-2', 'ring-primary', 'text-primary');
+                        filePreview.classList.remove('hidden');
+                        filePreview.classList.add('animate-fade-in');
                         fileNameDisplay.textContent = this.files[0].name;
-                        fileNameDisplay.classList.add('text-primary');
                     } else {
-                        attachBtn.classList.remove('text-primary', 'bg-indigo-50');
-                        attachBtn.classList.add('text-slate-400');
-                        if(fileIndicator) fileIndicator.classList.add('hidden');
-                        
-                        fileNameDisplay.textContent = "*Max 2MB (JPG/PNG/PDF)";
-                        fileNameDisplay.classList.remove('text-primary');
+                        resetFileInput();
                     }
                 });
+
+                if(removeFileBtn) {
+                    removeFileBtn.addEventListener('click', function() {
+                        resetFileInput();
+                    });
+                }
+
+                function resetFileInput() {
+                    fileInput.value = '';
+                    attachBtn.classList.remove('ring-2', 'ring-primary', 'text-primary');
+                    filePreview.classList.add('hidden');
+                    filePreview.classList.remove('animate-fade-in');
+                }
             }
         });
     </script>
