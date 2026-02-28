@@ -70,6 +70,7 @@ $debug_msg = "";
 // LOGIKA 1: ADMIN HARDCODED BYPASS (PASTI FULL AKSES)
 // =========================================================================
 if ($role_name === 'admin') {
+    // Penyesuaian Icon Bootstrap ke Phosphor Icon
     $sidebar_menu['dashboard'] = ['menu_label' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'ph-squares-four', 'children' => []];
     $sidebar_menu['leave'] = ['menu_label' => 'Leave Request', 'url' => 'leave_list.php', 'icon' => 'ph-calendar-check', 'children' => []];
     $sidebar_menu['delivery'] = ['menu_label' => 'Delivery', 'url' => 'delivery_list.php', 'icon' => 'ph-truck', 'children' => []];
@@ -112,7 +113,6 @@ if ($role_name === 'admin') {
         ]
     ];
 } 
-
 // =========================================================================
 // LOGIKA 2: USER STANDARD (LOAD DARI DATABASE)
 // =========================================================================
@@ -139,8 +139,9 @@ else {
                 if ($resMenu && $resMenu->num_rows > 0) {
                     $temp_menus = [];
                     while ($row = $resMenu->fetch_assoc()) {
-                        // Mengganti icon bawaan (bi) ke phosphor (ph)
-                        $icon = str_replace(['bi bi-', 'bi-'], ['ph ', 'ph-'], $row['icon']);
+                        // Transformasi dinamis dari Bootstrap Icon ke Phosphor Icon
+                        $icon = str_replace(['bi bi-', 'bi-'], ['ph-', 'ph-'], $row['icon']);
+                        $icon = str_replace('-fill', '', $icon); // Bersihkan fill agar konsisten
                         $row['icon'] = strpos($icon, 'ph-') === false ? 'ph-folder' : $icon;
                         
                         $temp_menus[$row['menu_key']] = $row;
@@ -222,6 +223,7 @@ $mappings = [
 
         <nav class="mt-1 flex-grow">
             <ul class="mb-6 flex flex-col gap-1.5">
+                
                 <?php if (!empty($sidebar_menu)): ?>
                     <?php foreach ($sidebar_menu as $key => $menu): ?>
                         
@@ -240,7 +242,7 @@ $mappings = [
                                     <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $is_active ? 'ph-fill' : '' ?>"></i>
                                     <span class="group-[.is-collapsed]:hidden truncate"><?= htmlspecialchars($menu['menu_label']) ?></span>
                                     
-                                    <div class="absolute left-full ml-4 hidden group-hover/link:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50">
+                                    <div class="absolute left-full ml-4 hidden group-hover/link:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50 shadow-lg">
                                         <?= htmlspecialchars($menu['menu_label']) ?>
                                     </div>
                                 </a>
@@ -257,7 +259,7 @@ $mappings = [
                                     </div>
                                     <i class="ph ph-caret-down shrink-0 transition-transform duration-200 group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'rotate-180' : '' ?>"></i>
                                     
-                                    <div class="absolute left-full ml-4 hidden group-hover/btn:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50">
+                                    <div class="absolute left-full ml-4 hidden group-hover/btn:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50 shadow-lg">
                                         <?= htmlspecialchars($menu['menu_label']) ?>
                                     </div>
                                 </button>
@@ -276,6 +278,7 @@ $mappings = [
                                 </ul>
                             </li>
                         <?php endif; ?>
+
                     <?php endforeach; ?>
                 
                 <?php else: ?>
@@ -284,11 +287,16 @@ $mappings = [
                             <i class="ph-fill ph-warning-circle text-xl mt-0.5"></i>
                             <div>
                                 <h6 class="font-bold text-sm mb-1">Akses Terbatas</h6>
-                                <p class="text-xs opacity-80 leading-relaxed">Hubungi admin untuk mendapatkan akses menu.</p>
+                                <p class="text-xs opacity-80 leading-relaxed">Hubungi admin untuk mendapatkan akses menu sistem.</p>
+                                <div class="mt-2 pt-2 border-t border-red-200/50 text-[10px] opacity-60">
+                                    Role: <?= htmlspecialchars($role_name) ?><br>
+                                    Div ID: <?= htmlspecialchars($user_division_id) ?><br>
+                                </div>
                             </div>
                         </div>
                     </li>
                 <?php endif; ?>
+
             </ul>
         </nav>
     </div>
@@ -301,7 +309,9 @@ $mappings = [
         const caret = button.querySelector('.ph-caret-down');
         
         const sidebar = document.getElementById('sidebar');
-        if (sidebar && sidebar.classList.contains('is-collapsed') && window.innerWidth >= 1024) return;
+        if (sidebar && sidebar.classList.contains('is-collapsed') && window.innerWidth >= 1024) {
+            return;
+        }
 
         if (isExpanded) {
             button.setAttribute('aria-expanded', 'false');
@@ -319,9 +329,154 @@ $mappings = [
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Init state untuk accordion yang aktif
         document.querySelectorAll('button[aria-expanded="true"]').forEach(btn => {
             const submenu = btn.nextElementSibling;
-            if(submenu) submenu.style.maxHeight = submenu.scrollHeight + 'px';
+            if(submenu) {
+                submenu.style.maxHeight = submenu.scrollHeight + 'px';
+            }
         });
+    });
+</script>
+
+
+<div id="main-content" class="flex flex-col flex-1 w-full h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 relative transition-colors duration-300">
+    
+    <header class="sticky top-0 z-40 flex w-full bg-white/80 backdrop-blur-md dark:bg-[#1A222C]/80 shadow-soft transition-all duration-300 border-b border-slate-100 dark:border-slate-800">
+        <div class="flex flex-grow items-center justify-between px-4 py-4 md:px-6 2xl:px-11 h-20">
+            
+            <div class="flex items-center gap-4 sm:gap-6">
+                <button id="sidebarToggleBtn" class="z-50 block rounded-lg p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer transition-colors" title="Toggle Sidebar">
+                     <i class="ph ph-list text-2xl"></i>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-3 2xsm:gap-6">
+                
+                <ul class="flex items-center gap-2">
+                     <li>
+                        <button id="darkModeToggle" class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all" title="Ganti Tema">
+                            <i class="ph ph-moon text-xl dark:hidden"></i>
+                            <i class="ph ph-sun text-xl hidden dark:block text-amber-400"></i>
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="relative">
+                    <div id="profileBtn" class="flex items-center gap-3 cursor-pointer pl-4 border-l border-slate-100 dark:border-slate-700 transition-colors group">
+                        <span class="hidden text-right lg:block">
+                            <span class="block text-sm font-bold text-slate-800 dark:text-white"><?= htmlspecialchars($username) ?></span>
+                            <span class="block text-xs font-medium text-slate-400"><?= ucfirst(htmlspecialchars($role_name)) ?></span>
+                        </span>
+                        
+                        <div class="h-11 w-11 rounded-full overflow-hidden border-2 border-white dark:border-slate-700 ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm transition-all group-hover:ring-indigo-200">
+                            <img src="https://ui-avatars.com/api/?name=<?= urlencode($username) ?>&background=random" alt="User" class="object-cover w-full h-full">
+                        </div>
+                        <i class="ph ph-caret-down text-slate-400 text-sm hidden lg:block transition-transform duration-200" id="profileCaret"></i>
+                    </div>
+
+                    <div id="profileDropdown" class="hidden absolute right-0 mt-4 flex w-64 flex-col rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-[#24303F] shadow-soft-lg z-50 overflow-hidden transition-all origin-top-right">
+                        
+                        <div class="px-6 py-5 bg-slate-50 dark:bg-slate-800/50">
+                            <p class="text-sm font-bold text-slate-800 dark:text-white"><?= htmlspecialchars($username) ?></p>
+                            <p class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5"><?= htmlspecialchars($email) ?></p>
+                        </div>
+
+                        <ul class="flex flex-col gap-1 px-4 py-2">
+                            <li>
+                                <a href="profile.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <i class="ph ph-user text-xl"></i> Edit Profile
+                                </a>
+                            </li>
+                            <li>
+                                <a href="settings.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                    <i class="ph ph-gear text-xl"></i> Account Settings
+                                </a>
+                            </li>
+                        </ul>
+
+                        <div class="px-4 my-1">
+                             <div class="border-t border-slate-100 dark:border-slate-700"></div>
+                        </div>
+
+                        <div class="px-4 pb-4 pt-1">
+                             <a href="../logout.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2 text-sm font-bold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                                <i class="ph ph-sign-out text-xl"></i> Sign out
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </header>
+    
+    <main class="flex-1 overflow-x-hidden overflow-y-auto relative">
+
+<script>
+    // Skrip Logika Top Navbar (Dark Mode & Dropdown)
+    document.addEventListener('DOMContentLoaded', () => {
+        // Toggle Dropdown Profil
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        const profileCaret = document.getElementById('profileCaret');
+
+        if(profileBtn && profileDropdown) {
+            profileBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                profileDropdown.classList.toggle('hidden');
+                if(profileCaret) profileCaret.classList.toggle('rotate-180');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
+                    profileDropdown.classList.add('hidden');
+                    if(profileCaret) profileCaret.classList.remove('rotate-180');
+                }
+            });
+        }
+
+        // Toggle Dark Mode
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const html = document.documentElement;
+
+        // Cek LocalStorage
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            html.classList.add('dark');
+        }
+
+        if(darkModeToggle) {
+            darkModeToggle.addEventListener('click', () => {
+                if (html.classList.contains('dark')) {
+                    html.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                } else {
+                    html.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                }
+            });
+        }
+
+        // Sidebar Toggle Mobile & Desktop
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        const closeBtn = document.getElementById('closeSidebarMobile');
+
+        if(toggleBtn && sidebar) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.innerWidth < 1024) {
+                    sidebar.classList.toggle('-translate-x-full');
+                } else {
+                    sidebar.classList.toggle('is-collapsed');
+                }
+            });
+        }
+        
+        if(closeBtn && sidebar) {
+            closeBtn.addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+            });
+        }
     });
 </script>
