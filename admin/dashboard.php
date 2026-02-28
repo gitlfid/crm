@@ -319,7 +319,6 @@ else {
 </div>
 <?php include 'includes/footer.php'; ?>
 
-<script src="assets/js/main.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
 <script>
