@@ -154,7 +154,7 @@ $active_link_style = "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:te
 $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-white font-medium";
 ?>
 
-<aside id="sidebar" class="group fixed left-0 top-0 z-[100] flex h-screen w-[280px] [&.is-collapsed]:w-[88px] flex-col overflow-y-hidden bg-white dark:bg-[#24303F] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 -translate-x-full border-r border-slate-100 dark:border-slate-800 shrink-0 shadow-2xl lg:shadow-none font-sans">
+<aside id="app-sidebar" class="group fixed left-0 top-0 z-[100] flex h-screen w-[280px] [&.is-collapsed]:w-[88px] flex-col overflow-y-hidden !bg-white dark:!bg-[#1A222C] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 -translate-x-full border-r border-slate-200 dark:border-slate-800 shrink-0 shadow-2xl lg:shadow-none font-sans">
     
     <div class="flex items-center justify-between lg:justify-start gap-3 px-6 group-[.is-collapsed]:px-0 group-[.is-collapsed]:justify-center pt-8 pb-6 lg:pt-10 lg:pb-8 transition-all duration-300 shrink-0">
         <a href="dashboard.php" class="flex items-center gap-3 overflow-hidden">
@@ -296,7 +296,8 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.getElementById('sidebar');
+        // PERHATIKAN: ID sekarang merujuk ke 'app-sidebar'
+        const sidebar = document.getElementById('app-sidebar'); 
         const mobileCloseBtn = document.getElementById('closeSidebarMobile');
         const profileBtn = document.getElementById('profileBtn');
         const profileDropdown = document.getElementById('profileDropdown');
@@ -305,60 +306,52 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
         const html = document.documentElement;
         const body = document.body;
 
-        // 1. FUNGSI UTAMA UNTUK MENGUBAH TEMA (Tahan Bentrok CSS)
+        // Fungsi Sinkronisasi Tema
         function applyTheme(theme) {
             if (theme === 'dark') {
-                // Aktifkan Dark Mode (Tailwind & Bootstrap/Mazer)
                 html.classList.add('dark');
                 html.setAttribute('data-bs-theme', 'dark');
                 body.classList.add('theme-dark');
                 localStorage.setItem('theme', 'dark');
-                
-                // Ubah icon secara manual menggunakan JS agar terhindar dari konflik CSS
                 if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph ph-sun text-xl"></i>';
+                    darkModeToggle.innerHTML = '<i class="ph-bold ph-sun text-xl"></i>';
                 }
             } else {
-                // Kembalikan ke Light Mode
                 html.classList.remove('dark');
                 html.setAttribute('data-bs-theme', 'light');
                 body.classList.remove('theme-dark');
                 localStorage.setItem('theme', 'light');
-                
-                // Kembalikan icon ke bulan
                 if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph ph-moon text-xl"></i>';
+                    darkModeToggle.innerHTML = '<i class="ph-bold ph-moon text-xl"></i>';
                 }
             }
         }
 
-        // 2. Terapkan tema saat halaman pertama kali dimuat
+        // Terapkan saat pertama kali dimuat
         const savedTheme = localStorage.getItem('theme') || 'light';
         applyTheme(savedTheme);
 
-        // 3. Event Listener untuk Tombol Toggle Dark/Light Mode
+        // Toggle Switch
         if (darkModeToggle) {
             darkModeToggle.addEventListener('click', function(e) {
                 e.preventDefault();
-                // Ambil status tema yang sedang aktif saat ini, lalu balikkan
                 const currentTheme = localStorage.getItem('theme');
                 applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
             });
         }
 
-        // 4. Mobile Sidebar Close
-        if (mobileCloseBtn) {
+        // Mobile Sidebar Close
+        if (mobileCloseBtn && sidebar) {
             mobileCloseBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 sidebar.classList.add('-translate-x-full');
             });
         }
 
-        // 5. Global Event Listener (Sidebar Burger & Profile Dropdown)
+        // Dropdown & Burger Menu
         document.addEventListener('click', function(e) {
-            // Sidebar Toggle
             const burgerBtn = e.target.closest('#sidebarToggle, .burger-btn');
-            if (burgerBtn) {
+            if (burgerBtn && sidebar) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (window.innerWidth < 1024) {
@@ -366,13 +359,12 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 } else {
                     sidebar.classList.toggle('is-collapsed');
                 }
-            } else {
-                if (window.innerWidth < 1024 && sidebar && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
+            } else if (sidebar) {
+                if (window.innerWidth < 1024 && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
                     sidebar.classList.add('-translate-x-full');
                 }
             }
 
-            // Profile Dropdown
             if (profileBtn && profileBtn.contains(e.target)) {
                 profileDropdown.classList.toggle('hidden');
             } else if (profileDropdown && !profileDropdown.contains(e.target)) {
@@ -380,7 +372,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
             }
         });
 
-        // 6. Submenu Toggle Logic (Animasi Accordion)
+        // Submenu Accordion
         const submenuToggles = document.querySelectorAll('.submenu-toggle');
         submenuToggles.forEach(toggle => {
             toggle.addEventListener('click', function() {
@@ -399,14 +391,16 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
             });
         });
 
-        // 7. Resize Handling
+        // Resize Layar
         window.addEventListener('resize', function() {
-            if (window.innerWidth >= 1024) {
-                sidebar.classList.remove('-translate-x-full');
-            } else {
-                sidebar.classList.remove('is-collapsed');
-                if(!sidebar.classList.contains('-translate-x-full')) {
-                     sidebar.classList.add('-translate-x-full');
+            if (sidebar) {
+                if (window.innerWidth >= 1024) {
+                    sidebar.classList.remove('-translate-x-full');
+                } else {
+                    sidebar.classList.remove('is-collapsed');
+                    if(!sidebar.classList.contains('-translate-x-full')) {
+                         sidebar.classList.add('-translate-x-full');
+                    }
                 }
             }
         });

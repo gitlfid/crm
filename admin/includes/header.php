@@ -19,17 +19,21 @@ $page_title = isset($page_title) ? $page_title : "Helpdesk System";
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $page_title ?></title>
     
+    <script>
+        tailwind = {
+            config: {
+                // Mengikat Tailwind agar 100% sinkron dengan toggle tema Bootstrap
+                darkMode: ['class', '[data-bs-theme="dark"]'], 
+            }
+        }
+    </script>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css">
     
-<script>
-        tailwind.config = {
-            darkMode: 'class', 
-        }
-        
-        // Auto-load theme sinkron (Tailwind + Bootstrap)
+    <script>
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
             document.documentElement.setAttribute('data-bs-theme', 'dark');
@@ -40,7 +44,6 @@ $page_title = isset($page_title) ? $page_title : "Helpdesk System";
     </script>
     
     <style>
-        /* CSS untuk menyembunyikan scrollbar pada sidebar bawaan */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
