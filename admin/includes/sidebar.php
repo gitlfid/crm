@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 2. Pastikan Koneksi Database Ada (Pencegahan Error)
+// 2. Pastikan Koneksi Database Ada
 if (!isset($conn)) {
     $db_path = __DIR__ . '/../../config/database.php'; 
     if (file_exists($db_path)) {
@@ -20,7 +20,7 @@ $username = isset($username) ? $username : ($_SESSION['username'] ?? 'User');
 $email = isset($email) ? $email : ($_SESSION['email'] ?? 'user@example.com');
 $user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 
-// --- Refresh Division ID (Pastikan Session Sinkron dengan DB) ---
+// --- Refresh Division ID ---
 $user_division_id = isset($_SESSION['division_id']) ? intval($_SESSION['division_id']) : 0;
 if ($user_division_id <= 0 && $user_id > 0 && isset($conn) && !$conn->connect_error) {
     $stmt = $conn->prepare("SELECT division_id FROM users WHERE id = ? LIMIT 1");
@@ -43,7 +43,6 @@ if (!function_exists('isChildActive')) {
             if ($c['url'] == $current) return true;
             if (strpos($c['url'], $current) !== false && $current != 'dashboard.php') return true;
             
-            // Mapping Spesifik Page -> Menu
             $mappings = [
                 'po_form.php' => 'po_list.php',
                 'quotation_form.php' => 'quotation_list.php',
@@ -69,7 +68,7 @@ $sidebar_menu = [];
 $debug_msg = "";
 
 // =========================================================================
-// LOGIKA 1: ADMIN HARDCODED BYPASS
+// LOGIKA 1: ADMIN HARDCODED BYPASS 
 // =========================================================================
 if ($role_name === 'admin') {
     $sidebar_menu['dashboard'] = ['menu_label' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'ph-squares-four', 'children' => []];
@@ -140,7 +139,6 @@ else {
                 if ($resMenu && $resMenu->num_rows > 0) {
                     $temp_menus = [];
                     while ($row = $resMenu->fetch_assoc()) {
-                        // Transformasi dinamis dari Bootstrap Icon ke Phosphor Icon
                         $icon = str_replace(['bi bi-', 'bi-'], ['ph-', 'ph-'], $row['icon']);
                         $icon = str_replace('-fill', '', $icon); 
                         $row['icon'] = strpos($icon, 'ph-') === false ? 'ph-folder' : $icon;
@@ -181,9 +179,9 @@ else {
     }
 }
 
-// Style Tailwind untuk state menu
+// Style Tailwind
 $active_link_style = "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shadow-sm font-bold";
-$inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-indigo-600 dark:hover:text-white font-medium";
+$inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-white font-medium";
 
 $mappings = [
     'po_form.php' => 'po_list.php',
@@ -201,7 +199,7 @@ $mappings = [
 ];
 ?>
 
-<aside id="sidebar" class="group fixed left-0 top-0 z-[100] flex h-screen w-[280px] [&.is-collapsed]:w-[88px] flex-col overflow-y-hidden bg-white dark:bg-[#1A222C] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 -translate-x-full border-r border-slate-100 dark:border-slate-800 shrink-0 shadow-2xl lg:shadow-none font-sans">
+<aside id="sidebar" class="group fixed left-0 top-0 z-[100] flex h-screen w-[280px] [&.is-collapsed]:w-[88px] flex-col overflow-y-hidden bg-white dark:bg-[#24303F] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 -translate-x-full border-r border-slate-100 dark:border-slate-800 shrink-0 shadow-2xl lg:shadow-none font-sans">
     
     <div class="flex items-center justify-between lg:justify-start gap-3 px-6 group-[.is-collapsed]:px-0 group-[.is-collapsed]:justify-center pt-8 pb-6 lg:pt-10 lg:pb-8 transition-all duration-300 shrink-0">
         <a href="dashboard.php" class="flex items-center gap-3 overflow-hidden">
@@ -239,7 +237,7 @@ $mappings = [
                             ?>
                             <li>
                                 <a href="<?= htmlspecialchars($menu['url']) ?>" class="group/link relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 <?= $link_class ?>" title="<?= htmlspecialchars($menu['menu_label']) ?>">
-                                    <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $is_active ? 'ph-fill text-indigo-600 dark:text-indigo-400' : '' ?>"></i>
+                                    <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $is_active ? 'ph-fill' : '' ?>"></i>
                                     <span class="group-[.is-collapsed]:hidden truncate"><?= htmlspecialchars($menu['menu_label']) ?></span>
                                     
                                     <div class="absolute left-full ml-4 hidden group-hover/link:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50 shadow-lg">
@@ -257,7 +255,7 @@ $mappings = [
                                         <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $isActiveGroup ? 'text-indigo-600 dark:text-indigo-400 ph-fill' : '' ?>"></i>
                                         <span class="group-[.is-collapsed]:hidden truncate <?= $isActiveGroup ? 'font-bold text-slate-800 dark:text-white' : '' ?>"><?= htmlspecialchars($menu['menu_label']) ?></span>
                                     </div>
-                                    <i class="ph ph-caret-down shrink-0 transition-transform duration-200 group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : '' ?>"></i>
+                                    <i class="ph ph-caret-down shrink-0 transition-transform duration-200 group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'rotate-180' : '' ?>"></i>
                                     
                                     <div class="absolute left-full ml-4 hidden group-hover/btn:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50 shadow-lg">
                                         <?= htmlspecialchars($menu['menu_label']) ?>
@@ -269,7 +267,7 @@ $mappings = [
                                         $isChildActive = isChildActive([$child], $current_page);
                                     ?>
                                         <li>
-                                            <a href="<?= htmlspecialchars($child['url']) ?>" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors <?= $isChildActive ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-500/10' : 'text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50' ?>">
+                                            <a href="<?= htmlspecialchars($child['url']) ?>" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors <?= $isChildActive ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-500/5' : 'text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50' ?>">
                                                 <div class="w-1.5 h-1.5 rounded-full <?= $isChildActive ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600' ?>"></div>
                                                 <span class="truncate"><?= htmlspecialchars($child['menu_label']) ?></span>
                                             </a>
@@ -296,47 +294,9 @@ $mappings = [
     </div>
 </aside>
 
-<script>
-    function toggleSubmenu(button) {
-        const isExpanded = button.getAttribute('aria-expanded') === 'true';
-        const submenu = button.nextElementSibling;
-        const caret = button.querySelector('.ph-caret-down');
-        const iconFill = button.querySelector('.ph-fill');
-        
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar && sidebar.classList.contains('is-collapsed') && window.innerWidth >= 1024) return;
-
-        if (isExpanded) {
-            button.setAttribute('aria-expanded', 'false');
-            submenu.style.maxHeight = '0px';
-            submenu.style.opacity = '0';
-            caret.style.transform = 'rotate(0deg)';
-            button.classList.remove('bg-slate-50', 'dark:bg-slate-800/50');
-            caret.classList.remove('text-indigo-600', 'dark:text-indigo-400');
-            if(iconFill) iconFill.classList.remove('text-indigo-600', 'dark:text-indigo-400');
-        } else {
-            button.setAttribute('aria-expanded', 'true');
-            submenu.style.maxHeight = submenu.scrollHeight + 'px';
-            submenu.style.opacity = '1';
-            caret.style.transform = 'rotate(180deg)';
-            button.classList.add('bg-slate-50', 'dark:bg-slate-800/50');
-            caret.classList.add('text-indigo-600', 'dark:text-indigo-400');
-            if(iconFill) iconFill.classList.add('text-indigo-600', 'dark:text-indigo-400');
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('button[aria-expanded="true"]').forEach(btn => {
-            const submenu = btn.nextElementSibling;
-            if(submenu) submenu.style.maxHeight = submenu.scrollHeight + 'px';
-        });
-    });
-</script>
-
-
-<div id="main-content" class="flex flex-col flex-1 w-full h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 relative transition-colors duration-300">
+<div class="flex flex-col flex-1 w-full h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 relative transition-colors duration-300">
     
-    <header class="sticky top-0 z-40 flex w-full bg-white/80 backdrop-blur-md dark:bg-[#1A222C]/80 shadow-soft border-b border-slate-100 dark:border-slate-800 transition-colors duration-300">
+    <header class="sticky top-0 z-40 flex w-full bg-white/80 backdrop-blur-md dark:bg-[#1A222C]/80 shadow-soft border-b border-slate-100 dark:border-slate-800">
         <div class="flex flex-grow items-center justify-between px-4 py-4 md:px-6 2xl:px-11 h-20">
             
             <div class="flex items-center gap-4 sm:gap-6">
@@ -346,10 +306,9 @@ $mappings = [
             </div>
 
             <div class="flex items-center gap-3 2xsm:gap-6">
-                
                 <ul class="flex items-center gap-2">
                      <li>
-                        <button id="darkModeToggle" class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all" title="Ubah Tema">
+                        <button id="darkModeToggle" class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all" title="Ganti Tema">
                             <i class="ph ph-moon text-xl dark:hidden"></i>
                             <i class="ph ph-sun text-xl hidden dark:block text-amber-400"></i>
                         </button>
@@ -404,4 +363,108 @@ $mappings = [
         </div>
     </header>
     
-    <main class="flex-1 overflow-x-hidden overflow-y-auto relative p-4 lg:p-6 bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+    <main class="flex-1 overflow-x-hidden overflow-y-auto relative">
+
+<script>
+    // FUNGSI ACCORDION SIDEBAR
+    function toggleSubmenu(button) {
+        const isExpanded = button.getAttribute('aria-expanded') === 'true';
+        const submenu = button.nextElementSibling;
+        const caret = button.querySelector('.ph-caret-down');
+        
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && sidebar.classList.contains('is-collapsed') && window.innerWidth >= 1024) return;
+
+        if (isExpanded) {
+            button.setAttribute('aria-expanded', 'false');
+            submenu.style.maxHeight = '0px';
+            submenu.style.opacity = '0';
+            caret.style.transform = 'rotate(0deg)';
+            button.classList.remove('bg-slate-50', 'dark:bg-slate-800/50');
+        } else {
+            button.setAttribute('aria-expanded', 'true');
+            submenu.style.maxHeight = submenu.scrollHeight + 'px';
+            submenu.style.opacity = '1';
+            caret.style.transform = 'rotate(180deg)';
+            button.classList.add('bg-slate-50', 'dark:bg-slate-800/50');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        
+        // Inisialisasi Accordion aktif
+        document.querySelectorAll('button[aria-expanded="true"]').forEach(btn => {
+            const submenu = btn.nextElementSibling;
+            if(submenu) submenu.style.maxHeight = submenu.scrollHeight + 'px';
+        });
+
+        // ----------------------------------------------------
+        // LOGIKA DROPDOWN PROFILE
+        // ----------------------------------------------------
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        const profileCaret = document.getElementById('profileCaret');
+
+        if(profileBtn && profileDropdown) {
+            profileBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                profileDropdown.classList.toggle('hidden');
+                if(profileCaret) profileCaret.classList.toggle('rotate-180');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
+                    profileDropdown.classList.add('hidden');
+                    if(profileCaret) profileCaret.classList.remove('rotate-180');
+                }
+            });
+        }
+
+        // ----------------------------------------------------
+        // LOGIKA DARK MODE
+        // ----------------------------------------------------
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const html = document.documentElement;
+
+        // Cek mode dari LocalStorage atau System
+        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            html.classList.add('dark');
+        }
+
+        if(darkModeToggle) {
+            darkModeToggle.addEventListener('click', () => {
+                if (html.classList.contains('dark')) {
+                    html.classList.remove('dark');
+                    localStorage.setItem('color-theme', 'light');
+                } else {
+                    html.classList.add('dark');
+                    localStorage.setItem('color-theme', 'dark');
+                }
+            });
+        }
+
+        // ----------------------------------------------------
+        // LOGIKA TOGGLE SIDEBAR
+        // ----------------------------------------------------
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        const closeBtn = document.getElementById('closeSidebarMobile');
+
+        if(toggleBtn && sidebar) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.innerWidth < 1024) {
+                    sidebar.classList.toggle('-translate-x-full');
+                } else {
+                    sidebar.classList.toggle('is-collapsed');
+                }
+            });
+        }
+        
+        if(closeBtn && sidebar) {
+            closeBtn.addEventListener('click', () => {
+                sidebar.classList.add('-translate-x-full');
+            });
+        }
+    });
+</script>
