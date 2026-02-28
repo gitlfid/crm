@@ -54,6 +54,58 @@ $email      = isset($_SESSION['email']) ? $_SESSION['email'] : 'user@example.com
     
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // 1. LOGIKA DARK MODE TOGGLE
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            const html = document.documentElement;
+
+            // Cek status dark mode dari LocalStorage saat halaman dimuat
+            if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                html.classList.add('dark');
+            } else {
+                html.classList.remove('dark');
+            }
+
+            // Aksi ketika tombol Dark Mode di-klik
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('click', () => {
+                    if (html.classList.contains('dark')) {
+                        html.classList.remove('dark');
+                        localStorage.setItem('color-theme', 'light');
+                    } else {
+                        html.classList.add('dark');
+                        localStorage.setItem('color-theme', 'dark');
+                    }
+                });
+            }
+
+            // 2. LOGIKA DROPDOWN PROFILE & LOGOUT
+            const profileBtn = document.getElementById('profileBtn');
+            const profileDropdown = document.getElementById('profileDropdown');
+            const profileCaret = document.getElementById('profileCaret');
+
+            if (profileBtn && profileDropdown) {
+                // Aksi buka/tutup dropdown
+                profileBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    profileDropdown.classList.toggle('hidden');
+                    if (profileCaret) profileCaret.classList.toggle('rotate-180');
+                });
+
+                // Tutup otomatis jika klik di tempat lain
+                document.addEventListener('click', (e) => {
+                    if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
+                        profileDropdown.classList.add('hidden');
+                        if (profileCaret) profileCaret.classList.remove('rotate-180');
+                    }
+                });
+            }
+
+        });
+    </script>
 </head>
 
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-200 font-sans antialiased overflow-hidden selection:bg-indigo-500 selection:text-white transition-colors duration-300">
