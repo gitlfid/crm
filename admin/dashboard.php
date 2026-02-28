@@ -2,11 +2,12 @@
 $page_title = "Dashboard Utama";
 include 'includes/header.php';
 include 'includes/sidebar.php';
-include '../config/functions.php';
+// Pastikan path fungsi sudah benar sesuai struktur Anda
+// include '../config/functions.php'; 
 
 // --- 0. DATA USER ---
 $current_user_id = $_SESSION['user_id'];
-$current_role    = $_SESSION['role'];
+$current_role    = strtolower(trim($_SESSION['role']));
 $uData = $conn->query("SELECT division_id, username FROM users WHERE id = $current_user_id")->fetch_assoc();
 $current_div_id = $uData['division_id'];
 
@@ -19,18 +20,22 @@ if ($current_role == 'admin') {
     $extStats = ['open'=>0, 'progress'=>0, 'closed'=>0, 'total'=>0];
     $sqlExt = "SELECT status, COUNT(*) as total FROM tickets GROUP BY status";
     $resExt = $conn->query($sqlExt);
-    while($row = $resExt->fetch_assoc()) {
-        $extStats[$row['status']] = $row['total'];
-        $extStats['total'] += $row['total'];
+    if($resExt) {
+        while($row = $resExt->fetch_assoc()) {
+            $extStats[$row['status']] = $row['total'];
+            $extStats['total'] += $row['total'];
+        }
     }
 
     // B. STATISTIK INTERNAL TICKETS
     $intStats = ['open'=>0, 'progress'=>0, 'closed'=>0, 'total'=>0];
     $sqlInt = "SELECT status, COUNT(*) as total FROM internal_tickets GROUP BY status";
     $resInt = $conn->query($sqlInt);
-    while($row = $resInt->fetch_assoc()) {
-        $intStats[$row['status']] = $row['total'];
-        $intStats['total'] += $row['total'];
+    if($resInt) {
+        while($row = $resInt->fetch_assoc()) {
+            $intStats[$row['status']] = $row['total'];
+            $intStats['total'] += $row['total'];
+        }
     }
 
     // C. GRAFIK TREND (EXTERNAL VS INTERNAL - 6 BULAN)
@@ -42,17 +47,17 @@ if ($current_role == 'admin') {
         $m = date('Y-m', strtotime("-$i months"));
         $months[] = date('M Y', strtotime("-$i months"));
         
-        $dataTrendExt[] = $conn->query("SELECT COUNT(*) as t FROM tickets WHERE DATE_FORMAT(created_at, '%Y-%m') = '$m'")->fetch_assoc()['t'];
-        $dataTrendInt[] = $conn->query("SELECT COUNT(*) as t FROM internal_tickets WHERE DATE_FORMAT(created_at, '%Y-%m') = '$m'")->fetch_assoc()['t'];
+        $tExt = $conn->query("SELECT COUNT(*) as t FROM tickets WHERE DATE_FORMAT(created_at, '%Y-%m') = '$m'")->fetch_assoc()['t'];
+        $tInt = $conn->query("SELECT COUNT(*) as t FROM internal_tickets WHERE DATE_FORMAT(created_at, '%Y-%m') = '$m'")->fetch_assoc()['t'];
+        
+        $dataTrendExt[] = $tExt ?? 0;
+        $dataTrendInt[] = $tInt ?? 0;
     }
 
-    // D. USER PERFORMANCE SUMMARY (UPDATED: INTERNAL ASSIGN)
-    $userPerformances = [];
+    // D. USER PERFORMANCE SUMMARY
     $sqlPerf = "SELECT u.id, u.username, u.role,
-                -- External Metrics
                 (SELECT COUNT(*) FROM tickets WHERE assigned_to = u.id) as ext_assigned,
                 (SELECT COUNT(*) FROM tickets WHERE assigned_to = u.id AND status='closed') as ext_closed,
-                -- Internal Metrics
                 (SELECT COUNT(*) FROM internal_tickets WHERE user_id = u.id) as int_created,
                 (SELECT COUNT(*) FROM internal_tickets WHERE assigned_to = u.id) as int_assigned,
                 (SELECT COUNT(*) FROM internal_tickets WHERE assigned_to = u.id AND status='closed') as int_closed
@@ -75,202 +80,210 @@ else {
     $myStatData = [0,0,0]; // Open, Progress, Closed
     $sqlStat = "SELECT status, COUNT(*) as t FROM internal_tickets WHERE user_id=$current_user_id OR target_division_id=$current_div_id GROUP BY status";
     $res = $conn->query($sqlStat);
-    while($r = $res->fetch_assoc()){
-        if($r['status']=='open') $myStatData[0] = $r['t'];
-        if($r['status']=='progress') $myStatData[1] = $r['t'];
-        if($r['status']=='closed') $myStatData[2] = $r['t'];
+    if($res) {
+        while($r = $res->fetch_assoc()){
+            if($r['status']=='open') $myStatData[0] = $r['t'];
+            if($r['status']=='progress') $myStatData[1] = $r['t'];
+            if($r['status']=='closed') $myStatData[2] = $r['t'];
+        }
     }
 }
 ?>
 
-<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto overflow-y-auto min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+<style>
+    .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .modern-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+    .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .modern-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .dark .modern-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+</style>
+
+<div class="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto space-y-6 animate-fade-in-up">
     
-    <div class="mb-8">
-        <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Dashboard Overview</h1>
-        <p class="text-slate-500 dark:text-slate-400 mt-1">Pantau metrik dan kinerja sistem Anda secara real-time.</p>
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-2">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Dashboard Overview</h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1 font-medium">Pantau metrik dan kinerja operasional hari ini.</p>
+        </div>
+        <div class="px-4 py-2 bg-white dark:bg-[#24303F] border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm inline-flex items-center gap-2">
+            <i class="ph-bold ph-calendar-blank text-indigo-500 text-lg"></i>
+            <span class="text-sm font-bold text-slate-600 dark:text-slate-300"><?= date('l, d F Y') ?></span>
+        </div>
     </div>
 
     <?php if ($current_role == 'admin'): ?>
     
-    <div class="mb-6">
-        <div class="border-b border-slate-200 dark:border-slate-700">
-            <nav class="flex gap-4" aria-label="Tabs">
-                <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-button active inline-flex items-center gap-2 py-4 px-1 border-b-2 font-bold text-sm transition-colors whitespace-nowrap border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400">
-                    <i class="ph-bold ph-squares-four text-lg"></i> Global Overview
-                </button>
-                <button onclick="switchTab('external')" id="tab-btn-external" class="tab-button inline-flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300">
-                    <i class="ph-bold ph-users text-lg"></i> External Tickets
-                </button>
-                <button onclick="switchTab('internal')" id="tab-btn-internal" class="tab-button inline-flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300">
-                    <i class="ph-bold ph-buildings text-lg"></i> Internal Tickets
-                </button>
-            </nav>
-        </div>
+    <div class="inline-flex bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-2xl shadow-inner backdrop-blur-sm overflow-x-auto max-w-full modern-scrollbar">
+        <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-button active flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all duration-300 bg-white dark:bg-indigo-600 shadow-sm text-indigo-600 dark:text-white">
+            <i class="ph-bold ph-squares-four text-lg"></i> Overview
+        </button>
+        <button onclick="switchTab('external')" id="tab-btn-external" class="tab-button flex items-center gap-2 py-2.5 px-6 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50">
+            <i class="ph-bold ph-headset text-lg"></i> External
+        </button>
+        <button onclick="switchTab('internal')" id="tab-btn-internal" class="tab-button flex items-center gap-2 py-2.5 px-6 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50">
+            <i class="ph-bold ph-buildings text-lg"></i> Internal
+        </button>
     </div>
 
-    <div class="relative">
+    <div class="relative mt-2">
 
-        <div id="panel-overview" class="tab-panel animate-fade-in block">
+        <div id="panel-overview" class="tab-panel block transition-opacity duration-300">
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div class="lg:col-span-2 bg-white dark:bg-[#1A222C] rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 p-6">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Traffic Tiket (6 Bulan Terakhir)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl shadow-lg shadow-indigo-500/20 p-6 sm:p-8 text-white relative overflow-hidden group hover:shadow-indigo-500/40 transition-all duration-300 hover:-translate-y-1">
+                    <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                    <div class="absolute right-6 bottom-6 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                        <i class="ph-fill ph-headset text-8xl"></i>
                     </div>
-                    <div id="chart-main-trend" class="w-full h-[300px]"></div>
+                    <div class="relative z-10">
+                        <span class="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg font-bold tracking-wider text-xs uppercase mb-4 shadow-sm border border-white/10">External Tickets</span>
+                        <h2 class="text-6xl font-black tracking-tighter mb-1"><?= $extStats['total'] ?></h2>
+                        <p class="text-indigo-100 font-medium opacity-90">Total tiket dukungan pelanggan</p>
+                    </div>
                 </div>
 
-                <div class="lg:col-span-1 flex flex-col gap-6">
-                    <div class="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-lg shadow-indigo-500/30 p-6 text-white relative overflow-hidden group hover:-translate-y-1 transition-transform">
-                        <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500"></div>
-                        <div class="relative z-10">
-                            <div class="flex items-center justify-between mb-4">
-                                <span class="text-indigo-100 font-medium tracking-wide text-sm uppercase">Total External</span>
-                                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                                    <i class="ph-fill ph-users text-xl"></i>
-                                </div>
-                            </div>
-                            <h2 class="text-5xl font-extrabold tracking-tight"><?= $extStats['total'] ?></h2>
-                            <p class="text-indigo-100 text-sm mt-2">Tiket dukungan pelanggan</p>
-                        </div>
+                <div class="bg-gradient-to-br from-orange-500 to-amber-600 rounded-3xl shadow-lg shadow-orange-500/20 p-6 sm:p-8 text-white relative overflow-hidden group hover:shadow-orange-500/40 transition-all duration-300 hover:-translate-y-1">
+                    <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                    <div class="absolute right-6 bottom-6 opacity-20 group-hover:opacity-40 transition-opacity duration-300">
+                        <i class="ph-fill ph-buildings text-8xl"></i>
                     </div>
-
-                    <div class="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl shadow-lg shadow-amber-500/30 p-6 text-white relative overflow-hidden group hover:-translate-y-1 transition-transform">
-                        <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500"></div>
-                        <div class="relative z-10">
-                            <div class="flex items-center justify-between mb-4">
-                                <span class="text-amber-100 font-medium tracking-wide text-sm uppercase">Total Internal</span>
-                                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                                    <i class="ph-fill ph-buildings text-xl"></i>
-                                </div>
-                            </div>
-                            <h2 class="text-5xl font-extrabold tracking-tight"><?= $intStats['total'] ?></h2>
-                            <p class="text-amber-100 text-sm mt-2">Tiket antar divisi perusahaan</p>
-                        </div>
+                    <div class="relative z-10">
+                        <span class="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg font-bold tracking-wider text-xs uppercase mb-4 shadow-sm border border-white/10">Internal Tickets</span>
+                        <h2 class="text-6xl font-black tracking-tighter mb-1"><?= $intStats['total'] ?></h2>
+                        <p class="text-orange-100 font-medium opacity-90">Total tiket lintas divisi perusahaan</p>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white dark:bg-[#1A222C] rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 overflow-hidden">
-                <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-white">User Performance Summary</h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Memantau beban kerja admin dan penyelesaian tiket.</p>
+            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 mb-6 transition-colors">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-white">Trend Traffic (6 Bulan)</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">Perbandingan tiket masuk per bulan.</p>
+                    </div>
+                    <div class="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                        <i class="ph-bold ph-chart-line-up text-xl"></i>
+                    </div>
+                </div>
+                <div id="chart-main-trend" class="w-full h-[320px]"></div>
+            </div>
+
+            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
+                <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800 dark:text-white">User Performance</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Metrik penyelesaian tiket oleh admin.</p>
+                    </div>
                 </div>
                 
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto modern-scrollbar">
                     <table class="w-full text-left border-collapse">
                         <thead>
-                            <tr>
-                                <th rowspan="2" class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider align-middle">Staff Name</th>
-                                <th rowspan="2" class="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider align-middle">Role</th>
-                                <th colspan="2" class="px-6 py-3 bg-indigo-50/50 dark:bg-indigo-900/10 border-b border-indigo-100 dark:border-indigo-900/30 text-center text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">External (Customer)</th>
-                                <th colspan="3" class="px-6 py-3 bg-amber-50/50 dark:bg-amber-900/10 border-b border-amber-100 dark:border-amber-900/30 text-center text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider border-l border-slate-200 dark:border-slate-700">Internal (Divisi)</th>
-                            </tr>
-                            <tr>
-                                <th class="px-4 py-3 bg-indigo-50/30 dark:bg-indigo-900/5 border-b border-slate-200 dark:border-slate-700 text-center text-xs font-semibold text-indigo-500">Assigned</th>
-                                <th class="px-4 py-3 bg-indigo-50/30 dark:bg-indigo-900/5 border-b border-slate-200 dark:border-slate-700 text-center text-xs font-semibold text-emerald-500">Closed</th>
-                                <th class="px-4 py-3 bg-amber-50/30 dark:bg-amber-900/5 border-b border-slate-200 dark:border-slate-700 border-l border-slate-200 dark:border-slate-700 text-center text-xs font-semibold text-amber-600">Assigned</th>
-                                <th class="px-4 py-3 bg-amber-50/30 dark:bg-amber-900/5 border-b border-slate-200 dark:border-slate-700 text-center text-xs font-semibold text-emerald-500">Closed</th>
-                                <th class="px-4 py-3 bg-amber-50/30 dark:bg-amber-900/5 border-b border-slate-200 dark:border-slate-700 text-center text-xs font-semibold text-slate-500">Created</th>
+                            <tr class="bg-slate-50/50 dark:bg-slate-800/30">
+                                <th class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider">Staff Name</th>
+                                <th class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider">Role</th>
+                                <th class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-indigo-500 uppercase tracking-wider bg-indigo-50/30 dark:bg-indigo-900/10">Ext. Assigned</th>
+                                <th class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-emerald-500 uppercase tracking-wider bg-indigo-50/30 dark:bg-indigo-900/10">Ext. Closed</th>
+                                <th class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-orange-500 uppercase tracking-wider bg-orange-50/30 dark:bg-orange-900/10 border-l border-slate-100 dark:border-slate-800">Int. Assigned</th>
+                                <th class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-emerald-500 uppercase tracking-wider bg-orange-50/30 dark:bg-orange-900/10">Int. Closed</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            <?php while($u = $resPerf->fetch_assoc()): ?>
-                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50">
+                            <?php if($resPerf): while($u = $resPerf->fetch_assoc()): ?>
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-xs uppercase">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-sm uppercase shadow-inner">
                                             <?= substr($u['username'],0,1) ?>
                                         </div>
-                                        <span class="font-semibold text-slate-800 dark:text-slate-200"><?= htmlspecialchars($u['username']) ?></span>
+                                        <span class="font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors"><?= htmlspecialchars($u['username']) ?></span>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                    <span class="px-3 py-1 inline-flex text-xs font-bold rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                         <?= ucfirst($u['role']) ?>
                                     </span>
                                 </td>
                                 
-                                <td class="px-4 py-4 whitespace-nowrap text-center">
-                                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 font-bold text-xs">
-                                        <?= $u['ext_assigned'] ?>
+                                <td class="px-6 py-4 whitespace-nowrap text-center bg-indigo-50/10 dark:bg-indigo-900/5">
+                                    <span class="font-bold text-slate-600 dark:text-slate-300"><?= $u['ext_assigned'] ?></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center bg-indigo-50/10 dark:bg-indigo-900/5">
+                                    <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-bold text-sm">
+                                        <?= $u['ext_closed'] ?>
                                     </span>
                                 </td>
-                                <td class="px-4 py-4 whitespace-nowrap text-center font-bold text-emerald-500"><?= $u['ext_closed'] ?></td>
                                 
-                                <td class="px-4 py-4 whitespace-nowrap text-center border-l border-slate-100 dark:border-slate-800">
-                                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-bold text-xs">
-                                        <?= $u['int_assigned'] ?>
+                                <td class="px-6 py-4 whitespace-nowrap text-center border-l border-slate-100 dark:border-slate-800 bg-orange-50/10 dark:bg-orange-900/5">
+                                    <span class="font-bold text-slate-600 dark:text-slate-300"><?= $u['int_assigned'] ?></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center bg-orange-50/10 dark:bg-orange-900/5">
+                                    <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-bold text-sm">
+                                        <?= $u['int_closed'] ?>
                                     </span>
                                 </td>
-                                <td class="px-4 py-4 whitespace-nowrap text-center font-bold text-emerald-500"><?= $u['int_closed'] ?></td>
-                                <td class="px-4 py-4 whitespace-nowrap text-center text-slate-400 font-medium"><?= $u['int_created'] ?></td>
                             </tr>
-                            <?php endwhile; ?>
+                            <?php endwhile; endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <div id="panel-external" class="tab-panel hidden animate-fade-in">
-            
+        <div id="panel-external" class="tab-panel hidden transition-opacity duration-300">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-ticket"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total External</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $extStats['total'] ?></h4></div>
+                <?php 
+                $extCards = [
+                    ['label'=>'Total', 'val'=>$extStats['total'], 'icon'=>'ph-ticket', 'color'=>'indigo'],
+                    ['label'=>'Open', 'val'=>$extStats['open'], 'icon'=>'ph-envelope-open', 'color'=>'emerald'],
+                    ['label'=>'Progress', 'val'=>$extStats['progress'], 'icon'=>'ph-spinner-gap', 'color'=>'amber'],
+                    ['label'=>'Closed', 'val'=>$extStats['closed'], 'icon'=>'ph-check-circle', 'color'=>'slate']
+                ];
+                foreach($extCards as $c): 
+                ?>
+                <div class="bg-white dark:bg-[#24303F] p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-5 hover:-translate-y-1 transition-transform">
+                    <div class="w-14 h-14 rounded-2xl bg-<?= $c['color'] ?>-50 text-<?= $c['color'] ?>-600 dark:bg-<?= $c['color'] ?>-500/10 dark:text-<?= $c['color'] ?>-400 flex items-center justify-center text-3xl shrink-0"><i class="ph-fill <?= $c['icon'] ?>"></i></div>
+                    <div><p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5"><?= $c['label'] ?></p><h4 class="text-3xl font-black text-slate-800 dark:text-white"><?= $c['val'] ?></h4></div>
                 </div>
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-envelope-open"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">Open</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $extStats['open'] ?></h4></div>
-                </div>
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-spinner"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">In Progress</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $extStats['progress'] ?></h4></div>
-                </div>
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-check-circle"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">Closed</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $extStats['closed'] ?></h4></div>
-                </div>
+                <?php endforeach; ?>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white dark:bg-[#1A222C] rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 p-6">
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-4">Distribusi Status</h3>
+                <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6">Distribusi Status</h3>
                     <div id="chart-ext-pie" class="flex justify-center h-[320px]"></div>
                 </div>
             </div>
-
         </div>
 
-        <div id="panel-internal" class="tab-panel hidden animate-fade-in">
-            
+        <div id="panel-internal" class="tab-panel hidden transition-opacity duration-300">
              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-buildings"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Internal</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $intStats['total'] ?></h4></div>
+                <?php 
+                $intCards = [
+                    ['label'=>'Total', 'val'=>$intStats['total'], 'icon'=>'ph-buildings', 'color'=>'orange'],
+                    ['label'=>'Open', 'val'=>$intStats['open'], 'icon'=>'ph-envelope-open', 'color'=>'emerald'],
+                    ['label'=>'Progress', 'val'=>$intStats['progress'], 'icon'=>'ph-spinner-gap', 'color'=>'blue'],
+                    ['label'=>'Closed', 'val'=>$intStats['closed'], 'icon'=>'ph-check-circle', 'color'=>'slate']
+                ];
+                foreach($intCards as $c): 
+                ?>
+                <div class="bg-white dark:bg-[#24303F] p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-5 hover:-translate-y-1 transition-transform">
+                    <div class="w-14 h-14 rounded-2xl bg-<?= $c['color'] ?>-50 text-<?= $c['color'] ?>-600 dark:bg-<?= $c['color'] ?>-500/10 dark:text-<?= $c['color'] ?>-400 flex items-center justify-center text-3xl shrink-0"><i class="ph-fill <?= $c['icon'] ?>"></i></div>
+                    <div><p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-0.5"><?= $c['label'] ?></p><h4 class="text-3xl font-black text-slate-800 dark:text-white"><?= $c['val'] ?></h4></div>
                 </div>
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-envelope-open"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">Open</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $intStats['open'] ?></h4></div>
-                </div>
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-spinner"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">In Progress</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $intStats['progress'] ?></h4></div>
-                </div>
-                <div class="bg-white dark:bg-[#1A222C] p-5 rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 flex items-center gap-4">
-                    <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-check-circle"></i></div>
-                    <div><p class="text-sm font-medium text-slate-500 dark:text-slate-400">Closed</p><h4 class="text-2xl font-bold text-slate-900 dark:text-white"><?= $intStats['closed'] ?></h4></div>
-                </div>
+                <?php endforeach; ?>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white dark:bg-[#1A222C] rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 p-6">
-                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-4">Distribusi Status (Internal)</h3>
+                <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6">Distribusi Status (Internal)</h3>
                     <div id="chart-int-pie" class="flex justify-center h-[320px]"></div>
                 </div>
             </div>
-
         </div>
 
     </div>
@@ -278,30 +291,30 @@ else {
     <?php else: ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             
-            <div class="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-lg p-6 text-white relative overflow-hidden group hover:-translate-y-1 transition-transform">
-                <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500"></div>
-                <div class="relative z-10 flex items-center gap-5">
-                    <div class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md shrink-0">
-                        <i class="ph-bold ph-paper-plane-right text-3xl"></i>
+            <div class="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl shadow-lg shadow-indigo-500/20 p-8 text-white relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                <div class="relative z-10 flex items-center gap-6">
+                    <div class="w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md shrink-0 shadow-inner border border-white/20">
+                        <i class="ph-fill ph-paper-plane-right text-4xl"></i>
                     </div>
                     <div>
-                        <h5 class="text-indigo-100 font-medium text-sm uppercase tracking-wider mb-1">Tiket Dikirim</h5>
-                        <h2 class="text-4xl font-extrabold tracking-tight"><?= $mySent ?></h2>
-                        <p class="text-indigo-100/80 text-xs mt-1">Tiket yang Anda buat untuk divisi lain.</p>
+                        <h5 class="text-indigo-100 font-bold text-xs uppercase tracking-widest mb-1">Tiket Dikirim</h5>
+                        <h2 class="text-5xl font-black tracking-tight"><?= $mySent ?></h2>
+                        <p class="text-indigo-100/80 text-sm mt-1">Dibuat oleh Anda untuk divisi lain.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl shadow-lg p-6 text-white relative overflow-hidden group hover:-translate-y-1 transition-transform">
-                <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500"></div>
-                <div class="relative z-10 flex items-center gap-5">
-                    <div class="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md shrink-0">
-                        <i class="ph-bold ph-tray text-3xl"></i>
+            <div class="bg-gradient-to-br from-teal-500 to-emerald-600 rounded-3xl shadow-lg shadow-teal-500/20 p-8 text-white relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                <div class="relative z-10 flex items-center gap-6">
+                    <div class="w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center backdrop-blur-md shrink-0 shadow-inner border border-white/20">
+                        <i class="ph-fill ph-tray text-4xl"></i>
                     </div>
                     <div>
-                        <h5 class="text-cyan-100 font-medium text-sm uppercase tracking-wider mb-1">Tiket Masuk Divisi</h5>
-                        <h2 class="text-4xl font-extrabold tracking-tight"><?= $myInbox ?></h2>
-                        <p class="text-cyan-100/80 text-xs mt-1">Tiket dari divisi lain ke divisi Anda.</p>
+                        <h5 class="text-teal-100 font-bold text-xs uppercase tracking-widest mb-1">Inbox Divisi</h5>
+                        <h2 class="text-5xl font-black tracking-tight"><?= $myInbox ?></h2>
+                        <p class="text-teal-100/80 text-sm mt-1">Masuk dari divisi lain ke divisi Anda.</p>
                     </div>
                 </div>
             </div>
@@ -309,138 +322,163 @@ else {
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white dark:bg-[#1A222C] rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 p-6">
-                <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-4">Status Tiket Anda & Divisi</h3>
+            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-6">Status Tiket Anda & Divisi</h3>
                 <div id="chart-std-status" class="flex justify-center h-[320px]"></div>
             </div>
         </div>
     <?php endif; ?>
 
 </div>
+
 <?php include 'includes/footer.php'; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
 <script>
-    // Tab Switching Logic (Tailwind approach)
+    // 1. TABS SWITCHING (Tailwind approach)
     function switchTab(tabId) {
-        // Sembunyikan semua panel
         document.querySelectorAll('.tab-panel').forEach(panel => {
             panel.classList.add('hidden');
             panel.classList.remove('block');
         });
-        // Tampilkan panel yang dituju
         document.getElementById('panel-' + tabId).classList.remove('hidden');
         document.getElementById('panel-' + tabId).classList.add('block');
 
-        // Reset styling semua tombol tab
         document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('border-indigo-600', 'text-indigo-600', 'dark:border-indigo-400', 'dark:text-indigo-400', 'font-bold');
-            btn.classList.add('border-transparent', 'text-slate-500', 'font-medium');
+            btn.className = "tab-button flex items-center gap-2 py-2.5 px-6 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50";
         });
         
-        // Aktifkan tombol yang di klik
         const activeBtn = document.getElementById('tab-btn-' + tabId);
-        activeBtn.classList.remove('border-transparent', 'text-slate-500', 'font-medium');
-        activeBtn.classList.add('border-indigo-600', 'text-indigo-600', 'dark:border-indigo-400', 'dark:text-indigo-400', 'font-bold');
+        activeBtn.className = "tab-button active flex items-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm transition-all duration-300 bg-white dark:bg-indigo-600 shadow-sm text-indigo-600 dark:text-white";
     }
 
-    // Chart Check Dark Mode (Untuk warna tulisan grafik)
-    const isDarkMode = document.documentElement.classList.contains('dark') || localStorage.getItem('color-theme') === 'dark';
-    const textColor = isDarkMode ? '#94a3b8' : '#64748b'; // slate-400 vs slate-500
-
-    // Common Font
+    // 2. CHART CONFIGURATION & DYNAMIC THEME FIX
     const fontFam = "'Inter', sans-serif";
-
-    <?php if ($current_role == 'admin'): ?>
-        
-        // CHART 1: Area Trend
-        var optionsMain = {
-            series: [
-                { name: 'External Tickets', data: <?php echo json_encode($dataTrendExt); ?> },
-                { name: 'Internal Tickets', data: <?php echo json_encode($dataTrendInt); ?> }
-            ],
-            chart: { 
-                height: 300, 
-                type: 'area', 
-                toolbar: { show: false },
-                fontFamily: fontFam,
-                background: 'transparent'
-            },
-            colors: ['#4F46E5', '#F59E0B'], // Indigo & Amber
-            fill: {
-                type: 'gradient',
-                gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05, stops: [0, 90, 100] }
-            },
-            dataLabels: { enabled: false },
-            stroke: { curve: 'smooth', width: 3 },
-            xaxis: { 
-                categories: <?php echo json_encode($months); ?>,
-                labels: { style: { colors: textColor } },
-                axisBorder: { show: false },
-                axisTicks: { show: false }
-            },
-            yaxis: {
-                labels: { style: { colors: textColor } }
-            },
-            grid: {
-                borderColor: isDarkMode ? '#334155' : '#e2e8f0', // slate-700 vs slate-200
-                strokeDashArray: 4,
-            },
-            legend: { position: 'top', horizontalAlign: 'right', labels: { colors: textColor } },
-            theme: { mode: isDarkMode ? 'dark' : 'light' }
+    
+    // Fungsi pembantu warna dinamis
+    function getChartColors() {
+        const isDark = document.documentElement.classList.contains('dark') || document.body.classList.contains('theme-dark');
+        return {
+            mode: isDark ? 'dark' : 'light',
+            text: isDark ? '#94a3b8' : '#64748b',
+            grid: isDark ? '#334155' : '#e2e8f0',
+            valColor: isDark ? '#ffffff' : '#0f172a'
         };
-        new ApexCharts(document.querySelector("#chart-main-trend"), optionsMain).render();
+    }
 
-        // CHART 2: External Pie
-        var optionsExtPie = {
-            series: [<?= $extStats['open'] ?>, <?= $extStats['progress'] ?>, <?= $extStats['closed'] ?>, <?= $extStats['total'] - ($extStats['open']+$extStats['progress']+$extStats['closed']) ?>],
-            chart: { type: 'donut', height: 320, fontFamily: fontFam, background: 'transparent' },
-            labels: ['Open', 'Progress', 'Closed', 'Other'],
-            colors: ['#10B981', '#0EA5E9', '#64748B', '#EF4444'], // Emerald, Light Blue, Slate, Red
-            stroke: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-                pie: { donut: { size: '75%', labels: { show: true, name: { color: textColor }, value: { color: isDarkMode ? '#fff' : '#0f172a', fontSize: '24px', fontWeight: 700 } } } }
-            },
-            legend: { position: 'bottom', labels: { colors: textColor } },
-            theme: { mode: isDarkMode ? 'dark' : 'light' }
-        };
-        new ApexCharts(document.querySelector("#chart-ext-pie"), optionsExtPie).render();
+    // Global variable chart
+    let chartMain, chartExtPie, chartIntPie, chartStd;
 
-        // CHART 3: Internal Pie
-        var optionsIntPie = {
-            series: [<?= $intStats['open'] ?>, <?= $intStats['progress'] ?>, <?= $intStats['closed'] ?>],
-            chart: { type: 'donut', height: 320, fontFamily: fontFam, background: 'transparent' },
-            labels: ['Open', 'Progress', 'Closed'],
-            colors: ['#10B981', '#F59E0B', '#64748B'], // Emerald, Amber, Slate
-            stroke: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-                pie: { donut: { size: '75%', labels: { show: true, name: { color: textColor }, value: { color: isDarkMode ? '#fff' : '#0f172a', fontSize: '24px', fontWeight: 700 } } } }
-            },
-            legend: { position: 'bottom', labels: { colors: textColor } },
-            theme: { mode: isDarkMode ? 'dark' : 'light' }
-        };
-        new ApexCharts(document.querySelector("#chart-int-pie"), optionsIntPie).render();
+    document.addEventListener('DOMContentLoaded', function() {
+        const colors = getChartColors();
 
-    <?php else: ?>
-        
-        // CHART 4: Standard User Pie
-        var optionsStd = {
-            series: [<?= $myStatData[0] ?>, <?= $myStatData[1] ?>, <?= $myStatData[2] ?>],
-            chart: { type: 'donut', height: 320, fontFamily: fontFam, background: 'transparent' },
-            labels: ['Open', 'Progress', 'Closed'],
-            colors: ['#10B981', '#F59E0B', '#64748B'],
-            stroke: { show: false },
-            dataLabels: { enabled: false },
-            plotOptions: {
-                pie: { donut: { size: '75%', labels: { show: true, name: { color: textColor }, value: { color: isDarkMode ? '#fff' : '#0f172a', fontSize: '24px', fontWeight: 700 } } } }
-            },
-            legend: { position: 'bottom', labels: { colors: textColor } },
-            theme: { mode: isDarkMode ? 'dark' : 'light' }
-        };
-        new ApexCharts(document.querySelector("#chart-std-status"), optionsStd).render();
-        
-    <?php endif; ?>
+        <?php if ($current_role == 'admin'): ?>
+            
+            // CHART 1: Area Trend
+            var optionsMain = {
+                series: [
+                    { name: 'External Tickets', data: <?php echo json_encode($dataTrendExt); ?> },
+                    { name: 'Internal Tickets', data: <?php echo json_encode($dataTrendInt); ?> }
+                ],
+                chart: { height: 320, type: 'area', toolbar: { show: false }, fontFamily: fontFam, background: 'transparent' },
+                colors: ['#4F46E5', '#F97316'], // Indigo & Orange
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 90, 100] } },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 3 },
+                xaxis: { 
+                    categories: <?php echo json_encode($months); ?>,
+                    labels: { style: { colors: colors.text, fontWeight: 500 } },
+                    axisBorder: { show: false }, axisTicks: { show: false }
+                },
+                yaxis: { labels: { style: { colors: colors.text, fontWeight: 500 } } },
+                grid: { borderColor: colors.grid, strokeDashArray: 4 },
+                legend: { position: 'top', horizontalAlign: 'right', labels: { colors: colors.text }, markers: { radius: 12 } },
+                theme: { mode: colors.mode }
+            };
+            chartMain = new ApexCharts(document.querySelector("#chart-main-trend"), optionsMain);
+            chartMain.render();
+
+            // CHART 2: External Pie
+            var optionsExtPie = {
+                series: [<?= $extStats['open'] ?>, <?= $extStats['progress'] ?>, <?= $extStats['closed'] ?>, <?= $extStats['total'] - ($extStats['open']+$extStats['progress']+$extStats['closed']) ?>],
+                chart: { type: 'donut', height: 320, fontFamily: fontFam, background: 'transparent' },
+                labels: ['Open', 'Progress', 'Closed', 'Other'],
+                colors: ['#10B981', '#3B82F6', '#64748B', '#EF4444'], 
+                stroke: { show: false },
+                dataLabels: { enabled: false },
+                plotOptions: { pie: { donut: { size: '75%', labels: { show: true, name: { color: colors.text }, value: { color: colors.valColor, fontSize: '28px', fontWeight: 800 } } } } },
+                legend: { position: 'bottom', labels: { colors: colors.text }, markers: { radius: 12 } },
+                theme: { mode: colors.mode }
+            };
+            chartExtPie = new ApexCharts(document.querySelector("#chart-ext-pie"), optionsExtPie);
+            chartExtPie.render();
+
+            // CHART 3: Internal Pie
+            var optionsIntPie = {
+                series: [<?= $intStats['open'] ?>, <?= $intStats['progress'] ?>, <?= $intStats['closed'] ?>],
+                chart: { type: 'donut', height: 320, fontFamily: fontFam, background: 'transparent' },
+                labels: ['Open', 'Progress', 'Closed'],
+                colors: ['#10B981', '#3B82F6', '#64748B'],
+                stroke: { show: false },
+                dataLabels: { enabled: false },
+                plotOptions: { pie: { donut: { size: '75%', labels: { show: true, name: { color: colors.text }, value: { color: colors.valColor, fontSize: '28px', fontWeight: 800 } } } } },
+                legend: { position: 'bottom', labels: { colors: colors.text }, markers: { radius: 12 } },
+                theme: { mode: colors.mode }
+            };
+            chartIntPie = new ApexCharts(document.querySelector("#chart-int-pie"), optionsIntPie);
+            chartIntPie.render();
+
+        <?php else: ?>
+            
+            // CHART 4: Standard User Pie
+            var optionsStd = {
+                series: [<?= $myStatData[0] ?>, <?= $myStatData[1] ?>, <?= $myStatData[2] ?>],
+                chart: { type: 'donut', height: 320, fontFamily: fontFam, background: 'transparent' },
+                labels: ['Open', 'Progress', 'Closed'],
+                colors: ['#10B981', '#3B82F6', '#64748B'],
+                stroke: { show: false },
+                dataLabels: { enabled: false },
+                plotOptions: { pie: { donut: { size: '75%', labels: { show: true, name: { color: colors.text }, value: { color: colors.valColor, fontSize: '28px', fontWeight: 800 } } } } },
+                legend: { position: 'bottom', labels: { colors: colors.text }, markers: { radius: 12 } },
+                theme: { mode: colors.mode }
+            };
+            chartStd = new ApexCharts(document.querySelector("#chart-std-status"), optionsStd);
+            chartStd.render();
+            
+        <?php endif; ?>
+
+        // 3. OBSERVER: MENDETEKSI PERUBAHAN TEMA REAL-TIME
+        // Fungsi ini yang memastikan saat tombol Light/Dark ditekan, grafik langsung berubah warna
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class' || mutation.attributeName === 'data-bs-theme') {
+                    const newColors = getChartColors();
+                    
+                    if (chartMain) {
+                        chartMain.updateOptions({
+                            theme: { mode: newColors.mode },
+                            xaxis: { labels: { style: { colors: newColors.text } } },
+                            yaxis: { labels: { style: { colors: newColors.text } } },
+                            grid: { borderColor: newColors.grid },
+                            legend: { labels: { colors: newColors.text } }
+                        });
+                    }
+                    
+                    [chartExtPie, chartIntPie, chartStd].forEach(chart => {
+                        if (chart) {
+                            chart.updateOptions({
+                                theme: { mode: newColors.mode },
+                                plotOptions: { pie: { donut: { labels: { name: { color: newColors.text }, value: { color: newColors.valColor } } } } },
+                                legend: { labels: { colors: newColors.text } }
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        observer.observe(document.documentElement, { attributes: true });
+        observer.observe(document.body, { attributes: true });
+    });
 </script>
