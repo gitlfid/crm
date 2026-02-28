@@ -36,13 +36,8 @@ $email      = isset($_SESSION['email']) ? $_SESSION['email'] : 'user@example.com
             darkMode: 'class', 
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        primary: '#4F46E5', // Indigo 600
-                        primaryDark: '#3730A3', // Indigo 800
-                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { primary: '#4F46E5', primaryDark: '#3730A3' },
                     boxShadow: {
                         'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
                         'soft-lg': '0 10px 25px -3px rgba(0, 0, 0, 0.08)'
@@ -58,44 +53,50 @@ $email      = isset($_SESSION['email']) ? $_SESSION['email'] : 'user@example.com
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             
-            // 1. LOGIKA DARK MODE TOGGLE
+            // 1. LOGIKA DARK MODE (SINKRONISASI TAILWIND & BOOTSTRAP LAMA)
             const darkModeToggle = document.getElementById('darkModeToggle');
             const html = document.documentElement;
+            const body = document.body;
 
-            // Cek status dark mode dari LocalStorage saat halaman dimuat
-            if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                html.classList.add('dark');
-            } else {
-                html.classList.remove('dark');
+            function applyDarkMode(isDark) {
+                if (isDark) {
+                    html.classList.add('dark'); // Aktifkan Dark Mode Tailwind
+                    html.setAttribute('data-bs-theme', 'dark'); // Aktifkan Dark Mode Bootstrap Lama
+                    body.classList.add('theme-dark');
+                    localStorage.setItem('color-theme', 'dark');
+                } else {
+                    html.classList.remove('dark');
+                    html.setAttribute('data-bs-theme', 'light');
+                    body.classList.remove('theme-dark');
+                    localStorage.setItem('color-theme', 'light');
+                }
             }
 
-            // Aksi ketika tombol Dark Mode di-klik
+            // Cek status saat pertama kali load
+            if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                applyDarkMode(true);
+            } else {
+                applyDarkMode(false);
+            }
+
+            // Event saat tombol matahari/bulan ditekan
             if (darkModeToggle) {
                 darkModeToggle.addEventListener('click', () => {
-                    if (html.classList.contains('dark')) {
-                        html.classList.remove('dark');
-                        localStorage.setItem('color-theme', 'light');
-                    } else {
-                        html.classList.add('dark');
-                        localStorage.setItem('color-theme', 'dark');
-                    }
+                    applyDarkMode(!html.classList.contains('dark'));
                 });
             }
 
-            // 2. LOGIKA DROPDOWN PROFILE & LOGOUT
+            // 2. LOGIKA DROPDOWN PROFILE
             const profileBtn = document.getElementById('profileBtn');
             const profileDropdown = document.getElementById('profileDropdown');
             const profileCaret = document.getElementById('profileCaret');
 
             if (profileBtn && profileDropdown) {
-                // Aksi buka/tutup dropdown
                 profileBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     profileDropdown.classList.toggle('hidden');
                     if (profileCaret) profileCaret.classList.toggle('rotate-180');
                 });
-
-                // Tutup otomatis jika klik di tempat lain
                 document.addEventListener('click', (e) => {
                     if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
                         profileDropdown.classList.add('hidden');
@@ -104,6 +105,26 @@ $email      = isset($_SESSION['email']) ? $_SESSION['email'] : 'user@example.com
                 });
             }
 
+            // 3. LOGIKA TOGGLE SIDEBAR (Animasi Buka Tutup)
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('sidebarToggleBtn');
+            const closeBtn = document.getElementById('closeSidebarMobile');
+
+            if (toggleBtn && sidebar) {
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (window.innerWidth < 1024) {
+                        sidebar.classList.toggle('-translate-x-full'); // Mobile Mode
+                    } else {
+                        sidebar.classList.toggle('is-collapsed'); // Desktop Mini Mode
+                    }
+                });
+            }
+            if (closeBtn && sidebar) {
+                closeBtn.addEventListener('click', () => {
+                    sidebar.classList.add('-translate-x-full');
+                });
+            }
         });
     </script>
 </head>
