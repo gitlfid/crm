@@ -51,7 +51,7 @@ if (!function_exists('isChildActive')) {
                 'internal_view.php' => 'internal_tickets.php',
                 'tsel_upload.php' => 'tsel_inject.php',
                 'tsel_history.php' => 'tsel_inject.php',
-                'tsel_dashboard.php' => 'tsel_dashboard.php', // [NEW MAPPING]
+                'tsel_dashboard.php' => 'tsel_dashboard.php', 
                 'leave_form.php' => 'leave_list.php',
                 'delivery_form.php' => 'delivery_list.php' 
             ];
@@ -69,19 +69,42 @@ $debug_msg = "";
 // LOGIKA 1: ADMIN HARDCODED BYPASS (PASTI FULL AKSES)
 // =========================================================================
 if ($role_name === 'admin') {
-    $sidebar_menu['dashboard'] = ['menu_label' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'bi bi-grid-fill', 'children' => []];
-    $sidebar_menu['leave'] = ['menu_label' => 'Leave Request', 'url' => 'leave_list.php', 'icon' => 'bi bi-calendar-check-fill', 'children' => []];
-    $sidebar_menu['delivery'] = ['menu_label' => 'Delivery', 'url' => 'delivery_list.php', 'icon' => 'bi bi-truck', 'children' => []];
-    $sidebar_menu['helpdesk'] = ['menu_label' => 'Helpdesk', 'url' => '#', 'icon' => 'bi bi-ticket-detailed-fill', 'children' => [['menu_label' => 'External Tickets', 'url' => 'tickets.php'], ['menu_label' => 'Internal Tickets', 'url' => 'internal_tickets.php']]];
-    $sidebar_menu['sales'] = ['menu_label' => 'Sales', 'url' => '#', 'icon' => 'bi bi-hand-thumbs-up-fill', 'children' => [['menu_label' => 'Dashboard Clients', 'url' => 'dashboard_clients.php'], ['menu_label' => 'Client List', 'url' => 'clients.php']]];
-    $sidebar_menu['finance'] = ['menu_label' => 'Finance', 'url' => '#', 'icon' => 'bi bi-currency-dollar', 'children' => [['menu_label' => 'Vendor List', 'url' => 'vendor_list.php'], ['menu_label' => 'Purchase Orders', 'url' => 'po_list.php'], ['menu_label' => 'Quotations', 'url' => 'quotation_list.php'], ['menu_label' => 'PO From Client', 'url' => 'po_client_list.php'], ['menu_label' => 'Invoices', 'url' => 'invoice_list.php'], ['menu_label' => 'Payments', 'url' => 'payment_list.php'], ['menu_label' => 'Delivery Orders', 'url' => 'delivery_order_list.php']]];
-    $sidebar_menu['admin'] = ['menu_label' => 'Administration', 'url' => '#', 'icon' => 'bi bi-gear-fill', 'children' => [['menu_label' => 'Manage Users', 'url' => 'manage_users.php'], ['menu_label' => 'Manage Divisions', 'url' => 'manage_divisions.php'], ['menu_label' => 'Manage Permissions', 'url' => 'manage_roles.php'], ['menu_label' => 'Settings', 'url' => 'settings.php']]];
+    // Map icon bootstrap ke phosphor icon
+    $sidebar_menu['dashboard'] = ['menu_label' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'ph-squares-four', 'children' => []];
+    $sidebar_menu['leave'] = ['menu_label' => 'Leave Request', 'url' => 'leave_list.php', 'icon' => 'ph-calendar-check', 'children' => []];
+    $sidebar_menu['delivery'] = ['menu_label' => 'Delivery', 'url' => 'delivery_list.php', 'icon' => 'ph-truck', 'children' => []];
     
-    // [FIXED ARRAY SYNTAX DISINI]
+    $sidebar_menu['helpdesk'] = ['menu_label' => 'Helpdesk', 'url' => '#', 'icon' => 'ph-headset', 'children' => [
+        ['menu_label' => 'External Tickets', 'url' => 'tickets.php'], 
+        ['menu_label' => 'Internal Tickets', 'url' => 'internal_tickets.php']
+    ]];
+    
+    $sidebar_menu['sales'] = ['menu_label' => 'Sales', 'url' => '#', 'icon' => 'ph-handshake', 'children' => [
+        ['menu_label' => 'Dashboard Clients', 'url' => 'dashboard_clients.php'], 
+        ['menu_label' => 'Client List', 'url' => 'clients.php']
+    ]];
+    
+    $sidebar_menu['finance'] = ['menu_label' => 'Finance', 'url' => '#', 'icon' => 'ph-currency-circle-dollar', 'children' => [
+        ['menu_label' => 'Vendor List', 'url' => 'vendor_list.php'], 
+        ['menu_label' => 'Purchase Orders', 'url' => 'po_list.php'], 
+        ['menu_label' => 'Quotations', 'url' => 'quotation_list.php'], 
+        ['menu_label' => 'PO From Client', 'url' => 'po_client_list.php'], 
+        ['menu_label' => 'Invoices', 'url' => 'invoice_list.php'], 
+        ['menu_label' => 'Payments', 'url' => 'payment_list.php'], 
+        ['menu_label' => 'Delivery Orders', 'url' => 'delivery_order_list.php']
+    ]];
+    
+    $sidebar_menu['admin'] = ['menu_label' => 'Administration', 'url' => '#', 'icon' => 'ph-gear', 'children' => [
+        ['menu_label' => 'Manage Users', 'url' => 'manage_users.php'], 
+        ['menu_label' => 'Manage Divisions', 'url' => 'manage_divisions.php'], 
+        ['menu_label' => 'Manage Permissions', 'url' => 'manage_roles.php'], 
+        ['menu_label' => 'Settings', 'url' => 'settings.php']
+    ]];
+    
     $sidebar_menu['ops'] = [
         'menu_label' => 'Telkomsel Ops', 
         'url' => '#', 
-        'icon' => 'bi bi-broadcast-pin', 
+        'icon' => 'ph-broadcast', 
         'children' => [
             ['menu_label' => 'Inject Dashboard', 'url' => 'tsel_dashboard.php'],
             ['menu_label' => 'Package List', 'url' => 'tsel_packages.php'], 
@@ -116,6 +139,11 @@ else {
                 if ($resMenu && $resMenu->num_rows > 0) {
                     $temp_menus = [];
                     while ($row = $resMenu->fetch_assoc()) {
+                        // Mengganti icon 'bi bi-xxx' dari database menjadi phosphor icons jika diperlukan, 
+                        // asumsikan database masih menggunakan string bi bi. Jika ingin konversi on the fly:
+                        $icon = str_replace('bi bi-', 'ph-', $row['icon']);
+                        $row['icon'] = strpos($icon, 'ph-') === false ? 'ph-folder' : $icon;
+                        
                         $temp_menus[$row['menu_key']] = $row;
                         if (!isset($temp_menus[$row['menu_key']]['children'])) {
                             $temp_menus[$row['menu_key']]['children'] = [];
@@ -151,50 +179,102 @@ else {
         $debug_msg = "Koneksi Database bermasalah.";
     }
 }
+
+// Style Tailwind untuk state menu
+$active_link_style = "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shadow-sm font-bold";
+$inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-white font-medium";
+
+// Helper Mapping agar style Tailwind bisa memanggil array mapping
+$mappings = [
+    'po_form.php' => 'po_list.php',
+    'quotation_form.php' => 'quotation_list.php',
+    'invoice_form.php' => 'invoice_list.php',
+    'delivery_order_form.php' => 'delivery_order_list.php',
+    'view_ticket.php' => 'tickets.php',
+    'internal_create.php' => 'internal_tickets.php',
+    'internal_view.php' => 'internal_tickets.php',
+    'tsel_upload.php' => 'tsel_inject.php',
+    'tsel_history.php' => 'tsel_inject.php',
+    'tsel_dashboard.php' => 'tsel_dashboard.php', 
+    'leave_form.php' => 'leave_list.php',
+    'delivery_form.php' => 'delivery_list.php' 
+];
 ?>
 
-<div id="sidebar" class="active">
-    <div class="sidebar-wrapper active d-flex flex-column" style="height: 100vh;">
-        <div class="sidebar-header position-relative">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="logo">
-                    <a href="dashboard.php"><h4 class="m-0">Helpdesk</h4></a>
-                </div>
-                <div class="sidebar-toggler x">
-                    <a href="#" class="sidebar-hide d-xl-none d-block"><i class="bi bi-x bi-middle"></i></a>
-                </div>
+<aside id="sidebar" class="group fixed left-0 top-0 z-[100] flex h-screen w-[280px] [&.is-collapsed]:w-[88px] flex-col overflow-y-hidden bg-white dark:bg-[#24303F] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 -translate-x-full border-r border-slate-100 dark:border-slate-800 shrink-0 shadow-2xl lg:shadow-none font-sans">
+    
+    <div class="flex items-center justify-between lg:justify-start gap-3 px-6 group-[.is-collapsed]:px-0 group-[.is-collapsed]:justify-center pt-8 pb-6 lg:pt-10 lg:pb-8 transition-all duration-300 shrink-0">
+        <a href="dashboard.php" class="flex items-center gap-3 overflow-hidden">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+                <i class="ph-fill ph-lifebuoy text-xl"></i>
             </div>
-        </div>
-        
-        <div class="sidebar-menu flex-grow-1">
-            <ul class="menu">
-                <li class="sidebar-title">Menu Utama</li>
+            <span class="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white group-[.is-collapsed]:hidden whitespace-nowrap">
+                Helpdesk<span class="text-indigo-600 dark:text-indigo-400">.</span>
+            </span>
+        </a>
+        <button id="closeSidebarMobile" class="lg:hidden text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+            <i class="ph ph-x text-2xl"></i>
+        </button>
+    </div>
 
+    <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear px-4 group-[.is-collapsed]:px-2 pb-4">
+        
+        <h3 class="mb-4 ml-2 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 group-[.is-collapsed]:hidden mt-2">
+            Menu Utama
+        </h3>
+
+        <nav class="mt-1 flex-grow">
+            <ul class="mb-6 flex flex-col gap-1.5">
+                
                 <?php if (!empty($sidebar_menu)): ?>
                     <?php foreach ($sidebar_menu as $key => $menu): ?>
                         
+                        <?php 
+                            // Pastikan icon formatnya ph- (Phosphor) bukan bi- (Bootstrap)
+                            $icon_class = str_replace(['bi bi-', 'bi-'], ['ph ', 'ph-'], $menu['icon']);
+                            if(strpos($icon_class, 'ph ') === false) { $icon_class = 'ph ' . $icon_class; }
+                        ?>
+
                         <?php if (empty($menu['children'])): ?>
-                            <li class="sidebar-item <?= ($current_page == $menu['url'] || (isset($mappings[$current_page]) && $mappings[$current_page] == $menu['url'])) ? 'active' : '' ?>">
-                                <a href="<?= htmlspecialchars($menu['url']) ?>" class='sidebar-link'>
-                                    <i class="<?= htmlspecialchars($menu['icon']) ?>"></i>
-                                    <span><?= htmlspecialchars($menu['menu_label']) ?></span>
+                            <?php 
+                                $is_active = ($current_page == $menu['url'] || (isset($mappings[$current_page]) && $mappings[$current_page] == $menu['url']));
+                                $link_class = $is_active ? $active_link_style : $inactive_link_style;
+                            ?>
+                            <li>
+                                <a href="<?= htmlspecialchars($menu['url']) ?>" class="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 <?= $link_class ?>" title="<?= htmlspecialchars($menu['menu_label']) ?>">
+                                    <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $is_active ? 'ph-fill' : '' ?>"></i>
+                                    <span class="group-[.is-collapsed]:hidden truncate"><?= htmlspecialchars($menu['menu_label']) ?></span>
+                                    
+                                    <div class="absolute left-full ml-4 hidden group-hover:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50">
+                                        <?= htmlspecialchars($menu['menu_label']) ?>
+                                    </div>
                                 </a>
                             </li>
                         
                         <?php else: ?>
-                            <?php $isActive = isChildActive($menu['children'], $current_page); ?>
-                            <li class="sidebar-item has-sub <?= $isActive ? 'active' : '' ?>">
-                                <a href="#" class='sidebar-link'>
-                                    <i class="<?= htmlspecialchars($menu['icon']) ?>"></i>
-                                    <span><?= htmlspecialchars($menu['menu_label']) ?></span>
-                                </a>
-                                <ul class="submenu <?= $isActive ? 'active' : '' ?>">
+                            <?php $isActiveGroup = isChildActive($menu['children'], $current_page); ?>
+                            
+                            <li>
+                                <button class="group relative flex w-full items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200 <?= $isActiveGroup ? 'bg-slate-50 dark:bg-slate-800/50' : '' ?> <?= $inactive_link_style ?>" aria-expanded="<?= $isActiveGroup ? 'true' : 'false' ?>" onclick="toggleSubmenu(this)" title="<?= htmlspecialchars($menu['menu_label']) ?>">
+                                    <div class="flex items-center gap-3 overflow-hidden">
+                                        <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $isActiveGroup ? 'text-indigo-600 dark:text-indigo-400 ph-fill' : '' ?>"></i>
+                                        <span class="group-[.is-collapsed]:hidden truncate <?= $isActiveGroup ? 'font-bold text-slate-800 dark:text-white' : '' ?>"><?= htmlspecialchars($menu['menu_label']) ?></span>
+                                    </div>
+                                    <i class="ph ph-caret-down shrink-0 transition-transform duration-200 group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'rotate-180' : '' ?>"></i>
+                                    
+                                    <div class="absolute left-full ml-4 hidden group-hover:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50">
+                                        <?= htmlspecialchars($menu['menu_label']) ?>
+                                    </div>
+                                </button>
+                                
+                                <ul class="mt-1 flex flex-col gap-1 pl-9 pr-2 overflow-hidden transition-all duration-300 ease-in-out group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0' ?>">
                                     <?php foreach ($menu['children'] as $child): 
                                         $isChildActive = isChildActive([$child], $current_page);
                                     ?>
-                                        <li class="submenu-item <?= $isChildActive ? 'active' : '' ?>">
-                                            <a href="<?= htmlspecialchars($child['url']) ?>">
-                                                <?= htmlspecialchars($child['menu_label']) ?>
+                                        <li>
+                                            <a href="<?= htmlspecialchars($child['url']) ?>" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors <?= $isChildActive ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-500/5' : 'text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50' ?>">
+                                                <div class="w-1.5 h-1.5 rounded-full <?= $isChildActive ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600' ?>"></div>
+                                                <span class="truncate"><?= htmlspecialchars($child['menu_label']) ?></span>
                                             </a>
                                         </li>
                                     <?php endforeach; ?>
@@ -203,117 +283,79 @@ else {
                         <?php endif; ?>
 
                     <?php endforeach; ?>
-                <?php else: ?>
-                    <li class="sidebar-item text-danger">
-                        <div class="p-3">
-                            <i class="bi bi-exclamation-triangle fs-4 mb-2 d-block"></i>
-                            <span class="fw-bold">Akses Ditolak</span><br>
-                            <small>
-                                Role: <?= htmlspecialchars($role_name) ?><br>
-                                Div ID: <?= htmlspecialchars($user_division_id) ?><br>
-                                <?= !empty($debug_msg) ? "Msg: $debug_msg" : "" ?>
-                            </small>
-                        </div>
-                    </li>
-                <?php endif; ?>
-            </ul>
-        </div>
-
-        <div class="sidebar-footer p-3 border-top">
-            <div class="theme-toggle d-flex align-items-center justify-content-between p-2 bg-light rounded cursor-pointer" onclick="toggleTheme()" title="Ganti Tema" style="cursor: pointer;">
-                <span class="small fw-bold text-muted">Mode Tampilan</span>
-                <i class="bi bi-sun-fill fs-5 text-warning" id="theme-icon"></i>
-            </div>
-        </div>
-    </div>
-</div>
-<div id="main">
-    <header class="mb-3">
-        <nav class="navbar navbar-expand navbar-light navbar-top">
-            <div class="container-fluid d-flex justify-content-between align-items-center px-0">
                 
-                <a href="#" class="burger-btn d-block p-2">
-                    <i class="bi bi-justify fs-3"></i>
-                </a>
-
-                <div class="dropdown">
-                    <a href="#" data-bs-toggle="dropdown" aria-expanded="false" class="d-block text-decoration-none">
-                        <div class="user-menu d-flex align-items-center">
-                            <div class="user-name text-end me-3">
-                                <h6 class="mb-0 text-gray-600"><?= htmlspecialchars($username) ?></h6>
-                                <p class="mb-0 text-sm text-gray-600">
-                                    <?= ucfirst($role_name) ?> 
-                                </p>
-                            </div>
-                            <div class="user-img d-flex align-items-center">
-                                <div class="avatar avatar-md bg-primary">
-                                    <span class="avatar-content text-white"><?= strtoupper(substr($username, 0, 1)) ?></span>
+                <?php else: ?>
+                    <li class="px-3 py-4 mt-2 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30 group-[.is-collapsed]:hidden">
+                        <div class="flex items-start gap-3 text-red-600 dark:text-red-400">
+                            <i class="ph-fill ph-warning-circle text-xl mt-0.5"></i>
+                            <div>
+                                <h6 class="font-bold text-sm mb-1">Akses Terbatas</h6>
+                                <p class="text-xs opacity-80 leading-relaxed">Hubungi admin untuk mendapatkan akses menu sistem.</p>
+                                <div class="mt-2 pt-2 border-t border-red-200/50 text-[10px] opacity-60">
+                                    Role: <?= htmlspecialchars($role_name) ?><br>
+                                    Div ID: <?= htmlspecialchars($user_division_id) ?><br>
                                 </div>
                             </div>
                         </div>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="dropdownMenuButton" style="min-width: 12rem;">
-                        <li><h6 class="dropdown-header text-muted">Hello, <?= htmlspecialchars($username) ?>!</h6></li>
-                        <li><a class="dropdown-item" href="../admin/profile.php"><i class="icon-mid bi bi-person me-2"></i> My Profile</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="../logout.php"><i class="icon-mid bi bi-box-arrow-left me-2"></i> Logout</a></li>
-                    </ul>
-                </div>
+                    </li>
+                <?php endif; ?>
 
-            </div>
+            </ul>
         </nav>
-    </header>
+    </div>
+
+</aside>
 
 <script>
-    // 1. Cek Tema saat Load
-    document.addEventListener('DOMContentLoaded', () => {
-        const savedTheme = localStorage.getItem('theme');
-        const themeIcon = document.getElementById('theme-icon');
+    function toggleSubmenu(button) {
+        const isExpanded = button.getAttribute('aria-expanded') === 'true';
+        const submenu = button.nextElementSibling;
+        const caret = button.querySelector('.ph-caret-down');
         
-        // Cek apakah user punya preferensi tersimpan
-        if (savedTheme === 'dark') {
-            document.body.classList.add('theme-dark');
-            document.documentElement.setAttribute('data-bs-theme', 'dark'); 
-            if(themeIcon) {
-                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
-                themeIcon.classList.add('bi-moon-fill', 'text-white');
-            }
-        } else {
-            // Default Light
-            if(themeIcon) {
-                themeIcon.classList.add('bi-sun-fill', 'text-warning');
-                themeIcon.classList.remove('bi-moon-fill', 'text-white');
-            }
+        // Cek jika sidebar sedang collapsed, jangan jalankan animasi accordion
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && sidebar.classList.contains('is-collapsed') && window.innerWidth >= 1024) {
+            // Logic saat collapsed bisa diletakkan di sini jika Anda ingin
+            // mengaktifkan submenu popover di masa depan.
+            // Saat ini submenunya .hidden via CSS.
+            return;
         }
-    });
 
-    // 2. Fungsi Ganti Tema
-    function toggleTheme() {
-        const html = document.documentElement;
-        const themeIcon = document.getElementById('theme-icon');
-        
-        if (html.getAttribute('data-bs-theme') === 'dark') {
-            // Ubah ke Light
-            html.setAttribute('data-bs-theme', 'light');
-            document.body.classList.remove('theme-dark');
-            localStorage.setItem('theme', 'light');
-            
-            // Icon Matahari
-            if(themeIcon) {
-                themeIcon.classList.remove('bi-moon-fill', 'text-white');
-                themeIcon.classList.add('bi-sun-fill', 'text-warning');
-            }
+        if (isExpanded) {
+            button.setAttribute('aria-expanded', 'false');
+            submenu.style.maxHeight = '0px';
+            submenu.style.opacity = '0';
+            caret.style.transform = 'rotate(0deg)';
+            button.classList.remove('bg-slate-50', 'dark:bg-slate-800/50');
         } else {
-            // Ubah ke Dark
-            html.setAttribute('data-bs-theme', 'dark');
-            document.body.classList.add('theme-dark');
-            localStorage.setItem('theme', 'dark');
-            
-            // Icon Bulan
-            if(themeIcon) {
-                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
-                themeIcon.classList.add('bi-moon-fill', 'text-white');
-            }
+            // Optional: Close other submenus first (Accordion effect)
+            /*
+            document.querySelectorAll('button[aria-expanded="true"]').forEach(activeBtn => {
+                if (activeBtn !== button) {
+                    activeBtn.setAttribute('aria-expanded', 'false');
+                    activeBtn.nextElementSibling.style.maxHeight = '0px';
+                    activeBtn.nextElementSibling.style.opacity = '0';
+                    activeBtn.querySelector('.ph-caret-down').style.transform = 'rotate(0deg)';
+                    activeBtn.classList.remove('bg-slate-50', 'dark:bg-slate-800/50');
+                }
+            });
+            */
+
+            button.setAttribute('aria-expanded', 'true');
+            submenu.style.maxHeight = submenu.scrollHeight + 'px';
+            submenu.style.opacity = '1';
+            caret.style.transform = 'rotate(180deg)';
+            button.classList.add('bg-slate-50', 'dark:bg-slate-800/50');
         }
     }
+
+    // Trigger initial max-height untuk menu yang active saat page load
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('button[aria-expanded="true"]').forEach(btn => {
+            const submenu = btn.nextElementSibling;
+            if(submenu) {
+                submenu.style.maxHeight = submenu.scrollHeight + 'px';
+            }
+        });
+    });
 </script>
