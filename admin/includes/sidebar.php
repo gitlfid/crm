@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 2. Pastikan Koneksi Database Ada
+// 2. Pastikan Koneksi Database Ada (Pencegahan Error)
 if (!isset($conn)) {
     $db_path = __DIR__ . '/../../config/database.php'; 
     if (file_exists($db_path)) {
@@ -14,13 +14,9 @@ if (!isset($conn)) {
 
 $current_page = basename($_SERVER['PHP_SELF']);
 $role_name = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 'standard';
-
-// Ambil variabel dari session (fallback jika dari header terlewat)
-$username = isset($username) ? $username : ($_SESSION['username'] ?? 'User');
-$email = isset($email) ? $email : ($_SESSION['email'] ?? 'user@example.com');
 $user_id = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
 
-// --- Refresh Division ID ---
+// --- Refresh Division ID (Pastikan Session Sinkron dengan DB) ---
 $user_division_id = isset($_SESSION['division_id']) ? intval($_SESSION['division_id']) : 0;
 if ($user_division_id <= 0 && $user_id > 0 && isset($conn) && !$conn->connect_error) {
     $stmt = $conn->prepare("SELECT division_id FROM users WHERE id = ? LIMIT 1");
@@ -43,6 +39,7 @@ if (!function_exists('isChildActive')) {
             if ($c['url'] == $current) return true;
             if (strpos($c['url'], $current) !== false && $current != 'dashboard.php') return true;
             
+            // Mapping Spesifik Page -> Menu
             $mappings = [
                 'po_form.php' => 'po_list.php',
                 'quotation_form.php' => 'quotation_list.php',
@@ -68,7 +65,7 @@ $sidebar_menu = [];
 $debug_msg = "";
 
 // =========================================================================
-// LOGIKA 1: ADMIN HARDCODED BYPASS 
+// LOGIKA 1: ADMIN HARDCODED BYPASS (PASTI FULL AKSES)
 // =========================================================================
 if ($role_name === 'admin') {
     $sidebar_menu['dashboard'] = ['menu_label' => 'Dashboard', 'url' => 'dashboard.php', 'icon' => 'ph-squares-four', 'children' => []];
@@ -139,6 +136,7 @@ else {
                 if ($resMenu && $resMenu->num_rows > 0) {
                     $temp_menus = [];
                     while ($row = $resMenu->fetch_assoc()) {
+                        // Transformasi dinamis dari Bootstrap Icon ke Phosphor Icon
                         $icon = str_replace(['bi bi-', 'bi-'], ['ph-', 'ph-'], $row['icon']);
                         $icon = str_replace('-fill', '', $icon); 
                         $row['icon'] = strpos($icon, 'ph-') === false ? 'ph-folder' : $icon;
@@ -179,7 +177,7 @@ else {
     }
 }
 
-// Style Tailwind
+// Style untuk menu aktif dan tidak aktif
 $active_link_style = "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shadow-sm font-bold";
 $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-white font-medium";
 
@@ -203,170 +201,97 @@ $mappings = [
     
     <div class="flex items-center justify-between lg:justify-start gap-3 px-6 group-[.is-collapsed]:px-0 group-[.is-collapsed]:justify-center pt-8 pb-6 lg:pt-10 lg:pb-8 transition-all duration-300 shrink-0">
         <a href="dashboard.php" class="flex items-center gap-3 overflow-hidden">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
-                <i class="ph-fill ph-lifebuoy text-xl"></i>
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-transform hover:scale-105">
+                <i class="ph-bold ph-lifebuoy text-2xl"></i>
             </div>
-            <span class="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white group-[.is-collapsed]:hidden whitespace-nowrap">
+            <span class="text-xl font-black text-slate-800 dark:text-white tracking-tight group-[.is-collapsed]:opacity-0 group-[.is-collapsed]:hidden whitespace-nowrap transition-all duration-300">
                 Helpdesk<span class="text-indigo-600 dark:text-indigo-400">.</span>
             </span>
         </a>
-        <button id="closeSidebarMobile" class="lg:hidden text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-            <i class="ph ph-x text-2xl"></i>
+        
+        <button id="closeSidebarMobile" class="block lg:hidden text-slate-400 hover:text-red-500 transition-colors ml-auto p-1">
+            <i class="ph-bold ph-x text-2xl"></i>
         </button>
     </div>
 
-    <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear px-4 group-[.is-collapsed]:px-2 pb-4">
-        <h3 class="mb-4 ml-2 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 group-[.is-collapsed]:hidden mt-2">
-            Menu Utama
-        </h3>
-
-        <nav class="mt-1 flex-grow">
-            <ul class="mb-6 flex flex-col gap-1.5">
-                <?php if (!empty($sidebar_menu)): ?>
-                    <?php foreach ($sidebar_menu as $key => $menu): ?>
-                        
-                        <?php 
-                            $icon_class = str_replace(['bi bi-', 'bi-'], ['ph ', 'ph-'], $menu['icon']);
-                            if(strpos($icon_class, 'ph ') === false) { $icon_class = 'ph ' . $icon_class; }
-                        ?>
-
-                        <?php if (empty($menu['children'])): ?>
-                            <?php 
-                                $is_active = ($current_page == $menu['url'] || (isset($mappings[$current_page]) && $mappings[$current_page] == $menu['url']));
-                                $link_class = $is_active ? $active_link_style : $inactive_link_style;
-                            ?>
-                            <li>
-                                <a href="<?= htmlspecialchars($menu['url']) ?>" class="group/link relative flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 <?= $link_class ?>" title="<?= htmlspecialchars($menu['menu_label']) ?>">
-                                    <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $is_active ? 'ph-fill' : '' ?>"></i>
-                                    <span class="group-[.is-collapsed]:hidden truncate"><?= htmlspecialchars($menu['menu_label']) ?></span>
-                                    
-                                    <div class="absolute left-full ml-4 hidden group-hover/link:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50 shadow-lg">
-                                        <?= htmlspecialchars($menu['menu_label']) ?>
-                                    </div>
-                                </a>
-                            </li>
-                        
-                        <?php else: ?>
-                            <?php $isActiveGroup = isChildActive($menu['children'], $current_page); ?>
-                            
-                            <li>
-                                <button class="group/btn relative flex w-full items-center justify-between rounded-xl px-3 py-2.5 transition-all duration-200 <?= $isActiveGroup ? 'bg-slate-50 dark:bg-slate-800/50' : '' ?> <?= $inactive_link_style ?>" aria-expanded="<?= $isActiveGroup ? 'true' : 'false' ?>" onclick="toggleSubmenu(this)" title="<?= htmlspecialchars($menu['menu_label']) ?>">
-                                    <div class="flex items-center gap-3 overflow-hidden">
-                                        <i class="<?= $icon_class ?> text-xl shrink-0 group-[.is-collapsed]:mx-auto <?= $isActiveGroup ? 'text-indigo-600 dark:text-indigo-400 ph-fill' : '' ?>"></i>
-                                        <span class="group-[.is-collapsed]:hidden truncate <?= $isActiveGroup ? 'font-bold text-slate-800 dark:text-white' : '' ?>"><?= htmlspecialchars($menu['menu_label']) ?></span>
-                                    </div>
-                                    <i class="ph ph-caret-down shrink-0 transition-transform duration-200 group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'rotate-180' : '' ?>"></i>
-                                    
-                                    <div class="absolute left-full ml-4 hidden group-hover/btn:group-[.is-collapsed]:block bg-slate-800 text-white text-xs px-2.5 py-1.5 rounded-lg whitespace-nowrap z-50 shadow-lg">
-                                        <?= htmlspecialchars($menu['menu_label']) ?>
-                                    </div>
-                                </button>
-                                
-                                <ul class="mt-1 flex flex-col gap-1 pl-9 pr-2 overflow-hidden transition-all duration-300 ease-in-out group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0' ?>">
-                                    <?php foreach ($menu['children'] as $child): 
-                                        $isChildActive = isChildActive([$child], $current_page);
-                                    ?>
-                                        <li>
-                                            <a href="<?= htmlspecialchars($child['url']) ?>" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors <?= $isChildActive ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-500/5' : 'text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50' ?>">
-                                                <div class="w-1.5 h-1.5 rounded-full <?= $isChildActive ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600' ?>"></div>
-                                                <span class="truncate"><?= htmlspecialchars($child['menu_label']) ?></span>
-                                            </a>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            </li>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
+    <div class="flex flex-col overflow-y-auto no-scrollbar flex-1 py-4 group-[.is-collapsed]:items-center transition-all">
+        <nav class="mt-2 w-full px-4 lg:px-6 group-[.is-collapsed]:px-3">
+            
+            <div class="mb-6">
+                <h3 class="mb-3 ml-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest group-[.is-collapsed]:hidden">Menu Utama</h3>
                 
-                <?php else: ?>
-                    <li class="px-3 py-4 mt-2 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30 group-[.is-collapsed]:hidden">
-                        <div class="flex items-start gap-3 text-red-600 dark:text-red-400">
-                            <i class="ph-fill ph-warning-circle text-xl mt-0.5"></i>
-                            <div>
-                                <h6 class="font-bold text-sm mb-1">Akses Terbatas</h6>
-                                <p class="text-xs opacity-80 leading-relaxed">Hubungi admin untuk mendapatkan akses menu sistem.</p>
+                <div class="hidden group-[.is-collapsed]:flex justify-center mb-4">
+                     <i class="ph-fill ph-dots-three-outline text-xl text-slate-300 dark:text-slate-600"></i>
+                </div>
+                
+                <ul class="flex flex-col gap-2">
+                    <?php if (!empty($sidebar_menu)): ?>
+                        <?php foreach ($sidebar_menu as $key => $menu): ?>
+                            
+                            <?php 
+                                $icon_class = str_replace(['bi bi-', 'bi-'], ['ph ', 'ph-'], $menu['icon']);
+                                if(strpos($icon_class, 'ph ') === false) { $icon_class = 'ph ' . $icon_class; }
+                            ?>
+
+                            <?php if (empty($menu['children'])): ?>
+                                <?php 
+                                    $is_active = ($current_page == $menu['url'] || (isset($mappings[$current_page]) && $mappings[$current_page] == $menu['url']));
+                                    $link_class = $is_active ? $active_link_style : $inactive_link_style;
+                                ?>
+                                <li>
+                                    <a href="<?= htmlspecialchars($menu['url']) ?>" class="relative flex items-center w-full group-[.is-collapsed]:w-12 group-[.is-collapsed]:h-12 gap-3 rounded-xl px-4 py-3 group-[.is-collapsed]:px-0 group-[.is-collapsed]:py-0 transition-all group-[.is-collapsed]:justify-center mx-auto <?= $link_class ?>" title="<?= htmlspecialchars($menu['menu_label']) ?>">
+                                        <i class="<?= $icon_class ?> text-xl shrink-0"></i>
+                                        <span class="group-[.is-collapsed]:hidden whitespace-nowrap"><?= htmlspecialchars($menu['menu_label']) ?></span>
+                                    </a>
+                                </li>
+                            
+                            <?php else: ?>
+                                <?php $isActiveGroup = isChildActive($menu['children'], $current_page); ?>
+                                
+                                <li>
+                                    <button class="relative flex items-center w-full group-[.is-collapsed]:w-12 group-[.is-collapsed]:h-12 gap-3 rounded-xl px-4 py-3 group-[.is-collapsed]:px-0 group-[.is-collapsed]:py-0 transition-all group-[.is-collapsed]:justify-center mx-auto <?= $isActiveGroup ? 'bg-slate-50 dark:bg-slate-800/50' : '' ?> <?= $inactive_link_style ?>" aria-expanded="<?= $isActiveGroup ? 'true' : 'false' ?>" onclick="toggleSubmenu(this)" title="<?= htmlspecialchars($menu['menu_label']) ?>">
+                                        <i class="<?= $icon_class ?> text-xl shrink-0 <?= $isActiveGroup ? 'text-indigo-600 dark:text-indigo-400' : '' ?>"></i>
+                                        <span class="group-[.is-collapsed]:hidden whitespace-nowrap flex-1 text-left <?= $isActiveGroup ? 'font-bold text-slate-800 dark:text-white' : '' ?>"><?= htmlspecialchars($menu['menu_label']) ?></span>
+                                        <i class="ph-bold ph-caret-down shrink-0 transition-transform duration-200 group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'rotate-180 text-indigo-600 dark:text-indigo-400' : '' ?>"></i>
+                                    </button>
+                                    
+                                    <ul class="mt-1 flex flex-col gap-1 pl-11 pr-2 overflow-hidden transition-all duration-300 ease-in-out group-[.is-collapsed]:hidden <?= $isActiveGroup ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0' ?>">
+                                        <?php foreach ($menu['children'] as $child): 
+                                            $isChildActive = isChildActive([$child], $current_page);
+                                        ?>
+                                            <li>
+                                                <a href="<?= htmlspecialchars($child['url']) ?>" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors <?= $isChildActive ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-500/10' : 'text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50' ?>">
+                                                    <div class="w-1.5 h-1.5 rounded-full <?= $isChildActive ? 'bg-indigo-600 dark:bg-indigo-400' : 'bg-slate-300 dark:bg-slate-600' ?>"></div>
+                                                    <span class="truncate"><?= htmlspecialchars($child['menu_label']) ?></span>
+                                                </a>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </li>
+                            <?php endif; ?>
+
+                        <?php endforeach; ?>
+                    
+                    <?php else: ?>
+                        <li class="px-4 py-4 mt-2 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30 group-[.is-collapsed]:hidden">
+                            <div class="flex items-start gap-3 text-red-600 dark:text-red-400">
+                                <i class="ph-fill ph-warning-circle text-xl mt-0.5"></i>
+                                <div>
+                                    <h6 class="font-bold text-sm mb-1">Akses Terbatas</h6>
+                                    <p class="text-xs opacity-80 leading-relaxed">Hubungi admin untuk mendapatkan akses menu sistem.</p>
+                                </div>
                             </div>
-                        </div>
-                    </li>
-                <?php endif; ?>
-            </ul>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </div>
+            
         </nav>
     </div>
 </aside>
 
-<div class="flex flex-col flex-1 w-full h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 relative transition-colors duration-300">
-    
-    <header class="sticky top-0 z-40 flex w-full bg-white/80 backdrop-blur-md dark:bg-[#1A222C]/80 shadow-soft border-b border-slate-100 dark:border-slate-800">
-        <div class="flex flex-grow items-center justify-between px-4 py-4 md:px-6 2xl:px-11 h-20">
-            
-            <div class="flex items-center gap-4 sm:gap-6">
-                <button id="sidebarToggleBtn" class="z-50 block rounded-lg p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer transition-colors" title="Toggle Sidebar">
-                     <i class="ph ph-list text-2xl"></i>
-                </button>
-            </div>
-
-            <div class="flex items-center gap-3 2xsm:gap-6">
-                <ul class="flex items-center gap-2">
-                     <li>
-                        <button id="darkModeToggle" class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all" title="Ganti Tema">
-                            <i class="ph ph-moon text-xl dark:hidden"></i>
-                            <i class="ph ph-sun text-xl hidden dark:block text-amber-400"></i>
-                        </button>
-                    </li>
-                </ul>
-
-                <div class="relative">
-                    <div id="profileBtn" class="flex items-center gap-3 cursor-pointer pl-4 border-l border-slate-100 dark:border-slate-700 transition-colors group">
-                        <span class="hidden text-right lg:block">
-                            <span class="block text-sm font-bold text-slate-800 dark:text-white"><?= htmlspecialchars($username) ?></span>
-                            <span class="block text-xs font-medium text-slate-400"><?= ucfirst(htmlspecialchars($role_name)) ?></span>
-                        </span>
-                        
-                        <div class="h-11 w-11 rounded-full overflow-hidden border-2 border-white dark:border-slate-700 ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm transition-all group-hover:ring-indigo-200">
-                            <img src="https://ui-avatars.com/api/?name=<?= urlencode($username) ?>&background=random" alt="User" class="object-cover w-full h-full">
-                        </div>
-                        <i class="ph ph-caret-down text-slate-400 text-sm hidden lg:block transition-transform duration-200" id="profileCaret"></i>
-                    </div>
-
-                    <div id="profileDropdown" class="hidden absolute right-0 mt-4 flex w-64 flex-col rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-[#24303F] shadow-soft-lg z-50 overflow-hidden transition-all origin-top-right">
-                        
-                        <div class="px-6 py-5 bg-slate-50 dark:bg-slate-800/50">
-                            <p class="text-sm font-bold text-slate-800 dark:text-white"><?= htmlspecialchars($username) ?></p>
-                            <p class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5"><?= htmlspecialchars($email) ?></p>
-                        </div>
-
-                        <ul class="flex flex-col gap-1 px-4 py-2">
-                            <li>
-                                <a href="profile.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <i class="ph ph-user text-xl"></i> Edit Profile
-                                </a>
-                            </li>
-                            <li>
-                                <a href="settings.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                                    <i class="ph ph-gear text-xl"></i> Account Settings
-                                </a>
-                            </li>
-                        </ul>
-
-                        <div class="px-4 my-1">
-                             <div class="border-t border-slate-100 dark:border-slate-700"></div>
-                        </div>
-
-                        <div class="px-4 pb-4 pt-1">
-                             <a href="../logout.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2 text-sm font-bold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
-                                <i class="ph ph-sign-out text-xl"></i> Sign out
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </header>
-    
-    <main class="flex-1 overflow-x-hidden overflow-y-auto relative">
-
 <script>
-    // FUNGSI ACCORDION SIDEBAR
+    // 1. Logika Accordion Menu
     function toggleSubmenu(button) {
         const isExpanded = button.getAttribute('aria-expanded') === 'true';
         const submenu = button.nextElementSibling;
@@ -390,81 +315,56 @@ $mappings = [
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        const mobileCloseBtn = document.getElementById('closeSidebarMobile');
         
-        // Inisialisasi Accordion aktif
+        // Atur state awal untuk menu yang sedang aktif
         document.querySelectorAll('button[aria-expanded="true"]').forEach(btn => {
             const submenu = btn.nextElementSibling;
-            if(submenu) submenu.style.maxHeight = submenu.scrollHeight + 'px';
+            if(submenu) {
+                submenu.style.maxHeight = submenu.scrollHeight + 'px';
+            }
         });
 
-        // ----------------------------------------------------
-        // LOGIKA DROPDOWN PROFILE
-        // ----------------------------------------------------
-        const profileBtn = document.getElementById('profileBtn');
-        const profileDropdown = document.getElementById('profileDropdown');
-        const profileCaret = document.getElementById('profileCaret');
-
-        if(profileBtn && profileDropdown) {
-            profileBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                profileDropdown.classList.toggle('hidden');
-                if(profileCaret) profileCaret.classList.toggle('rotate-180');
-            });
-
-            document.addEventListener('click', (e) => {
-                if (!profileDropdown.contains(e.target) && !profileBtn.contains(e.target)) {
-                    profileDropdown.classList.add('hidden');
-                    if(profileCaret) profileCaret.classList.remove('rotate-180');
-                }
+        // 2. Menutup sidebar menggunakan tombol "X" di mode Mobile
+        if (mobileCloseBtn) {
+            mobileCloseBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                sidebar.classList.add('-translate-x-full');
             });
         }
 
-        // ----------------------------------------------------
-        // LOGIKA DARK MODE
-        // ----------------------------------------------------
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        const html = document.documentElement;
-
-        // Cek mode dari LocalStorage atau System
-        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            html.classList.add('dark');
-        }
-
-        if(darkModeToggle) {
-            darkModeToggle.addEventListener('click', () => {
-                if (html.classList.contains('dark')) {
-                    html.classList.remove('dark');
-                    localStorage.setItem('color-theme', 'light');
-                } else {
-                    html.classList.add('dark');
-                    localStorage.setItem('color-theme', 'dark');
-                }
-            });
-        }
-
-        // ----------------------------------------------------
-        // LOGIKA TOGGLE SIDEBAR
-        // ----------------------------------------------------
-        const sidebar = document.getElementById('sidebar');
-        const toggleBtn = document.getElementById('sidebarToggleBtn');
-        const closeBtn = document.getElementById('closeSidebarMobile');
-
-        if(toggleBtn && sidebar) {
-            toggleBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
+        // 3. Global Event Listener untuk tombol Burger di Header 
+        document.addEventListener('click', function(e) {
+            const burgerBtn = e.target.closest('.ph-list, .ph-list-bold, .ph-list-dash, .ph-text-align-justify, #sidebarToggle, .burger-btn');
+            
+            if (burgerBtn) {
+                e.preventDefault();
+                e.stopPropagation(); 
+                
                 if (window.innerWidth < 1024) {
                     sidebar.classList.toggle('-translate-x-full');
                 } else {
                     sidebar.classList.toggle('is-collapsed');
                 }
-            });
-        }
-        
-        if(closeBtn && sidebar) {
-            closeBtn.addEventListener('click', () => {
-                sidebar.classList.add('-translate-x-full');
-            });
-        }
+            } else {
+                if (window.innerWidth < 1024 && sidebar && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
+                    sidebar.classList.add('-translate-x-full');
+                }
+            }
+        });
+
+        // 4. Mereset state Sidebar ketika ukuran layar ditarik/berubah (Resize)
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                sidebar.classList.remove('-translate-x-full');
+            } else {
+                sidebar.classList.remove('is-collapsed');
+                if(!sidebar.classList.contains('-translate-x-full')) {
+                     sidebar.classList.add('-translate-x-full');
+                }
+            }
+        });
     });
 </script>
