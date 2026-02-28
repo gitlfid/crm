@@ -295,109 +295,122 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
     </header>
 
 <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const sidebar = document.getElementById('sidebar');
-            const mobileCloseBtn = document.getElementById('closeSidebarMobile');
-            const profileBtn = document.getElementById('profileBtn');
-            const profileDropdown = document.getElementById('profileDropdown');
-            const darkModeToggle = document.getElementById('darkModeToggle');
-            const html = document.documentElement;
-            
-            // 1. Sinkronisasi Class Body (Legacy Bootstrap) saat Load
-            const savedTheme = localStorage.getItem('theme');
-            if (savedTheme === 'dark') {
-                document.body.classList.add('theme-dark');
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        const mobileCloseBtn = document.getElementById('closeSidebarMobile');
+        const profileBtn = document.getElementById('profileBtn');
+        const profileDropdown = document.getElementById('profileDropdown');
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        
+        const html = document.documentElement;
+        const body = document.body;
+
+        // 1. FUNGSI UTAMA UNTUK MENGUBAH TEMA (Tahan Bentrok CSS)
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                // Aktifkan Dark Mode (Tailwind & Bootstrap/Mazer)
+                html.classList.add('dark');
+                html.setAttribute('data-bs-theme', 'dark');
+                body.classList.add('theme-dark');
+                localStorage.setItem('theme', 'dark');
+                
+                // Ubah icon secara manual menggunakan JS agar terhindar dari konflik CSS
+                if (darkModeToggle) {
+                    darkModeToggle.innerHTML = '<i class="ph ph-sun text-xl"></i>';
+                }
             } else {
-                document.body.classList.remove('theme-dark');
+                // Kembalikan ke Light Mode
+                html.classList.remove('dark');
+                html.setAttribute('data-bs-theme', 'light');
+                body.classList.remove('theme-dark');
+                localStorage.setItem('theme', 'light');
+                
+                // Kembalikan icon ke bulan
+                if (darkModeToggle) {
+                    darkModeToggle.innerHTML = '<i class="ph ph-moon text-xl"></i>';
+                }
             }
+        }
 
-            // 2. Mobile Sidebar Close
-            if (mobileCloseBtn) {
-                mobileCloseBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
+        // 2. Terapkan tema saat halaman pertama kali dimuat
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        applyTheme(savedTheme);
+
+        // 3. Event Listener untuk Tombol Toggle Dark/Light Mode
+        if (darkModeToggle) {
+            darkModeToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Ambil status tema yang sedang aktif saat ini, lalu balikkan
+                const currentTheme = localStorage.getItem('theme');
+                applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+            });
+        }
+
+        // 4. Mobile Sidebar Close
+        if (mobileCloseBtn) {
+            mobileCloseBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                sidebar.classList.add('-translate-x-full');
+            });
+        }
+
+        // 5. Global Event Listener (Sidebar Burger & Profile Dropdown)
+        document.addEventListener('click', function(e) {
+            // Sidebar Toggle
+            const burgerBtn = e.target.closest('#sidebarToggle, .burger-btn');
+            if (burgerBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.innerWidth < 1024) {
+                    sidebar.classList.toggle('-translate-x-full');
+                } else {
+                    sidebar.classList.toggle('is-collapsed');
+                }
+            } else {
+                if (window.innerWidth < 1024 && sidebar && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
                     sidebar.classList.add('-translate-x-full');
-                });
+                }
             }
 
-            // 3. Global Event Listener (Sidebar & Dropdown)
-            document.addEventListener('click', function(e) {
-                // Sidebar Toggle
-                const burgerBtn = e.target.closest('#sidebarToggle, .burger-btn');
-                if (burgerBtn) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (window.innerWidth < 1024) {
-                        sidebar.classList.toggle('-translate-x-full');
-                    } else {
-                        sidebar.classList.toggle('is-collapsed');
-                    }
-                } else {
-                    if (window.innerWidth < 1024 && sidebar && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
-                        sidebar.classList.add('-translate-x-full');
-                    }
-                }
-
-                // Profile Dropdown
-                if (profileBtn && profileBtn.contains(e.target)) {
-                    profileDropdown.classList.toggle('hidden');
-                } else if (profileDropdown && !profileDropdown.contains(e.target)) {
-                    profileDropdown.classList.add('hidden');
-                }
-            });
-
-            // 4. Submenu Toggle Logic (Animasi Accordion)
-            const submenuToggles = document.querySelectorAll('.submenu-toggle');
-            submenuToggles.forEach(toggle => {
-                toggle.addEventListener('click', function() {
-                    const submenu = this.nextElementSibling;
-                    const icon = this.querySelector('.ph-caret-down');
-                    
-                    if(submenu.classList.contains('max-h-0')) {
-                        submenu.classList.remove('max-h-0');
-                        submenu.classList.add('max-h-[500px]');
-                        if(icon) icon.classList.add('rotate-180');
-                    } else {
-                        submenu.classList.add('max-h-0');
-                        submenu.classList.remove('max-h-[500px]');
-                        if(icon) icon.classList.remove('rotate-180');
-                    }
-                });
-            });
-
-            // 5. Resize Handling
-            window.addEventListener('resize', function() {
-                if (window.innerWidth >= 1024) {
-                    sidebar.classList.remove('-translate-x-full');
-                } else {
-                    sidebar.classList.remove('is-collapsed');
-                    if(!sidebar.classList.contains('-translate-x-full')) {
-                         sidebar.classList.add('-translate-x-full');
-                    }
-                }
-            });
-
-            // 6. Dark Mode Toggle Lengkap (Tailwind + Legacy Bootstrap)
-            if (darkModeToggle) {
-                darkModeToggle.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    // Cek jika saat ini aktif di Dark Mode
-                    if (html.classList.contains('dark') || html.getAttribute('data-bs-theme') === 'dark') {
-                        // Switch ke Light Mode (Mereset Kedua Sistem)
-                        html.classList.remove('dark');
-                        html.setAttribute('data-bs-theme', 'light');
-                        document.body.classList.remove('theme-dark');
-                        localStorage.setItem('theme', 'light');
-                    } else {
-                        // Switch ke Dark Mode (Mengaktifkan Kedua Sistem)
-                        html.classList.add('dark');
-                        html.setAttribute('data-bs-theme', 'dark');
-                        document.body.classList.add('theme-dark');
-                        localStorage.setItem('theme', 'dark');
-                    }
-                });
+            // Profile Dropdown
+            if (profileBtn && profileBtn.contains(e.target)) {
+                profileDropdown.classList.toggle('hidden');
+            } else if (profileDropdown && !profileDropdown.contains(e.target)) {
+                profileDropdown.classList.add('hidden');
             }
         });
-    </script>
+
+        // 6. Submenu Toggle Logic (Animasi Accordion)
+        const submenuToggles = document.querySelectorAll('.submenu-toggle');
+        submenuToggles.forEach(toggle => {
+            toggle.addEventListener('click', function() {
+                const submenu = this.nextElementSibling;
+                const icon = this.querySelector('.ph-caret-down');
+                
+                if(submenu.classList.contains('max-h-0')) {
+                    submenu.classList.remove('max-h-0');
+                    submenu.classList.add('max-h-[500px]');
+                    if(icon) icon.classList.add('rotate-180');
+                } else {
+                    submenu.classList.add('max-h-0');
+                    submenu.classList.remove('max-h-[500px]');
+                    if(icon) icon.classList.remove('rotate-180');
+                }
+            });
+        });
+
+        // 7. Resize Handling
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                sidebar.classList.remove('-translate-x-full');
+            } else {
+                sidebar.classList.remove('is-collapsed');
+                if(!sidebar.classList.contains('-translate-x-full')) {
+                     sidebar.classList.add('-translate-x-full');
+                }
+            }
+        });
+    });
+</script>
 
     <main class="p-4 md:p-6 2xl:p-10">
