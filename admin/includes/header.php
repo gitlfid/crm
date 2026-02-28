@@ -24,16 +24,18 @@ $page_title = isset($page_title) ? $page_title : "Helpdesk System";
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css">
     
-    <script>
+<script>
         tailwind.config = {
-            darkMode: 'class', // Menggunakan class 'dark' di tag <html>
+            darkMode: 'class', 
         }
         
-        // Auto-load theme untuk menghindari flash putih saat reload
+        // Auto-load theme sinkron (Tailwind + Bootstrap)
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
         } else {
             document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-bs-theme', 'light');
         }
     </script>
     

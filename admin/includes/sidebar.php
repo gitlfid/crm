@@ -294,7 +294,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
         </div>
     </header>
 
-    <script>
+<script>
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('sidebar');
             const mobileCloseBtn = document.getElementById('closeSidebarMobile');
@@ -303,7 +303,15 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
             const darkModeToggle = document.getElementById('darkModeToggle');
             const html = document.documentElement;
             
-            // 1. Mobile Sidebar Close
+            // 1. Sinkronisasi Class Body (Legacy Bootstrap) saat Load
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('theme-dark');
+            } else {
+                document.body.classList.remove('theme-dark');
+            }
+
+            // 2. Mobile Sidebar Close
             if (mobileCloseBtn) {
                 mobileCloseBtn.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -311,7 +319,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 });
             }
 
-            // 2. Global Event Listener (Sidebar & Dropdown)
+            // 3. Global Event Listener (Sidebar & Dropdown)
             document.addEventListener('click', function(e) {
                 // Sidebar Toggle
                 const burgerBtn = e.target.closest('#sidebarToggle, .burger-btn');
@@ -337,7 +345,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 }
             });
 
-            // 3. Submenu Toggle Logic (Animasi Accordion)
+            // 4. Submenu Toggle Logic (Animasi Accordion)
             const submenuToggles = document.querySelectorAll('.submenu-toggle');
             submenuToggles.forEach(toggle => {
                 toggle.addEventListener('click', function() {
@@ -346,7 +354,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                     
                     if(submenu.classList.contains('max-h-0')) {
                         submenu.classList.remove('max-h-0');
-                        submenu.classList.add('max-h-[500px]'); // Sesuaikan limit tinggi submenu
+                        submenu.classList.add('max-h-[500px]');
                         if(icon) icon.classList.add('rotate-180');
                     } else {
                         submenu.classList.add('max-h-0');
@@ -356,7 +364,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 });
             });
 
-            // 4. Resize Handling
+            // 5. Resize Handling
             window.addEventListener('resize', function() {
                 if (window.innerWidth >= 1024) {
                     sidebar.classList.remove('-translate-x-full');
@@ -368,14 +376,23 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 }
             });
 
-            // 5. Dark Mode Toggle
+            // 6. Dark Mode Toggle Lengkap (Tailwind + Legacy Bootstrap)
             if (darkModeToggle) {
-                darkModeToggle.addEventListener('click', function() {
-                    if (html.classList.contains('dark')) {
+                darkModeToggle.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Cek jika saat ini aktif di Dark Mode
+                    if (html.classList.contains('dark') || html.getAttribute('data-bs-theme') === 'dark') {
+                        // Switch ke Light Mode (Mereset Kedua Sistem)
                         html.classList.remove('dark');
+                        html.setAttribute('data-bs-theme', 'light');
+                        document.body.classList.remove('theme-dark');
                         localStorage.setItem('theme', 'light');
                     } else {
+                        // Switch ke Dark Mode (Mengaktifkan Kedua Sistem)
                         html.classList.add('dark');
+                        html.setAttribute('data-bs-theme', 'dark');
+                        document.body.classList.add('theme-dark');
                         localStorage.setItem('theme', 'dark');
                     }
                 });
