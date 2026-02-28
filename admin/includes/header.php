@@ -55,9 +55,9 @@ $email      = isset($_SESSION['email']) ? $_SESSION['email'] : 'user@example.com
 
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-200 font-sans antialiased overflow-hidden selection:bg-indigo-500 selection:text-white">
     
-    <div id="app" class="flex h-screen w-full overflow-hidden flex-col lg:flex-row">
+    <div id="app" class="flex h-screen w-full overflow-hidden">
         
-        <div class="flex flex-col flex-1 w-full overflow-hidden order-2">
+        <div class="flex flex-col flex-1 w-full overflow-hidden">
             
             <header class="sticky top-0 z-40 flex w-full bg-white/80 backdrop-blur-md dark:bg-[#1A222C]/80 shadow-soft transition-all duration-300 border-b border-slate-100 dark:border-slate-800">
                 <div class="flex flex-grow items-center justify-between px-4 py-4 md:px-6 2xl:px-11 h-20">
