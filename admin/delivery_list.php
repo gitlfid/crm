@@ -43,315 +43,325 @@ $sql = "SELECT * FROM deliveries $where_clause ORDER BY delivery_date DESC";
 $result = $conn->query($sql);
 ?>
 
-<style>
-    /* Custom Style untuk Tampilan Lebih Rapi */
-    .table-modern thead th {
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        background-color: #f8f9fa;
-        color: #6c757d;
-        border-bottom: 1px solid #dee2e6;
-        padding: 12px 10px;
-    }
-    .table-modern tbody td {
-        font-size: 0.9rem;
-        padding: 10px;
-        vertical-align: middle;
-        color: #495057;
-    }
-    .filter-card {
-        border: none;
-        background: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-    }
-    .text-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        color: #adb5bd;
-        margin-bottom: 4px;
-        display: block;
-        text-transform: uppercase;
-    }
-</style>
-
-<div class="page-heading mb-4">
-    <div class="row align-items-center">
-        <div class="col-md-6">
-            <h3 class="mb-1">Delivery Management</h3>
-            <p class="text-muted small mb-0">Monitor status pengiriman dan riwayat logistik.</p>
-        </div>
-        <div class="col-md-6 text-end">
-            <a href="delivery_form.php" class="btn btn-primary shadow-sm btn-sm px-3 py-2">
-                <i class="bi bi-plus-lg me-2"></i> Input Delivery
-            </a>
-        </div>
-    </div>
-</div>
-
-<div class="page-content">
+<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
     
-    <div class="card filter-card mb-4">
-        <div class="card-body py-3">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 animate-slide-up">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Delivery Management</h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">Monitor status pengiriman dan riwayat logistik.</p>
+        </div>
+        <a href="delivery_form.php" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all transform hover:-translate-y-0.5">
+            <i class="ph-bold ph-plus text-lg"></i> Input Delivery
+        </a>
+    </div>
+
+    <div class="bg-white dark:bg-[#1A222C] rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 mb-6 animate-slide-up delay-100">
+        <div class="p-5">
             <form method="GET" action="delivery_list.php">
-                <div class="row g-2 align-items-end">
-                    <div class="col-md-3">
-                        <label class="text-label">Search Tracking</label>
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" name="search_track" class="form-control border-start-0" placeholder="Nomor Resi..." value="<?= htmlspecialchars($search_track) ?>">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                    
+                    <div class="lg:col-span-1">
+                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Search Tracking</label>
+                        <div class="relative">
+                            <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" name="search_track" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white outline-none transition-all" placeholder="Nomor Resi..." value="<?= htmlspecialchars($search_track) ?>">
                         </div>
                     </div>
 
-                    <div class="col-md-2">
-                        <label class="text-label">Project</label>
-                        <select name="filter_project" class="form-select form-select-sm">
-                            <option value="">- All Projects -</option>
-                            <?php 
-                            if($opt_projects->num_rows > 0){
-                                $opt_projects->data_seek(0); // Reset pointer
-                                while($p = $opt_projects->fetch_assoc()): 
-                            ?>
-                                <option value="<?= $p['project_name'] ?>" <?= ($filter_project == $p['project_name']) ? 'selected' : '' ?>>
-                                    <?= $p['project_name'] ?>
-                                </option>
-                            <?php endwhile; } ?>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="text-label">Courier</label>
-                        <select name="filter_courier" class="form-select form-select-sm">
-                            <option value="">- All Couriers -</option>
-                            <?php 
-                            if($opt_couriers->num_rows > 0){
-                                $opt_couriers->data_seek(0);
-                                while($c = $opt_couriers->fetch_assoc()): 
-                            ?>
-                                <option value="<?= $c['courier_name'] ?>" <?= ($filter_courier == $c['courier_name']) ? 'selected' : '' ?>>
-                                    <?= strtoupper($c['courier_name']) ?>
-                                </option>
-                            <?php endwhile; } ?>
-                        </select>
-                    </div>
-
-                    <div class="col-md-2">
-                        <label class="text-label">Receiver</label>
-                        <select name="filter_receiver" class="form-select form-select-sm">
-                            <option value="">- All Receivers -</option>
-                            <?php 
-                            if($opt_receivers->num_rows > 0){
-                                $opt_receivers->data_seek(0);
-                                while($r = $opt_receivers->fetch_assoc()): 
-                            ?>
-                                <option value="<?= $r['receiver_name'] ?>" <?= ($filter_receiver == $r['receiver_name']) ? 'selected' : '' ?>>
-                                    <?= $r['receiver_name'] ?>
-                                </option>
-                            <?php endwhile; } ?>
-                        </select>
-                    </div>
-
-                    <div class="col-md-3">
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
-                                Filter
-                            </button>
-                            <?php if(!empty($search_track) || !empty($filter_project) || !empty($filter_courier) || !empty($filter_receiver)): ?>
-                                <a href="delivery_list.php" class="btn btn-outline-secondary btn-sm w-100">
-                                    Reset
-                                </a>
-                            <?php endif; ?>
+                    <div class="lg:col-span-1">
+                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Project</label>
+                        <div class="relative">
+                            <select name="filter_project" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all">
+                                <option value="">- All Projects -</option>
+                                <?php 
+                                if($opt_projects->num_rows > 0){
+                                    $opt_projects->data_seek(0);
+                                    while($p = $opt_projects->fetch_assoc()): 
+                                ?>
+                                    <option value="<?= $p['project_name'] ?>" <?= ($filter_project == $p['project_name']) ? 'selected' : '' ?>><?= $p['project_name'] ?></option>
+                                <?php endwhile; } ?>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                         </div>
                     </div>
+
+                    <div class="lg:col-span-1">
+                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Courier</label>
+                        <div class="relative">
+                            <select name="filter_courier" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all">
+                                <option value="">- All Couriers -</option>
+                                <?php 
+                                if($opt_couriers->num_rows > 0){
+                                    $opt_couriers->data_seek(0);
+                                    while($c = $opt_couriers->fetch_assoc()): 
+                                ?>
+                                    <option value="<?= $c['courier_name'] ?>" <?= ($filter_courier == $c['courier_name']) ? 'selected' : '' ?>><?= strtoupper($c['courier_name']) ?></option>
+                                <?php endwhile; } ?>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-1">
+                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Receiver</label>
+                        <div class="relative">
+                            <select name="filter_receiver" class="w-full pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all">
+                                <option value="">- All Receivers -</option>
+                                <?php 
+                                if($opt_receivers->num_rows > 0){
+                                    $opt_receivers->data_seek(0);
+                                    while($r = $opt_receivers->fetch_assoc()): 
+                                ?>
+                                    <option value="<?= $r['receiver_name'] ?>" <?= ($filter_receiver == $r['receiver_name']) ? 'selected' : '' ?>><?= $r['receiver_name'] ?></option>
+                                <?php endwhile; } ?>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-1 flex gap-2">
+                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm">
+                            Filter
+                        </button>
+                        <?php if(!empty($search_track) || !empty($filter_project) || !empty($filter_courier) || !empty($filter_receiver)): ?>
+                            <a href="delivery_list.php" class="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold py-2.5 px-4 rounded-xl transition-colors text-sm text-center">
+                                Reset
+                            </a>
+                        <?php endif; ?>
+                    </div>
+
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-modern mb-0 text-nowrap">
-                    <thead>
-                        <tr>
-                            <th class="ps-4">Sent Date</th>
-                            <th>Delivered</th>
-                            <th>Project</th> 
-                            <th>Tracking Info</th>
-                            <th>Sender</th>
-                            <th>Receiver</th>
-                            <th>Item Name</th>
-                            <th>Package</th>
-                            <th class="text-center">Qty</th>
-                            <th class="text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if($result->num_rows > 0): ?>
-                            <?php while($row = $result->fetch_assoc()): ?>
-                            <tr>
-                                <td class="ps-4">
-                                    <?= date('d M Y', strtotime($row['delivery_date'])) ?>
-                                </td>
-                                
-                                <td>
-                                    <?php if($row['delivered_date']): ?>
-                                        <div class="d-flex align-items-center text-success">
-                                            <i class="bi bi-check-circle-fill me-2"></i>
-                                            <div>
-                                                <div class="fw-bold" style="font-size:0.85rem;"><?= date('d M Y', strtotime($row['delivered_date'])) ?></div>
-                                                <div class="small text-muted" style="font-size:0.75rem;"><?= date('H:i', strtotime($row['delivered_date'])) ?></div>
-                                            </div>
+    <div class="bg-white dark:bg-[#1A222C] rounded-2xl shadow-soft border border-slate-100 dark:border-slate-800 overflow-hidden animate-slide-up delay-200">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse whitespace-nowrap">
+                <thead class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
+                    <tr>
+                        <th class="px-6 py-4">Sent Date</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Project</th> 
+                        <th class="px-6 py-4">Tracking Info</th>
+                        <th class="px-6 py-4">Sender</th>
+                        <th class="px-6 py-4">Receiver</th>
+                        <th class="px-6 py-4">Item Name</th>
+                        <th class="px-6 py-4 text-center">Qty</th>
+                        <th class="px-6 py-4 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
+                    <?php if($result->num_rows > 0): ?>
+                        <?php while($row = $result->fetch_assoc()): ?>
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
+                            
+                            <td class="px-6 py-4 text-slate-700 dark:text-slate-300 font-medium">
+                                <?= date('d M Y', strtotime($row['delivery_date'])) ?>
+                            </td>
+                            
+                            <td class="px-6 py-4">
+                                <?php if($row['delivered_date']): ?>
+                                    <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                                        <div class="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center shrink-0">
+                                            <i class="ph-fill ph-check-circle text-lg"></i>
                                         </div>
-                                    <?php else: ?>
-                                        <span class="badge bg-light text-secondary border">In Progress</span>
-                                    <?php endif; ?>
-                                </td>
-
-                                <td>
-                                    <?php if(!empty($row['project_name'])): ?>
-                                        <span class="badge bg-info text-dark bg-opacity-10 border border-info">
-                                            <i class="bi bi-kanban me-1"></i> <?= htmlspecialchars($row['project_name']) ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-muted small">-</span>
-                                    <?php endif; ?>
-                                </td>
-
-                                <td>
-                                    <div class="d-flex flex-column">
-                                        <a href="#" onclick="trackResi('<?= $row['tracking_number'] ?>', '<?= $row['courier_name'] ?>')" class="text-decoration-none fw-bold font-monospace text-primary">
-                                            <?= htmlspecialchars($row['tracking_number']) ?>
-                                        </a>
-                                        <span class="badge bg-secondary text-uppercase mt-1" style="width: fit-content; font-size: 0.65rem;">
-                                            <?= htmlspecialchars($row['courier_name']) ?>
-                                        </span>
+                                        <div>
+                                            <div class="font-bold text-xs"><?= date('d M Y', strtotime($row['delivered_date'])) ?></div>
+                                            <div class="text-[10px] opacity-70"><?= date('H:i', strtotime($row['delivered_date'])) ?></div>
+                                        </div>
                                     </div>
-                                </td>
+                                <?php else: ?>
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold border border-amber-200 dark:border-amber-500/20">
+                                        <i class="ph-bold ph-spinner animate-spin-slow"></i> In Progress
+                                    </span>
+                                <?php endif; ?>
+                            </td>
 
-                                <td>
-                                    <div class="fw-bold small"><?= htmlspecialchars($row['sender_name']) ?></div>
-                                    <div class="text-muted small text-truncate" style="max-width: 120px;" title="<?= htmlspecialchars($row['sender_company']) ?>">
-                                        <?= htmlspecialchars($row['sender_company']) ?>
-                                    </div>
-                                </td>
+                            <td class="px-6 py-4">
+                                <?php if(!empty($row['project_name'])): ?>
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-xs font-bold border border-indigo-100 dark:border-indigo-500/20">
+                                        <i class="ph-fill ph-folder-open"></i> <?= htmlspecialchars($row['project_name']) ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-slate-400">-</span>
+                                <?php endif; ?>
+                            </td>
 
-                                <td>
-                                    <div class="fw-bold small"><?= htmlspecialchars($row['receiver_name']) ?></div>
-                                    <div class="text-muted small text-truncate" style="max-width: 120px;" title="<?= htmlspecialchars($row['receiver_company']) ?>">
-                                        <?= htmlspecialchars($row['receiver_company']) ?>
-                                    </div>
-                                </td>
-                                
-                                <td><?= htmlspecialchars($row['item_name']) ?></td>
-                                <td>
-                                    <?php if(!empty($row['data_package'])): ?>
-                                        <span class="badge bg-light text-dark border"><?= htmlspecialchars($row['data_package']) ?></span>
-                                    <?php else: ?>
-                                        -
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-center fw-bold"><?= $row['qty'] ?></td>
+                            <td class="px-6 py-4">
+                                <div class="flex flex-col items-start gap-1">
+                                    <button type="button" onclick="trackResi('<?= $row['tracking_number'] ?>', '<?= $row['courier_name'] ?>')" class="text-indigo-600 dark:text-indigo-400 font-bold font-mono text-sm hover:underline flex items-center gap-1">
+                                        <?= htmlspecialchars($row['tracking_number']) ?>
+                                    </button>
+                                    <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-bold uppercase tracking-wide">
+                                        <?= htmlspecialchars($row['courier_name']) ?>
+                                    </span>
+                                </div>
+                            </td>
 
-                                <td class="text-center">
-                                    <div class="btn-group shadow-sm" role="group">
-                                        <button class="btn btn-sm btn-outline-primary" title="Lacak Paket" onclick="trackResi('<?= $row['tracking_number'] ?>', '<?= $row['courier_name'] ?>')">
-                                            <i class="bi bi-geo-alt-fill"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-secondary" title="Lihat Detail" onclick="viewDetail(<?= $row['id'] ?>)">
-                                            <i class="bi bi-eye-fill"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="10" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-                                    Data tidak ditemukan dengan filter saat ini.
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-slate-800 dark:text-slate-200"><?= htmlspecialchars($row['sender_name']) ?></div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[150px]" title="<?= htmlspecialchars($row['sender_company']) ?>">
+                                    <?= htmlspecialchars($row['sender_company']) ?>
+                                </div>
+                            </td>
+
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-slate-800 dark:text-slate-200"><?= htmlspecialchars($row['receiver_name']) ?></div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[150px]" title="<?= htmlspecialchars($row['receiver_company']) ?>">
+                                    <?= htmlspecialchars($row['receiver_company']) ?>
+                                </div>
+                            </td>
+                            
+                            <td class="px-6 py-4">
+                                <div class="text-slate-800 dark:text-slate-200 font-medium"><?= htmlspecialchars($row['item_name']) ?></div>
+                                <?php if(!empty($row['data_package'])): ?>
+                                    <div class="text-[10px] text-slate-500 mt-1"><span class="px-1.5 py-0.5 border border-slate-200 dark:border-slate-600 rounded"><?= htmlspecialchars($row['data_package']) ?></span></div>
+                                <?php endif; ?>
+                            </td>
+                            
+                            <td class="px-6 py-4 text-center">
+                                <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 font-bold text-slate-700 dark:text-slate-300 text-xs">
+                                    <?= $row['qty'] ?>
+                                </span>
+                            </td>
+
+                            <td class="px-6 py-4 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button onclick="trackResi('<?= $row['tracking_number'] ?>', '<?= $row['courier_name'] ?>')" class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-500 hover:text-white dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500 flex items-center justify-center transition-colors" title="Lacak Paket">
+                                        <i class="ph-bold ph-crosshair"></i>
+                                    </button>
+                                    <button onclick="viewDetail(<?= $row['id'] ?>)" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-500 hover:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors" title="Lihat Detail">
+                                        <i class="ph-bold ph-eye"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="9" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                                    <i class="ph-fill ph-package text-5xl mb-3 opacity-50"></i>
+                                    <p class="text-sm font-medium">Data pengiriman tidak ditemukan dengan filter saat ini.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
+        
         <?php if($result->num_rows > 0): ?>
-        <div class="card-footer bg-white border-top py-2">
-            <small class="text-muted">Menampilkan hasil data pengiriman terbaru.</small>
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
+            <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Menampilkan hasil data pengiriman terbaru.</p>
         </div>
         <?php endif; ?>
     </div>
 </div>
 
-<div class="modal fade" id="trackingModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold"><i class="bi bi-truck me-2 text-primary"></i> Shipment Status</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="location.reload();"></button> 
-            </div>
-            <div class="modal-body bg-light" id="trackingResult"></div>
+<div id="trackingModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl mx-4">
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center shrink-0">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="ph-fill ph-truck text-indigo-500 text-xl"></i> Shipment Status
+            </h3>
+            <button onclick="location.reload();" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-700 dark:text-slate-400 transition-colors">
+                <i class="ph-bold ph-x"></i>
+            </button>
         </div>
+        <div class="p-6 overflow-y-auto bg-slate-50 dark:bg-slate-900/50 flex-1 rounded-b-2xl text-sm dark:text-slate-300" id="trackingResult">
+            </div>
     </div>
 </div>
 
-<div class="modal fade" id="detailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-white">
-                <h5 class="modal-title fw-bold">Delivery Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="detailResult">
-                <div class="text-center py-4"><div class="spinner-border text-primary"></div></div>
-            </div>
+<div id="detailModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl mx-4">
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center shrink-0">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="ph-fill ph-file-text text-indigo-500 text-xl"></i> Delivery Details
+            </h3>
+            <button onclick="closeModal('detailModal')" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-slate-600 transition-colors">
+                <i class="ph-bold ph-x"></i>
+            </button>
         </div>
+        <div class="p-6 overflow-y-auto flex-1 dark:text-slate-300" id="detailResult">
+            </div>
     </div>
 </div>
 
 <script>
-// Logic Lacak Paket (Tidak berubah)
-function trackResi(resi, kurir) {
-    var myModal = new bootstrap.Modal(document.getElementById('trackingModal'));
-    myModal.show();
-    
-    document.getElementById('trackingResult').innerHTML = `
-        <div class="text-center py-5">
-            <div class="spinner-border text-primary" role="status"></div>
-            <p class="mt-2 text-muted">Connecting to Courier API...</p>
-        </div>
-    `;
+    // --- CUSTOM MODAL HANDLERS ---
+    function openModal(id) {
+        const modal = document.getElementById(id);
+        const box = modal.querySelector('.modal-box');
+        modal.classList.remove('hidden');
+        // Small delay to allow display to apply before firing animation
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            box.classList.remove('scale-95', 'opacity-0');
+        }, 10);
+    }
 
-    fetch(`ajax_track_delivery.php?resi=${resi}&kurir=${kurir}`)
-        .then(response => response.text())
-        .then(data => {
-            document.getElementById('trackingResult').innerHTML = data;
-        })
-        .catch(err => {
-            document.getElementById('trackingResult').innerHTML = '<div class="alert alert-danger">Gagal memuat data tracking.</div>';
-        });
-}
+    function closeModal(id) {
+        const modal = document.getElementById(id);
+        const box = modal.querySelector('.modal-box');
+        modal.classList.add('opacity-0');
+        box.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
 
-// Logic View Detail (Tidak berubah)
-function viewDetail(id) {
-    var myModal = new bootstrap.Modal(document.getElementById('detailModal'));
-    myModal.show();
+    // --- ORIGINAL AJAX FUNCTIONS (Wrapped in new UI) ---
+    function trackResi(resi, kurir) {
+        openModal('trackingModal');
+        
+        document.getElementById('trackingResult').innerHTML = `
+            <div class="flex flex-col items-center justify-center py-10 opacity-70">
+                <i class="ph-bold ph-spinner-gap text-4xl animate-spin text-indigo-500 mb-3"></i>
+                <p class="font-medium text-slate-500 dark:text-slate-400">Connecting to Courier API...</p>
+            </div>
+        `;
 
-    const formData = new FormData();
-    formData.append('id', id);
+        fetch(`ajax_track_delivery.php?resi=${resi}&kurir=${kurir}`)
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('trackingResult').innerHTML = data;
+            })
+            .catch(err => {
+                document.getElementById('trackingResult').innerHTML = `
+                    <div class="p-4 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl flex items-center gap-2">
+                        <i class="ph-bold ph-warning-circle text-lg"></i> Gagal memuat data tracking.
+                    </div>`;
+            });
+    }
 
-    fetch('ajax_get_delivery.php', { method: 'POST', body: formData })
-        .then(response => response.text())
-        .then(data => {
-            document.getElementById('detailResult').innerHTML = data;
-        })
-        .catch(err => {
-            document.getElementById('detailResult').innerHTML = '<div class="alert alert-danger">Gagal memuat detail data.</div>';
-        });
-}
+    function viewDetail(id) {
+        openModal('detailModal');
+
+        document.getElementById('detailResult').innerHTML = `
+            <div class="flex flex-col items-center justify-center py-10 opacity-70">
+                <i class="ph-bold ph-spinner-gap text-4xl animate-spin text-indigo-500 mb-3"></i>
+                <p class="font-medium text-slate-500 dark:text-slate-400">Loading details...</p>
+            </div>
+        `;
+
+        const formData = new FormData();
+        formData.append('id', id);
+
+        fetch('ajax_get_delivery.php', { method: 'POST', body: formData })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('detailResult').innerHTML = data;
+            })
+            .catch(err => {
+                document.getElementById('detailResult').innerHTML = `
+                    <div class="p-4 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl flex items-center gap-2">
+                        <i class="ph-bold ph-warning-circle text-lg"></i> Gagal memuat detail data.
+                    </div>`;
+            });
+    }
 </script>
 
 <?php include 'includes/footer.php'; ?>
