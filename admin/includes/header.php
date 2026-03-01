@@ -17,12 +17,12 @@ $page_title = isset($page_title) ? $page_title : "Helpdesk System";
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $page_title ?></title>
+    <title><?= htmlspecialchars($page_title) ?></title>
     
     <script>
         tailwind = {
             config: {
-                darkMode: 'class', // Cukup gunakan 'class' standar Tailwind
+                darkMode: 'class', // Standar Tailwind
                 theme: {
                     extend: {
                         colors: {
@@ -40,45 +40,58 @@ $page_title = isset($page_title) ? $page_title : "Helpdesk System";
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css">
     
     <script>
-        // 1. Eksekusi Instan saat Render (Mencegah Flash Putih)
+        // 1. FUNGSI UTAMA TEMA (Dibuat Global dan Anti-Error)
         const html = document.documentElement;
-        const currentTheme = localStorage.getItem('theme');
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-        if (currentTheme === 'dark' || (!currentTheme && systemPrefersDark)) {
-            html.classList.add('dark');
-            html.classList.add('theme-dark');
-            html.setAttribute('data-bs-theme', 'dark');
-        } else {
-            html.classList.remove('dark');
-            html.classList.remove('theme-dark');
-            html.setAttribute('data-bs-theme', 'light');
+        
+        function applyTheme(isDark) {
+            if (isDark) {
+                // Terapkan Mode Gelap
+                html.classList.add('dark', 'theme-dark');
+                html.setAttribute('data-bs-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                if (document.body) document.body.classList.add('theme-dark');
+            } else {
+                // Terapkan Mode Terang
+                html.classList.remove('dark', 'theme-dark');
+                html.setAttribute('data-bs-theme', 'light');
+                localStorage.setItem('theme', 'light');
+                if (document.body) document.body.classList.remove('theme-dark');
+            }
         }
 
-        // 2. Event Listener untuk Tombol Toggle setelah DOM Load
-        document.addEventListener('DOMContentLoaded', () => {
-            const darkModeToggle = document.getElementById('darkModeToggle');
+        // 2. EKSEKUSI INSTAN (Mencegah Layar Berkedip Putih saat Refresh)
+        const currentTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        
+        if (currentTheme === 'dark' || (!currentTheme && systemPrefersDark)) {
+            applyTheme(true);
+        } else {
+            applyTheme(false);
+        }
 
-            if (darkModeToggle) {
-                darkModeToggle.addEventListener('click', (e) => {
+        // Fungsi yang akan dipanggil saat tombol diklik
+        window.toggleDarkMode = function() {
+            const isCurrentlyDark = html.classList.contains('dark');
+            applyTheme(!isCurrentlyDark);
+        };
+
+        // 3. BINDING EVENT SAAT DOM SIAP
+        document.addEventListener('DOMContentLoaded', () => {
+            // Pastikan body mendapatkan class yang benar jika telat dimuat
+            if (html.classList.contains('dark')) {
+                document.body.classList.add('theme-dark');
+            } else {
+                document.body.classList.remove('theme-dark');
+            }
+
+            // Deteksi Tombol Toggle
+            const darkModeBtn = document.getElementById('darkModeToggle');
+            if (darkModeBtn) {
+                // Kita menimpa aksi klik agar pasti jalan
+                darkModeBtn.addEventListener('click', (e) => {
                     e.preventDefault();
-                    
-                    // Cek apakah saat ini sedang Dark Mode
-                    const isDarkMode = html.classList.contains('dark');
-                    
-                    if (isDarkMode) {
-                        // Switch ke Light Mode
-                        html.classList.remove('dark');
-                        html.classList.remove('theme-dark');
-                        html.setAttribute('data-bs-theme', 'light');
-                        localStorage.setItem('theme', 'light');
-                    } else {
-                        // Switch ke Dark Mode
-                        html.classList.add('dark');
-                        html.classList.add('theme-dark');
-                        html.setAttribute('data-bs-theme', 'dark');
-                        localStorage.setItem('theme', 'dark');
-                    }
+                    e.stopPropagation(); // Mencegah event bentrok dengan elemen lain
+                    window.toggleDarkMode();
                 });
             }
         });
