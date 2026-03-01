@@ -22,25 +22,66 @@ $page_title = isset($page_title) ? $page_title : "Helpdesk System";
     <script>
         tailwind = {
             config: {
-                // Mengikat Tailwind agar 100% sinkron dengan toggle tema Bootstrap
-                darkMode: ['class', '[data-bs-theme="dark"]'], 
+                darkMode: 'class', // Cukup gunakan 'class' standar Tailwind
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: '#4F46E5', 
+                            primaryDark: '#3730A3', 
+                        }
+                    }
+                }
             }
         }
     </script>
-    
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css">
     
     <script>
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.setAttribute('data-bs-theme', 'dark');
+        // 1. Eksekusi Instan saat Render (Mencegah Flash Putih)
+        const html = document.documentElement;
+        const currentTheme = localStorage.getItem('theme');
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (currentTheme === 'dark' || (!currentTheme && systemPrefersDark)) {
+            html.classList.add('dark');
+            html.classList.add('theme-dark');
+            html.setAttribute('data-bs-theme', 'dark');
         } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.setAttribute('data-bs-theme', 'light');
+            html.classList.remove('dark');
+            html.classList.remove('theme-dark');
+            html.setAttribute('data-bs-theme', 'light');
         }
+
+        // 2. Event Listener untuk Tombol Toggle setelah DOM Load
+        document.addEventListener('DOMContentLoaded', () => {
+            const darkModeToggle = document.getElementById('darkModeToggle');
+
+            if (darkModeToggle) {
+                darkModeToggle.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    
+                    // Cek apakah saat ini sedang Dark Mode
+                    const isDarkMode = html.classList.contains('dark');
+                    
+                    if (isDarkMode) {
+                        // Switch ke Light Mode
+                        html.classList.remove('dark');
+                        html.classList.remove('theme-dark');
+                        html.setAttribute('data-bs-theme', 'light');
+                        localStorage.setItem('theme', 'light');
+                    } else {
+                        // Switch ke Dark Mode
+                        html.classList.add('dark');
+                        html.classList.add('theme-dark');
+                        html.setAttribute('data-bs-theme', 'dark');
+                        localStorage.setItem('theme', 'dark');
+                    }
+                });
+            }
+        });
     </script>
     
     <style>
@@ -50,4 +91,5 @@ $page_title = isset($page_title) ? $page_title : "Helpdesk System";
 </head>
 
 <body class="bg-slate-50 text-slate-800 dark:bg-[#1A222C] dark:text-slate-200 transition-colors duration-300 font-sans">
-    <div id="app" class="flex h-screen overflow-hidden">
+    
+    <div id="app" class="flex h-screen w-full overflow-hidden">
