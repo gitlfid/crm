@@ -5,19 +5,17 @@ include 'includes/sidebar.php';
 include '../config/functions.php';
 
 // --- LOGIKA FILTER & PENCARIAN ---
-
 $filter_id = isset($_GET['search_id']) ? $_GET['search_id'] : '';
 $filter_status = isset($_GET['filter_status']) ? $_GET['filter_status'] : '';
 $filter_company = isset($_GET['filter_company']) ? $_GET['filter_company'] : '';
 
 // 1. QUERY JOIN TABLE (Tickets + Users)
-// Kita gunakan alias 't' untuk tickets dan 'u' untuk users
 $sql = "SELECT t.*, u.username as assigned_name 
         FROM tickets t 
         LEFT JOIN users u ON t.assigned_to = u.id 
         WHERE 1=1";
 
-// 2. Filter Logic (Gunakan alias t.)
+// 2. Filter Logic 
 if (!empty($filter_id)) {
     $safe_id = $conn->real_escape_string($filter_id);
     $sql .= " AND t.ticket_code LIKE '%$safe_id%'";
@@ -37,172 +35,226 @@ if (!empty($filter_company)) {
 $sql .= " ORDER BY t.created_at DESC";
 
 $result = $conn->query($sql);
+
+// --- Helper Mapping untuk UI Tailwind ---
+$type_styles = [
+    'support' => 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-400',
+    'payment' => 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400',
+    'info'    => 'bg-sky-50 text-sky-600 border-sky-100 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-400'
+];
+$type_icons = [
+    'support' => 'ph-lifebuoy',
+    'payment' => 'ph-credit-card',
+    'info'    => 'ph-info'
+];
+
+$status_styles = [
+    'open'     => 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400',
+    'progress' => 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400',
+    'hold'     => 'bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-400',
+    'closed'   => 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300',
+    'canceled' => 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400'
+];
+$status_icons = [
+    'open'     => 'ph-envelope-open',
+    'progress' => 'ph-hourglass-high animate-pulse', // Animasi berdenyut
+    'hold'     => 'ph-pause-circle',
+    'closed'   => 'ph-check-circle',
+    'canceled' => 'ph-x-circle'
+];
 ?>
 
-<div class="page-heading">
-    <div class="page-title">
-        <div class="row">
-            <div class="col-12 col-md-6 order-md-1 order-last">
-                <h3>Eksternal Ticket</h3>
-                <p class="text-subtitle text-muted">Management pusat tiket masuk.</p>
-            </div>
-            <div class="col-12 col-md-6 order-md-2 order-first">
-                <nav aria-label="breadcrumb" class="breadcrumb-header float-start float-lg-end">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="dashboard.php">Dashboard</a></li>
-                        <li class="breadcrumb-item active" aria-current="page">Tickets</li>
-                    </ol>
-                </nav>
-            </div>
+<style>
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
+</style>
+
+<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto min-h-screen bg-slate-50 dark:bg-[#1A222C] transition-colors duration-300">
+    
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 animate-fade-in-up">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">External Tickets</h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-1">Pusat manajemen dukungan pelanggan dan tiket masuk.</p>
         </div>
+        <nav aria-label="breadcrumb" class="hidden sm:block">
+            <ol class="flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+                <li><a href="dashboard.php" class="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">Dashboard</a></li>
+                <li><i class="ph-bold ph-caret-right text-xs"></i></li>
+                <li class="text-slate-800 dark:text-slate-200">Tickets</li>
+            </ol>
+        </nav>
     </div>
 
-    <section class="section">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 mb-6 animate-fade-in-up" style="animation-delay: 0.1s;">
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center cursor-pointer" onclick="document.getElementById('filterBody').classList.toggle('hidden')">
+            <h3 class="font-bold text-indigo-600 dark:text-indigo-400 text-sm uppercase tracking-widest flex items-center gap-2">
+                <i class="ph-fill ph-funnel text-lg"></i> Filter & Pencarian
+            </h3>
+            <i class="ph-bold ph-caret-down text-slate-400 transition-transform duration-200"></i>
+        </div>
         
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#filterCard">
-                <h6 class="mb-0 text-primary fw-bold"><i class="bi bi-funnel-fill"></i> Filter & Pencarian</h6>
-                <i class="bi bi-chevron-down text-muted"></i>
-            </div>
-            <div class="card-body collapse show" id="filterCard">
-                <form method="GET" action="">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted text-uppercase">Nomor Ticket</label>
-                            <input type="text" name="search_id" class="form-control" placeholder="LFID-..." value="<?= htmlspecialchars($filter_id) ?>">
+        <div id="filterBody" class="p-5 block">
+            <form method="GET" action="">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 items-end">
+                    
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nomor Ticket</label>
+                        <div class="relative">
+                            <i class="ph-bold ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                            <input type="text" name="search_id" class="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400" placeholder="LFID-..." value="<?= htmlspecialchars($filter_id) ?>">
                         </div>
-                        
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted text-uppercase">Nama Perusahaan</label>
-                            <input type="text" name="filter_company" class="form-control" placeholder="PT..." value="<?= htmlspecialchars($filter_company) ?>">
-                        </div>
+                    </div>
 
-                        <div class="col-md-3">
-                            <label class="form-label small text-muted text-uppercase">Status</label>
-                            <select name="filter_status" class="form-select">
-                                <option value="">-- Semua Status --</option>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nama Perusahaan</label>
+                        <div class="relative">
+                            <i class="ph-bold ph-buildings absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                            <input type="text" name="filter_company" class="w-full pl-10 pr-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400" placeholder="PT..." value="<?= htmlspecialchars($filter_company) ?>">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
+                        <div class="relative">
+                            <select name="filter_status" class="w-full pl-4 pr-10 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer">
+                                <option value="">Semua Status</option>
                                 <option value="open" <?= $filter_status == 'open' ? 'selected' : '' ?>>Open</option>
                                 <option value="progress" <?= $filter_status == 'progress' ? 'selected' : '' ?>>In Progress</option>
                                 <option value="hold" <?= $filter_status == 'hold' ? 'selected' : '' ?>>Hold</option>
                                 <option value="closed" <?= $filter_status == 'closed' ? 'selected' : '' ?>>Closed</option>
                                 <option value="canceled" <?= $filter_status == 'canceled' ? 'selected' : '' ?>>Canceled</option>
                             </select>
-                        </div>
-
-                        <div class="col-md-3 d-flex align-items-end gap-2">
-                            <button type="submit" class="btn btn-primary flex-grow-1"><i class="bi bi-search"></i> Cari</button>
-                            <a href="tickets.php" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
+                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                         </div>
                     </div>
-                </form>
-            </div>
-        </div>
 
-        <div class="card shadow-sm">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover table-striped mb-0 align-middle" id="table1">
-                        <thead class="bg-light text-secondary">
-                            <tr>
-                                <th class="px-4 py-3">ID Ticket</th>
-                                <th>Subject & Type</th>
-                                <th>Client / Company</th>
-                                <th>Assigned To</th>
-                                <th>Status</th>
-                                <th class="text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if ($result && $result->num_rows > 0): ?>
-                                <?php while($row = $result->fetch_assoc()): ?>
-                                <tr>
-                                    <td class="px-4 fw-bold text-primary font-monospace" style="font-size: 0.9rem;">
-                                        <?= $row['ticket_code'] ?>
-                                        <div class="text-muted small fw-normal mt-1">
-                                            <?= date('d M Y', strtotime($row['created_at'])) ?>
-                                        </div>
-                                    </td>
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl transition-colors text-sm shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-funnel"></i> Filter
+                        </button>
+                        <?php if(!empty($filter_id) || !empty($filter_status) || !empty($filter_company)): ?>
+                            <a href="tickets.php" class="flex-none bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-2.5 px-4 rounded-xl transition-colors text-sm text-center border border-rose-100 dark:border-rose-500/20 active:scale-95" title="Reset Filters">
+                                <i class="ph-bold ph-arrows-counter-clockwise text-lg"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
 
-                                    <td>
-                                        <?php 
-                                            $typeColor = 'secondary';
-                                            if($row['type'] == 'support') $typeColor = 'info';
-                                            elseif($row['type'] == 'payment') $typeColor = 'warning';
-                                            elseif($row['type'] == 'info') $typeColor = 'primary';
-                                        ?>
-                                        <span class="badge bg-<?= $typeColor ?> bg-opacity-25 text-<?= $typeColor ?> mb-1" style="font-size: 0.7rem;">
-                                            <?= strtoupper($row['type']) ?>
-                                        </span>
-                                        <div class="fw-bold text-dark text-truncate" style="max-width: 250px;" title="<?= htmlspecialchars($row['subject']) ?>">
-                                            <?= htmlspecialchars($row['subject']) ?>
-                                        </div>
-                                    </td>
-
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <div class="avatar avatar-sm bg-light text-dark me-2">
-                                                <span class="avatar-content small"><?= strtoupper(substr($row['company'], 0, 1)) ?></span>
-                                            </div>
-                                            <span class="fw-semibold text-secondary small"><?= htmlspecialchars($row['company']) ?></span>
-                                        </div>
-                                    </td>
-
-                                    <td>
-                                        <?php if($row['assigned_name']): ?>
-                                            <span class="badge bg-white border text-dark">
-                                                <i class="bi bi-person-fill text-primary"></i> <?= htmlspecialchars($row['assigned_name']) ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-light text-muted border-0">
-                                                <i class="bi bi-dash-circle"></i> Unassigned
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-
-                                    <td>
-                                        <?php 
-                                            $st = $row['status'];
-                                            $badgeClass = 'secondary';
-                                            $icon = 'circle';
-                                            
-                                            if($st == 'open') { $badgeClass = 'success'; $icon = 'envelope-open'; }
-                                            elseif($st == 'progress') { $badgeClass = 'warning text-dark'; $icon = 'hourglass-split'; }
-                                            elseif($st == 'hold') { $badgeClass = 'info text-dark'; $icon = 'pause-circle'; }
-                                            elseif($st == 'closed') { $badgeClass = 'secondary'; $icon = 'check-circle'; }
-                                            elseif($st == 'canceled') { $badgeClass = 'danger'; $icon = 'x-circle'; }
-                                        ?>
-                                        <span class="badge bg-<?= $badgeClass ?> d-inline-flex align-items-center gap-1">
-                                            <i class="bi bi-<?= $icon ?>"></i> <?= strtoupper($st) ?>
-                                        </span>
-                                    </td>
-
-                                    <td class="text-center">
-                                        <a href="view_ticket.php?id=<?= $row['id'] ?>" class="btn btn-sm btn-primary shadow-sm" title="View Detail">
-                                            Manage <i class="bi bi-arrow-right-short"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="6" class="text-center py-5 text-muted">
-                                        <img src="../assets/compiled/svg/no-data.svg" alt="No Data" style="width: 100px; opacity: 0.5;" class="mb-3 d-block mx-auto">
-                                        <h6 class="text-secondary">Tidak ada data ticket yang ditemukan.</h6>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
                 </div>
-            </div>
-            
-            <?php if($result && $result->num_rows > 20): ?>
-            <div class="card-footer bg-white border-top text-center">
-                <small class="text-muted">Showing all records</small>
-            </div>
-            <?php endif; ?>
+            </form>
         </div>
-    </section>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in-up" style="animation-delay: 0.2s;">
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50/80 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-black">
+                    <tr>
+                        <th class="px-6 py-4">Ticket Info</th>
+                        <th class="px-6 py-4">Subject & Details</th>
+                        <th class="px-6 py-4">Client / Company</th>
+                        <th class="px-6 py-4">Assignment</th>
+                        <th class="px-6 py-4 text-center">Status</th>
+                        <th class="px-6 py-4 text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-sm">
+                    <?php if ($result && $result->num_rows > 0): ?>
+                        <?php while($row = $result->fetch_assoc()): ?>
+                        <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/80 transition-colors group">
+                            
+                            <td class="px-6 py-4 align-top">
+                                <div class="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-sm">
+                                    <?= htmlspecialchars($row['ticket_code']) ?>
+                                </div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+                                    <i class="ph-fill ph-calendar-blank"></i>
+                                    <?= date('d M Y', strtotime($row['created_at'])) ?>
+                                </div>
+                            </td>
+
+                            <td class="px-6 py-4 align-top">
+                                <?php 
+                                    $t = strtolower($row['type']);
+                                    $tStyle = isset($type_styles[$t]) ? $type_styles[$t] : $type_styles['info'];
+                                    $tIcon  = isset($type_icons[$t]) ? $type_icons[$t] : $type_icons['info'];
+                                ?>
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border mb-1.5 <?= $tStyle ?>">
+                                    <i class="ph-fill <?= $tIcon ?>"></i> <?= htmlspecialchars($row['type']) ?>
+                                </span>
+                                <div class="font-bold text-slate-800 dark:text-white text-sm max-w-[250px] truncate" title="<?= htmlspecialchars($row['subject']) ?>">
+                                    <?= htmlspecialchars($row['subject']) ?>
+                                </div>
+                            </td>
+
+                            <td class="px-6 py-4 align-top">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-xs shrink-0">
+                                        <?= strtoupper(substr($row['company'], 0, 1)) ?>
+                                    </div>
+                                    <div class="font-semibold text-slate-700 dark:text-slate-300 text-sm truncate max-w-[180px]" title="<?= htmlspecialchars($row['company']) ?>">
+                                        <?= htmlspecialchars($row['company']) ?>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td class="px-6 py-4 align-top">
+                                <?php if($row['assigned_name']): ?>
+                                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                                        <div class="w-5 h-5 rounded-full overflow-hidden shrink-0">
+                                            <img src="https://ui-avatars.com/api/?name=<?= urlencode($row['assigned_name']) ?>&background=random" alt="Avatar" class="w-full h-full object-cover">
+                                        </div>
+                                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300"><?= htmlspecialchars($row['assigned_name']) ?></span>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500">
+                                        <i class="ph-bold ph-user-minus text-sm"></i>
+                                        <span class="text-[11px] font-bold uppercase tracking-wider">Unassigned</span>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+
+                            <td class="px-6 py-4 align-top text-center">
+                                <?php 
+                                    $st = strtolower($row['status']);
+                                    $sStyle = isset($status_styles[$st]) ? $status_styles[$st] : $status_styles['closed'];
+                                    $sIcon  = isset($status_icons[$st]) ? $status_icons[$st] : $status_icons['closed'];
+                                ?>
+                                <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest w-28 <?= $sStyle ?>">
+                                    <i class="ph-fill <?= $sIcon ?> text-sm"></i> <?= htmlspecialchars($st) ?>
+                                </span>
+                            </td>
+
+                            <td class="px-6 py-4 align-top text-center">
+                                <a href="view_ticket.php?id=<?= $row['id'] ?>" class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 hover:bg-indigo-50 dark:bg-slate-700 dark:hover:bg-indigo-500/20 text-slate-600 hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-400 transition-all shadow-sm active:scale-95" title="Manage Ticket">
+                                    <i class="ph-bold ph-arrow-right text-lg"></i>
+                                </a>
+                            </td>
+
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="6" class="px-6 py-16 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                                    <div class="w-20 h-20 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-700">
+                                        <i class="ph-fill ph-ticket text-4xl text-slate-300 dark:text-slate-600"></i>
+                                    </div>
+                                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-lg mb-1">Tidak Ada Data</h4>
+                                    <p class="text-sm font-medium">Data ticket tidak ditemukan dengan filter saat ini.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <?php if($result && $result->num_rows > 10): ?>
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Menampilkan seluruh data tiket.</p>
+        </div>
+        <?php endif; ?>
+    </div>
 </div>
 
 <?php include 'includes/footer.php'; ?>
