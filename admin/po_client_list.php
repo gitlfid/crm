@@ -132,226 +132,303 @@ $res = $conn->query($sql);
 ?>
 
 <style>
-    .table-responsive { overflow: visible !important; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
+    .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
 </style>
 
-<div class="page-heading">
-    <div class="row align-items-center">
-        <div class="col-12 col-md-6">
-            <h3>Purchase Order (Client)</h3>
-            <p class="text-subtitle text-muted">Daftar PO yang diterima dari client.</p>
+<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto min-h-screen bg-slate-50 dark:bg-[#1A222C] transition-colors duration-300">
+    
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 animate-fade-in-up">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Client Purchase Orders</h1>
+            <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Daftar PO yang diterima dari klien dan siap diproses menjadi Invoice.</p>
         </div>
     </div>
-</div>
 
-<div class="page-content">
-    
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center cursor-pointer" data-bs-toggle="collapse" data-bs-target="#filterPanel">
-            <h6 class="m-0 text-primary fw-bold"><i class="bi bi-funnel-fill me-2"></i> Filter Data & Export</h6>
-            <i class="bi bi-chevron-down text-muted"></i>
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 mb-6 animate-fade-in-up" style="animation-delay: 0.1s;">
+        <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-t-2xl" id="filterToggleBtn">
+            <h3 class="font-bold text-slate-700 dark:text-slate-200 text-xs uppercase tracking-widest flex items-center gap-2">
+                <i class="ph-bold ph-funnel text-indigo-500 text-base"></i> Filter Data & Export
+            </h3>
+            <i id="filterIcon" class="ph-bold ph-caret-up text-slate-400 transition-transform duration-300"></i>
         </div>
-        <div class="card-body collapse show" id="filterPanel">
-            <div class="row g-3">
-                <div class="col-lg-9">
-                    <form method="GET" class="row g-2">
-                        <div class="col-md-4">
-                            <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
-                                <input type="text" name="search" class="form-control" placeholder="No PO / No Quote..." value="<?= htmlspecialchars($search ?? '') ?>">
-                            </div>
+        
+        <div id="filterBody" class="p-5 block transition-all duration-300">
+            <form method="GET" id="filterForm">
+                <div class="flex flex-col xl:flex-row gap-4 xl:items-end">
+                    
+                    <div class="w-full xl:w-64 shrink-0">
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">No PO / No Quote</label>
+                        <div class="relative">
+                            <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="text" name="search" class="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400" placeholder="e.g. PO-..." value="<?= htmlspecialchars($search ?? '') ?>">
                         </div>
+                    </div>
 
-                        <div class="col-md-3">
-                            <select name="client_id" class="form-select">
+                    <div class="w-full xl:w-64 shrink-0">
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Perusahaan Klien</label>
+                        <div class="relative">
+                            <select name="client_id" class="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer">
                                 <option value="">- Semua Client -</option>
-                                <?php 
-                                if($clients->num_rows > 0) {
-                                    $clients->data_seek(0);
-                                    while($c = $clients->fetch_assoc()): 
-                                ?>
-                                    <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($c['company_name']) ?>
-                                    </option>
+                                <?php if($clients->num_rows > 0) { $clients->data_seek(0); while($c = $clients->fetch_assoc()): ?>
+                                    <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name']) ?></option>
                                 <?php endwhile; } ?>
                             </select>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
                         </div>
-                        
-                        <div class="col-md-3">
-                            <select name="status" class="form-select">
+                    </div>
+
+                    <div class="w-full xl:w-48 shrink-0 flex-1">
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Status Dokumen</label>
+                        <div class="relative">
+                            <select name="status" class="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-bold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer">
                                 <option value="">- Semua Status -</option>
                                 <option value="po_received" <?= $f_status=='po_received'?'selected':'' ?>>Pending Invoice</option>
                                 <option value="invoiced" <?= $f_status=='invoiced'?'selected':'' ?>>Invoiced</option>
                             </select>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
                         </div>
+                    </div>
 
-                        <div class="col-md-2">
-                            <button type="submit" class="btn btn-primary w-100">Filter</button>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="col-lg-3 border-start d-flex align-items-center justify-content-end">
-                    <form method="POST" class="w-100">
-                        <input type="hidden" name="search" value="<?= htmlspecialchars($search ?? '') ?>">
-                        <input type="hidden" name="client_id" value="<?= htmlspecialchars($f_client ?? '') ?>">
-                        <input type="hidden" name="status" value="<?= htmlspecialchars($f_status ?? '') ?>">
-                        
-                        <button type="submit" name="export_excel" class="btn btn-success w-100 text-white">
-                            <i class="bi bi-file-earmark-spreadsheet me-2"></i> Export to Excel
+                    <div class="w-full xl:w-auto flex gap-2 shrink-0">
+                        <button type="submit" class="flex-1 xl:flex-none bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-xl transition-colors text-[11px] shadow-sm active:scale-95 flex items-center justify-center gap-1.5">
+                            <i class="ph-bold ph-funnel text-sm"></i> Filter
                         </button>
-                    </form>
+                        
+                        <button type="submit" formmethod="POST" name="export_excel" class="flex-1 xl:flex-none bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors text-[11px] shadow-sm active:scale-95 flex items-center justify-center gap-1.5">
+                            <i class="ph-bold ph-file-csv text-sm"></i> Export
+                        </button>
+
+                        <?php if(!empty($search) || !empty($f_client) || !empty($f_status)): ?>
+                            <a href="po_client_list.php" class="flex-none bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-2 px-3 rounded-xl transition-colors text-[11px] text-center border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
+                                <i class="ph-bold ph-arrows-counter-clockwise text-sm"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
-            </div>
-            
-            <?php if(!empty($search) || !empty($f_client) || !empty($f_status)): ?>
-                <div class="mt-3 text-center border-top pt-2">
-                    <small class="text-muted">Filter aktif.</small> 
-                    <a href="po_client_list.php" class="text-danger text-decoration-none fw-bold ms-2">Reset Filter</a>
-                </div>
-            <?php endif; ?>
+            </form>
         </div>
     </div>
 
-    <div class="card shadow-sm border-top border-success border-3">
-        <div class="card-body">
-            <div class="table-responsive" style="overflow: visible;">
-                <table class="table table-hover align-middle" id="table1">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>PO Number</th>
-                            <th>Quote Ref</th>
-                            <th>Client</th>
-                            <th>Status</th>
-                            <th>PO Doc</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if($res->num_rows > 0): ?>
-                            <?php while($row = $res->fetch_assoc()): ?>
-                            <tr>
-                                <td class="fw-bold text-success"><?= htmlspecialchars($row['po_number_client'] ?? '') ?></td>
-                                <td class="text-muted font-monospace"><?= htmlspecialchars($row['quotation_no'] ?? '') ?></td>
-                                <td>
-                                    <div class="fw-bold"><?= htmlspecialchars($row['company_name'] ?? '') ?></div>
-                                    <small class="text-muted"><i class="bi bi-person me-1"></i> <?= htmlspecialchars($row['username'] ?? '') ?></small>
-                                </td>
-                                <td>
-                                    <?php if($row['status'] == 'po_received'): ?>
-                                        <span class="badge bg-warning text-dark">Pending Invoice</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-success">Invoiced</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if($row['po_file_client']): ?>
-                                        <a href="../uploads/<?= $row['po_file_client'] ?>" target="_blank" class="btn btn-sm btn-outline-secondary" title="Lihat Bukti">
-                                            <i class="bi bi-file-earmark-pdf"></i> View
+    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in-up" style="animation-delay: 0.2s;">
+        <div class="overflow-x-auto w-full pb-20">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50/80 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-black">
+                    <tr>
+                        <th class="px-5 py-3.5 whitespace-nowrap w-[20%]">PO Details</th>
+                        <th class="px-5 py-3.5 w-[30%]">Client Info</th>
+                        <th class="px-5 py-3.5 text-center whitespace-nowrap w-[15%]">Document</th>
+                        <th class="px-5 py-3.5 text-center whitespace-nowrap w-[15%]">Status</th>
+                        <th class="px-5 py-3.5 text-center whitespace-nowrap w-[10%]">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-[11px]">
+                    <?php if($res->num_rows > 0): ?>
+                        <?php while($row = $res->fetch_assoc()): ?>
+                        <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/80 transition-colors group">
+                            
+                            <td class="px-5 py-3 align-middle whitespace-nowrap">
+                                <div class="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-[12px] mb-0.5">
+                                    <?= htmlspecialchars($row['po_number_client'] ?? 'N/A') ?>
+                                </div>
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                    Ref: <span class="font-mono bg-slate-100 dark:bg-slate-700 px-1 rounded"><?= htmlspecialchars($row['quotation_no'] ?? '') ?></span>
+                                </div>
+                            </td>
+
+                            <td class="px-5 py-3 align-middle">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 leading-snug truncate max-w-[250px]" title="<?= htmlspecialchars($row['company_name'] ?? '') ?>">
+                                    <?= htmlspecialchars($row['company_name'] ?? '') ?>
+                                </div>
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1 font-medium whitespace-nowrap">
+                                    <i class="ph-fill ph-user-circle"></i> <?= htmlspecialchars($row['username'] ?? '') ?>
+                                </div>
+                            </td>
+
+                            <td class="px-5 py-3 align-middle text-center whitespace-nowrap">
+                                <?php if($row['po_file_client']): ?>
+                                    <a href="../uploads/<?= $row['po_file_client'] ?>" target="_blank" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 dark:bg-slate-700 dark:hover:bg-indigo-500/20 dark:text-slate-300 dark:hover:text-indigo-400 transition-colors border border-slate-200 dark:border-slate-600 font-bold text-[10px] tracking-wide">
+                                        <i class="ph-bold ph-file-pdf text-sm"></i> View Doc
+                                    </a>
+                                <?php else: ?>
+                                    <span class="text-slate-400 dark:text-slate-500 italic text-[10px]">- Not Uploaded -</span>
+                                <?php endif; ?>
+                            </td>
+
+                            <td class="px-5 py-3 align-middle text-center whitespace-nowrap">
+                                <?php if($row['status'] == 'po_received'): ?>
+                                    <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest w-32">
+                                        <i class="ph-fill ph-hourglass-high text-[11px]"></i> Pending Inv
+                                    </span>
+                                <?php else: ?>
+                                    <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest w-32">
+                                        <i class="ph-fill ph-receipt text-[11px]"></i> Invoiced
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+
+                            <td class="px-5 py-3 align-middle text-center whitespace-nowrap relative">
+                                <button onclick="toggleActionMenu(<?= $row['id'] ?>)" class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-all shadow-sm active:scale-95 focus:outline-none">
+                                    <i class="ph-bold ph-dots-three-vertical text-base"></i>
+                                </button>
+
+                                <div id="action-menu-<?= $row['id'] ?>" class="hidden absolute right-10 top-2 w-48 bg-white dark:bg-[#24303F] rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right">
+                                    <div class="py-1">
+                                        <a href="quotation_print.php?id=<?= $row['id'] ?>" target="_blank" class="flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <i class="ph-bold ph-eye text-sm text-slate-400"></i> View Quote
                                         </a>
-                                    <?php else: ?>
-                                        <span class="text-muted small">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-boundary="viewport">
-                                            Action
+
+                                        <button onclick="openUploadModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['po_number_client'] ?? '') ?>')" class="w-full text-left flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <i class="ph-bold ph-cloud-arrow-up text-sm text-slate-400"></i> <?= $row['po_file_client'] ? 'Update PO Doc' : 'Upload PO Doc' ?>
                                         </button>
-                                        <ul class="dropdown-menu dropdown-menu-end shadow">
-                                            
-                                            <li>
-                                                <a class="dropdown-item" href="quotation_print.php?id=<?= $row['id'] ?>" target="_blank">
-                                                    <i class="bi bi-eye me-2"></i> View Quote
-                                                </a>
-                                            </li>
 
-                                            <li>
-                                                <button class="dropdown-item" onclick="openUploadModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['po_number_client'] ?? '') ?>')">
-                                                    <i class="bi bi-cloud-upload me-2"></i> <?= $row['po_file_client'] ? 'Update PO Doc' : 'Upload PO Doc' ?>
-                                                </button>
-                                            </li>
-
-                                            <?php if($row['status'] == 'po_received'): ?>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <a class="dropdown-item fw-bold text-primary" href="?process_invoice_id=<?= $row['id'] ?>">
-                                                        <i class="bi bi-receipt me-2"></i> Process to Invoice
-                                                    </a>
-                                                </li>
-                                                
-                                                <li>
-                                                    <a class="dropdown-item text-danger" href="?cancel_id=<?= $row['id'] ?>" onclick="return confirm('PERINGATAN: Membatalkan PO ini juga akan membatalkan Quotation. Lanjutkan?')">
-                                                        <i class="bi bi-x-circle me-2"></i> Cancel PO
-                                                    </a>
-                                                </li>
-                                            <?php else: ?>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><span class="dropdown-item text-muted disabled"><i class="bi bi-check2-all me-2"></i> Already Invoiced</span></li>
-                                            <?php endif; ?>
+                                        <?php if($row['status'] == 'po_received'): ?>
+                                            <div class="border-t border-slate-100 dark:border-slate-700 my-1"></div>
                                             
-                                        </ul>
+                                            <a href="?process_invoice_id=<?= $row['id'] ?>" class="flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                <i class="ph-bold ph-receipt text-sm"></i> Process to Invoice
+                                            </a>
+                                            
+                                            <a href="?cancel_id=<?= $row['id'] ?>" onclick="return confirm('PERINGATAN: Membatalkan PO ini juga akan membatalkan Quotation. Lanjutkan?')" class="flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                <i class="ph-bold ph-x-circle text-sm"></i> Cancel PO
+                                            </a>
+                                        <?php else: ?>
+                                            <div class="border-t border-slate-100 dark:border-slate-700 my-1"></div>
+                                            <span class="block px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 italic">
+                                                <i class="ph-bold ph-check-circle mr-1"></i> Already Invoiced
+                                            </span>
+                                        <?php endif; ?>
                                     </div>
-                                </td>
-                            </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
-                                    Tidak ada data PO ditemukan.
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-            
-            <?php if($res->num_rows > 20): ?>
-            <div class="card-footer bg-white border-top text-center py-3">
-                <small class="text-muted">Menampilkan hasil pencarian</small>
-            </div>
-            <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="5" class="px-4 py-12 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                                    <div class="w-14 h-14 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-3 border border-slate-100 dark:border-slate-700">
+                                        <i class="ph-fill ph-file-text text-2xl text-slate-300 dark:text-slate-600"></i>
+                                    </div>
+                                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-[13px] mb-0.5">Tidak Ada Data</h4>
+                                    <p class="text-[11px] font-medium">Purchase Order Client tidak ditemukan.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
+        
+        <?php if($res->num_rows > 0): ?>
+        <div class="px-5 py-3 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Menampilkan total <?= $res->num_rows ?> data PO.</p>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
-<div class="modal fade" id="uploadPOModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form method="POST" enctype="multipart/form-data" class="modal-content">
-            <div class="modal-header bg-primary text-white py-2">
-                <h6 class="modal-title"><i class="bi bi-cloud-arrow-up-fill me-2"></i> Upload PO Document</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+<div id="uploadPOModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl border border-slate-100 dark:border-slate-700 flex flex-col">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="px-6 py-4 border-b border-indigo-500 bg-indigo-600 rounded-t-2xl flex justify-between items-center text-white">
+                <h3 class="text-sm font-bold flex items-center gap-2"><i class="ph-bold ph-cloud-arrow-up text-lg"></i> Upload PO Document</h3>
+                <button type="button" onclick="closeModal('uploadPOModal')" class="text-white/70 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
-            <div class="modal-body">
+            
+            <div class="p-6">
                 <input type="hidden" name="quotation_id" id="modal_q_id">
                 
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">PO Number</label>
-                    <input type="text" id="modal_po_no" class="form-control form-control-sm bg-light" readonly>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label small fw-bold">File (PDF / Image)</label>
-                    <input type="file" name="po_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
-                    <div class="form-text text-muted small">Maksimal 5MB.</div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Client PO Number</label>
+                        <input type="text" id="modal_po_no" class="w-full px-4 py-2.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 outline-none" readonly>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Select File (PDF / Image) <span class="text-rose-500">*</span></label>
+                        <input type="file" name="po_file" class="w-full block text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100 dark:file:bg-indigo-500/10 dark:file:text-indigo-400 dark:hover:file:bg-indigo-500/20 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-xl" accept=".pdf,.jpg,.jpeg,.png" required>
+                        <p class="text-[10px] text-slate-400 mt-1.5 italic"><i class="ph-fill ph-info"></i> Maksimal ukuran file 5MB.</p>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer py-1">
-                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button>
-                <button type="submit" name="upload_po_doc" class="btn btn-primary btn-sm">Upload File</button>
+            
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex bg-slate-50/50 dark:bg-slate-800/50 rounded-b-2xl justify-end gap-2">
+                <button type="button" onclick="closeModal('uploadPOModal')" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-xs">Batal</button>
+                <button type="submit" name="upload_po_doc" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-500/30 flex items-center justify-center gap-2">
+                    <i class="ph-bold ph-upload-simple text-sm"></i> Upload File
+                </button>
             </div>
         </form>
     </div>
 </div>
 
-<?php include 'includes/footer.php'; ?>
-
 <script>
+    // --- FILTER TOGGLE ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('filterToggleBtn');
+        const body = document.getElementById('filterBody');
+        const icon = document.getElementById('filterIcon');
+
+        if(btn && body && icon) {
+            btn.addEventListener('click', () => {
+                body.classList.toggle('hidden');
+                if (body.classList.contains('hidden')) {
+                    icon.classList.replace('ph-caret-up', 'ph-caret-down');
+                } else {
+                    icon.classList.replace('ph-caret-down', 'ph-caret-up');
+                }
+            });
+        }
+    });
+
+    // --- MODAL HANDLERS ---
+    function openModal(id) {
+        const modal = document.getElementById(id);
+        const box = modal.querySelector('.modal-box');
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            box.classList.remove('scale-95', 'opacity-0');
+        }, 10);
+    }
+
+    function closeModal(id) {
+        const modal = document.getElementById(id);
+        const box = modal.querySelector('.modal-box');
+        modal.classList.add('opacity-0');
+        box.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
     function openUploadModal(id, poNo) {
         document.getElementById('modal_q_id').value = id;
         document.getElementById('modal_po_no').value = poNo;
-        var myModal = new bootstrap.Modal(document.getElementById('uploadPOModal'));
-        myModal.show();
+        openModal('uploadPOModal');
     }
+
+    // --- ACTION MENU DROPDOWN LOGIC ---
+    let currentOpenDropdown = null;
+    function toggleActionMenu(id) {
+        const menu = document.getElementById('action-menu-' + id);
+        if (currentOpenDropdown && currentOpenDropdown !== menu) {
+            currentOpenDropdown.classList.add('hidden');
+        }
+        menu.classList.toggle('hidden');
+        currentOpenDropdown = menu.classList.contains('hidden') ? null : menu;
+    }
+    
+    document.addEventListener('click', (e) => {
+        if (currentOpenDropdown && !e.target.closest('td.relative')) {
+            currentOpenDropdown.classList.add('hidden');
+            currentOpenDropdown = null;
+        }
+    });
 </script>
+
+<?php include 'includes/footer.php'; ?>
