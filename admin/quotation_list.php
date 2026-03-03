@@ -254,15 +254,15 @@ $status_icons = [
     </div>
 
     <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in-up" style="animation-delay: 0.2s;">
-        <div class="overflow-x-auto custom-scrollbar w-full pb-32"> <table class="w-full text-left border-collapse whitespace-nowrap">
+        <div class="overflow-x-auto custom-scrollbar w-full pb-20"> <table class="w-full text-left border-collapse whitespace-nowrap">
                 <thead class="bg-slate-50/80 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-black">
                     <tr>
-                        <th class="px-5 py-3.5">Quotation Info</th>
-                        <th class="px-5 py-3.5">Client Details</th>
-                        <th class="px-5 py-3.5">Package & Items</th>
-                        <th class="px-5 py-3.5 text-right">Amount</th>
-                        <th class="px-5 py-3.5 text-center">Status</th>
-                        <th class="px-5 py-3.5 text-center">Action</th>
+                        <th class="px-4 py-3">Quotation Info</th>
+                        <th class="px-4 py-3">Client Details</th>
+                        <th class="px-4 py-3">Package & Items</th>
+                        <th class="px-4 py-3 text-right">Amount</th>
+                        <th class="px-4 py-3 text-center">Status</th>
+                        <th class="px-4 py-3 text-center">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-xs">
@@ -284,101 +284,101 @@ $status_icons = [
                         ?>
                         <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/80 transition-colors group">
                             
-                            <td class="px-5 py-4 align-top">
-                                <div class="font-mono font-extrabold text-indigo-600 dark:text-indigo-400 text-xs">
+                            <td class="px-4 py-3 align-middle">
+                                <div class="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-[11px]">
                                     <?= htmlspecialchars($row['quotation_no']) ?>
                                 </div>
-                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-medium flex items-center gap-1">
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium flex items-center gap-1">
                                     <i class="ph-fill ph-calendar-blank"></i> <?= date('d M Y', strtotime($row['quotation_date'])) ?>
                                 </div>
                             </td>
 
-                            <td class="px-5 py-4 align-top">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-xs truncate max-w-[200px]" title="<?= htmlspecialchars($row['company_name']) ?>">
+                            <td class="px-4 py-3 align-middle">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-[11px] truncate max-w-[180px]" title="<?= htmlspecialchars($row['company_name']) ?>">
                                     <?= htmlspecialchars($row['company_name']) ?>
                                 </div>
-                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 font-medium">
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1 font-medium">
                                     <i class="ph-fill ph-user-circle"></i> <?= htmlspecialchars($row['username']) ?>
                                 </div>
                             </td>
 
-                            <td class="px-5 py-4 align-top">
-                                <div class="flex flex-wrap gap-1 mb-1.5 max-w-[200px]">
-                                    <?php if(!empty($cardList)): ?>
-                                        <?php foreach($cardList as $ctype): ?>
-                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">
-                                                <?= htmlspecialchars($ctype) ?>
-                                            </span>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <span class="text-slate-400 text-[10px] italic">-</span>
-                                    <?php endif; ?>
+                            <td class="px-4 py-3 align-middle">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                        <i class="ph-fill ph-cube"></i> <?= $countItem ?> Items
+                                    </span>
+                                    <div class="flex gap-1">
+                                        <?php if(!empty($cardList)): ?>
+                                            <?php foreach($cardList as $ctype): ?>
+                                                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">
+                                                    <?= htmlspecialchars($ctype) ?>
+                                                </span>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
-                                <span class="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-500 dark:text-indigo-400">
-                                    <i class="ph-fill ph-cube"></i> <?= $countItem ?> Items
-                                </span>
                             </td>
 
-                            <td class="px-5 py-4 align-top text-right">
-                                <span class="text-[10px] font-bold text-slate-400 mr-1"><?= $row['currency'] ?></span>
-                                <span class="font-black text-slate-800 dark:text-slate-200 text-sm">
+                            <td class="px-4 py-3 align-middle text-right">
+                                <span class="text-[10px] font-bold text-slate-400 mr-0.5"><?= $row['currency'] ?></span>
+                                <span class="font-bold text-slate-800 dark:text-slate-200 text-[11px]">
                                     <?= number_format($total, 0, ',', '.') ?>
                                 </span>
                             </td>
 
-                            <td class="px-5 py-4 align-top text-center">
-                                <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest w-28 <?= $sStyle ?>">
+                            <td class="px-4 py-3 align-middle text-center">
+                                <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest w-24 <?= $sStyle ?>">
                                     <i class="ph-fill <?= $sIcon ?> text-[11px]"></i> <?= str_replace('_', ' ', $st) ?>
                                 </span>
                             </td>
 
-                            <td class="px-5 py-4 align-top text-center relative">
-                                <button onclick="toggleActionMenu(<?= $row['id'] ?>)" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-all shadow-sm active:scale-95 focus:outline-none">
-                                    <i class="ph-bold ph-dots-three-vertical text-lg"></i>
+                            <td class="px-4 py-3 align-middle text-center relative">
+                                <button onclick="toggleActionMenu(<?= $row['id'] ?>)" class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-all shadow-sm active:scale-95 focus:outline-none">
+                                    <i class="ph-bold ph-dots-three-vertical text-base"></i>
                                 </button>
 
-                                <div id="action-menu-<?= $row['id'] ?>" class="hidden absolute right-10 top-4 w-44 bg-white dark:bg-[#24303F] rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right">
+                                <div id="action-menu-<?= $row['id'] ?>" class="hidden absolute right-10 top-2 w-44 bg-white dark:bg-[#24303F] rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right">
                                     <div class="py-1">
-                                        <a href="quotation_print.php?id=<?= $row['id'] ?>" target="_blank" class="flex items-center gap-2 px-4 py-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                        <a href="quotation_print.php?id=<?= $row['id'] ?>" target="_blank" class="flex items-center gap-2 px-4 py-2 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                             <i class="ph-bold ph-printer text-sm"></i> Print PDF
                                         </a>
                                         
                                         <div class="border-t border-slate-100 dark:border-slate-700 my-1"></div>
 
                                         <?php if($st == 'draft'): ?>
-                                            <a href="quotation_form.php?edit_id=<?= $row['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <a href="quotation_form.php?edit_id=<?= $row['id'] ?>" class="flex items-center gap-2 px-4 py-2 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-pencil-simple text-sm"></i> Edit Quote
                                             </a>
-                                            <a href="?status_id=<?= $row['id'] ?>&st=sent" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <a href="?status_id=<?= $row['id'] ?>&st=sent" class="flex items-center gap-2 px-4 py-2 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-paper-plane-tilt text-sm"></i> Mark as Sent
                                             </a>
-                                            <button onclick="openPOModal(<?= $row['id'] ?>, '<?= $row['quotation_no'] ?>')" class="w-full text-left flex items-center gap-2 px-4 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <button onclick="openPOModal(<?= $row['id'] ?>, '<?= $row['quotation_no'] ?>')" class="w-full text-left flex items-center gap-2 px-4 py-2 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-file-earmark-check text-sm"></i> Process to PO
                                             </button>
-                                            <a href="?status_id=<?= $row['id'] ?>&st=cancel" onclick="return confirm('Batalkan Quotation ini?')" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <a href="?status_id=<?= $row['id'] ?>&st=cancel" onclick="return confirm('Batalkan Quotation ini?')" class="flex items-center gap-2 px-4 py-2 text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-x-circle text-sm"></i> Cancel Quote
                                             </a>
                                             <div class="border-t border-slate-100 dark:border-slate-700 my-1"></div>
-                                            <a href="?delete_id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')" class="flex items-center gap-2 px-4 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                            <a href="?delete_id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')" class="flex items-center gap-2 px-4 py-2 text-[11px] font-black text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
                                                 <i class="ph-fill ph-trash text-sm"></i> Delete
                                             </a>
                                         
                                         <?php elseif(in_array($st, ['sent', 'po_received', 'invoiced'])): ?>
-                                            <a href="?status_id=<?= $row['id'] ?>&st=draft" onclick="return confirm('Kembalikan status ke DRAFT agar bisa diedit?')" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <a href="?status_id=<?= $row['id'] ?>&st=draft" onclick="return confirm('Kembalikan status ke DRAFT agar bisa diedit?')" class="flex items-center gap-2 px-4 py-2 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-arrow-counterclockwise text-sm"></i> Revert to Draft
                                             </a>
                                             <?php if($st == 'sent'): ?>
-                                                <button onclick="openPOModal(<?= $row['id'] ?>, '<?= $row['quotation_no'] ?>')" class="w-full text-left flex items-center gap-2 px-4 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                <button onclick="openPOModal(<?= $row['id'] ?>, '<?= $row['quotation_no'] ?>')" class="w-full text-left flex items-center gap-2 px-4 py-2 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                     <i class="ph-bold ph-file-earmark-check text-sm"></i> Process to PO
                                                 </button>
                                             <?php endif; ?>
                                         <?php endif; ?>
 
                                         <?php if($st == 'cancel'): ?>
-                                            <a href="?status_id=<?= $row['id'] ?>&st=draft" class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <a href="?status_id=<?= $row['id'] ?>&st=draft" class="flex items-center gap-2 px-4 py-2 text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-arrow-counterclockwise text-sm"></i> Revert to Draft
                                             </a>
-                                            <a href="?delete_id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')" class="flex items-center gap-2 px-4 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                            <a href="?delete_id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')" class="flex items-center gap-2 px-4 py-2 text-[11px] font-black text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
                                                 <i class="ph-fill ph-trash text-sm"></i> Delete
                                             </a>
                                         <?php endif; ?>
@@ -389,12 +389,12 @@ $status_icons = [
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" class="px-6 py-16 text-center">
+                            <td colspan="6" class="px-4 py-12 text-center">
                                 <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
-                                    <div class="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-3 border border-slate-100 dark:border-slate-700">
-                                        <i class="ph-fill ph-file-text text-3xl text-slate-300 dark:text-slate-600"></i>
+                                    <div class="w-14 h-14 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-3 border border-slate-100 dark:border-slate-700">
+                                        <i class="ph-fill ph-file-text text-2xl text-slate-300 dark:text-slate-600"></i>
                                     </div>
-                                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-sm mb-0.5">Tidak Ada Data</h4>
+                                    <h4 class="font-bold text-slate-700 dark:text-slate-300 text-[13px] mb-0.5">Tidak Ada Data</h4>
                                     <p class="text-[11px] font-medium">Quotation tidak ditemukan dengan filter saat ini.</p>
                                 </div>
                             </td>
