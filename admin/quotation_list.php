@@ -178,20 +178,20 @@ $status_icons = [
         
         <div id="filterBody" class="p-5 block transition-all duration-300">
             <form method="GET" id="filterForm">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-end">
+                <div class="flex flex-col xl:flex-row gap-4 xl:items-end">
                     
-                    <div>
+                    <div class="w-full xl:w-48 shrink-0">
                         <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">No Quotation</label>
                         <div class="relative">
                             <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                            <input type="text" name="search" class="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400" placeholder="e.g. QUO-..." value="<?= htmlspecialchars($search) ?>">
+                            <input type="text" name="search" class="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400" placeholder="e.g. QUO-..." value="<?= htmlspecialchars($search) ?>">
                         </div>
                     </div>
 
-                    <div>
+                    <div class="w-full xl:w-56 shrink-0">
                         <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Perusahaan Klien</label>
                         <div class="relative">
-                            <select name="client_id" class="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer">
+                            <select name="client_id" class="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer">
                                 <option value="">- Semua Client -</option>
                                 <?php if($clients->num_rows > 0) { $clients->data_seek(0); while($c = $clients->fetch_assoc()): ?>
                                     <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name']) ?></option>
@@ -201,10 +201,10 @@ $status_icons = [
                         </div>
                     </div>
 
-                    <div>
+                    <div class="w-full xl:w-40 shrink-0">
                         <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Status</label>
                         <div class="relative">
-                            <select name="status" class="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer">
+                            <select name="status" class="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-bold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer">
                                 <option value="">- Semua Status -</option>
                                 <option value="draft" <?= $f_status=='draft'?'selected':'' ?>>Draft</option>
                                 <option value="sent" <?= $f_status=='sent'?'selected':'' ?>>Sent</option>
@@ -216,53 +216,46 @@ $status_icons = [
                         </div>
                     </div>
 
-                    <div>
+                    <div class="w-full xl:w-auto flex-1">
                         <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Rentang Tanggal</label>
                         <div class="flex items-center gap-2">
-                            <input type="date" name="start_date" class="w-full px-2 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" value="<?= $f_start ?>">
-                            <span class="text-slate-400">-</span>
-                            <input type="date" name="end_date" class="w-full px-2 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" value="<?= $f_end ?>">
+                            <input type="date" name="start_date" class="w-full px-2 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-medium focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" value="<?= $f_start ?>">
+                            <span class="text-slate-400 text-sm">-</span>
+                            <input type="date" name="end_date" class="w-full px-2 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-[11px] font-medium focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" value="<?= $f_end ?>">
                         </div>
                     </div>
 
-                    <div class="flex gap-2 xl:col-span-1">
-                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold py-2 px-3 rounded-xl transition-colors text-xs shadow-sm active:scale-95 flex items-center justify-center gap-1.5">
+                    <div class="w-full xl:w-auto flex gap-2 shrink-0">
+                        <button type="submit" class="flex-1 xl:flex-none bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-xl transition-colors text-[11px] shadow-sm active:scale-95 flex items-center justify-center gap-1.5">
                             <i class="ph-bold ph-funnel text-sm"></i> Filter
                         </button>
+                        
+                        <button type="submit" formmethod="POST" name="export_excel" class="flex-1 xl:flex-none bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors text-[11px] shadow-sm active:scale-95 flex items-center justify-center gap-1.5">
+                            <i class="ph-bold ph-file-csv text-sm"></i> Export
+                        </button>
+
                         <?php if(!empty($search) || !empty($f_client) || !empty($f_status) || !empty($f_start)): ?>
-                            <a href="quotation_list.php" class="flex-none bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-2 px-3 rounded-xl transition-colors text-xs text-center border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
+                            <a href="quotation_list.php" class="flex-none bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-2 px-3 rounded-xl transition-colors text-[11px] text-center border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
                                 <i class="ph-bold ph-arrows-counter-clockwise text-sm"></i>
                             </a>
                         <?php endif; ?>
                     </div>
                 </div>
             </form>
-            
-            <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end">
-                <form method="POST">
-                    <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-                    <input type="hidden" name="client_id" value="<?= htmlspecialchars($f_client) ?>">
-                    <input type="hidden" name="status" value="<?= htmlspecialchars($f_status) ?>">
-                    <input type="hidden" name="start_date" value="<?= htmlspecialchars($f_start) ?>">
-                    <input type="hidden" name="end_date" value="<?= htmlspecialchars($f_end) ?>">
-                    <button type="submit" name="export_excel" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-5 rounded-xl transition-colors text-xs shadow-sm shadow-emerald-500/30 active:scale-95 flex items-center justify-center gap-2">
-                        <i class="ph-bold ph-file-csv text-base"></i> Export Item Details
-                    </button>
-                </form>
-            </div>
         </div>
     </div>
 
     <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in-up" style="animation-delay: 0.2s;">
-        <div class="overflow-x-auto custom-scrollbar w-full pb-20"> <table class="w-full text-left border-collapse whitespace-nowrap">
+        <div class="overflow-x-auto custom-scrollbar w-full pb-20">
+            <table class="w-full text-left border-collapse">
                 <thead class="bg-slate-50/80 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-black">
                     <tr>
-                        <th class="px-4 py-3">Quotation Info</th>
-                        <th class="px-4 py-3">Client Details</th>
-                        <th class="px-4 py-3">Package & Items</th>
-                        <th class="px-4 py-3 text-right">Amount</th>
-                        <th class="px-4 py-3 text-center">Status</th>
-                        <th class="px-4 py-3 text-center">Action</th>
+                        <th class="px-4 py-3 whitespace-nowrap w-[15%]">Quotation Info</th>
+                        <th class="px-4 py-3 w-[25%]">Client Details</th>
+                        <th class="px-4 py-3 w-[25%]">Package & Items</th>
+                        <th class="px-4 py-3 text-right whitespace-nowrap w-[15%]">Amount</th>
+                        <th class="px-4 py-3 text-center whitespace-nowrap w-[10%]">Status</th>
+                        <th class="px-4 py-3 text-center whitespace-nowrap w-[10%]">Action</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-xs">
@@ -284,7 +277,7 @@ $status_icons = [
                         ?>
                         <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/80 transition-colors group">
                             
-                            <td class="px-4 py-3 align-middle">
+                            <td class="px-4 py-3 align-middle whitespace-nowrap">
                                 <div class="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-[11px]">
                                     <?= htmlspecialchars($row['quotation_no']) ?>
                                 </div>
@@ -294,45 +287,45 @@ $status_icons = [
                             </td>
 
                             <td class="px-4 py-3 align-middle">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-[11px] truncate max-w-[180px]" title="<?= htmlspecialchars($row['company_name']) ?>">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-[11px] leading-tight line-clamp-2">
                                     <?= htmlspecialchars($row['company_name']) ?>
                                 </div>
-                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1 font-medium">
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1 font-medium">
                                     <i class="ph-fill ph-user-circle"></i> <?= htmlspecialchars($row['username']) ?>
                                 </div>
                             </td>
 
                             <td class="px-4 py-3 align-middle">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    <span class="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-500/20 whitespace-nowrap">
                                         <i class="ph-fill ph-cube"></i> <?= $countItem ?> Items
                                     </span>
-                                    <div class="flex gap-1">
-                                        <?php if(!empty($cardList)): ?>
-                                            <?php foreach($cardList as $ctype): ?>
-                                                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">
-                                                    <?= htmlspecialchars($ctype) ?>
-                                                </span>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </div>
+                                    <?php if(!empty($cardList)): ?>
+                                        <?php foreach($cardList as $ctype): ?>
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600 whitespace-nowrap">
+                                                <?= htmlspecialchars($ctype) ?>
+                                            </span>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <span class="text-slate-400 text-[10px] italic">-</span>
+                                    <?php endif; ?>
                                 </div>
                             </td>
 
-                            <td class="px-4 py-3 align-middle text-right">
+                            <td class="px-4 py-3 align-middle text-right whitespace-nowrap">
                                 <span class="text-[10px] font-bold text-slate-400 mr-0.5"><?= $row['currency'] ?></span>
-                                <span class="font-bold text-slate-800 dark:text-slate-200 text-[11px]">
+                                <span class="font-black text-slate-800 dark:text-slate-200 text-[11px]">
                                     <?= number_format($total, 0, ',', '.') ?>
                                 </span>
                             </td>
 
-                            <td class="px-4 py-3 align-middle text-center">
-                                <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest w-24 <?= $sStyle ?>">
+                            <td class="px-4 py-3 align-middle text-center whitespace-nowrap">
+                                <span class="inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest w-24 <?= $sStyle ?>">
                                     <i class="ph-fill <?= $sIcon ?> text-[11px]"></i> <?= str_replace('_', ' ', $st) ?>
                                 </span>
                             </td>
 
-                            <td class="px-4 py-3 align-middle text-center relative">
+                            <td class="px-4 py-3 align-middle text-center whitespace-nowrap relative">
                                 <button onclick="toggleActionMenu(<?= $row['id'] ?>)" class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-all shadow-sm active:scale-95 focus:outline-none">
                                     <i class="ph-bold ph-dots-three-vertical text-base"></i>
                                 </button>
