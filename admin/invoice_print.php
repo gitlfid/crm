@@ -162,7 +162,7 @@ function format_money($num, $is_intl) {
                 <table class="inner-table">
                     <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($inv['company_name']) ?></strong></td></tr>
                     <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($inv['c_address'])) ?></td></tr>
-                    <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($inv['pic_name']) ?> <br> <?= htmlspecialchars($inv['pic_phone']) ?></td></tr>
+                    <tr><td class="lbl">Attention</td><td class="sep">:</td><td><?= htmlspecialchars($inv['pic_name']) ?> <br> <?= htmlspecialchars($inv['pic_phone']) ?></td></tr>
                 </table>
             </td>
             <td class="info-box">
@@ -173,9 +173,9 @@ function format_money($num, $is_intl) {
                     <tr><td class="lbl">PO. Reference</td><td class="sep">:</td><td><?= $inv['po_number_client'] ?></td></tr>
                     <tr><td class="lbl">Currency</td><td class="sep">:</td><td><?= $inv['currency'] ?></td></tr>
                     <tr><td colspan="3" style="height:5px"></td></tr>
-                    <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= $inv['sales_name'] ?></td></tr>
+                    <tr><td class="lbl">Contact Person</td><td class="sep">:</td><td><?= $inv['sales_name'] ?></td></tr>
                     <tr><td class="lbl">Email</td><td class="sep">:</td><td><?= $inv['sales_email'] ?></td></tr>
-                    <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= $inv['sales_phone'] ?></td></tr>
+                    <tr><td class="lbl">Phone</td><td class="sep">:</td><td><?= $inv['sales_phone'] ?></td></tr>
                 </table>
             </td>
         </tr>
