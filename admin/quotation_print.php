@@ -5,7 +5,7 @@ if (!isset($_SESSION['user_id'])) die("Access Denied");
 
 $id = intval($_GET['id']);
 
-// 1. AMBIL DATA HEADER
+// 1. AMBIL DATA HEADER QUOTATION
 $sql = "SELECT q.*, 
                c.company_name, c.address as c_address, c.pic_name, c.pic_phone,
                u.username as sales_name, u.email as sales_email, u.phone as sales_phone, 
@@ -14,107 +14,114 @@ $sql = "SELECT q.*,
         JOIN clients c ON q.client_id = c.id
         JOIN users u ON q.created_by_user_id = u.id
         WHERE q.id = $id";
+$quo = $conn->query($sql)->fetch_assoc();
+if(!$quo) die("Quotation not found");
 
-$quot = $conn->query($sql)->fetch_assoc();
-if(!$quot) die("Quotation not found");
+// 2. AMBIL ITEM QUOTATION
+$itemsData = [];
+$resQ = $conn->query("SELECT item_name, qty, unit_price, card_type, description FROM quotation_items WHERE quotation_id = $id");
+while($row = $resQ->fetch_assoc()) { $itemsData[] = $row; }
 
-$items = $conn->query("SELECT * FROM quotation_items WHERE quotation_id = $id");
-
-// [BARU] AMBIL ADJUSTMENT
-$adjData = [];
-$checkTbl = $conn->query("SHOW TABLES LIKE 'quotation_adjustments'");
-if ($checkTbl && $checkTbl->num_rows > 0) {
-    $resAdj = $conn->query("SELECT * FROM quotation_adjustments WHERE quotation_id = $id");
-    while($row = $resAdj->fetch_assoc()) {
-        $adjData[] = $row;
-    }
-}
-
+// 3. AMBIL SETTINGS APLIKASI (Logo, Alamat Perusahaan)
 $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// --- FORMAT PINTAR ---
-function smart_format($num, $curr = 'IDR') {
-    $val = floatval($num);
-    if ($curr == 'IDR') {
-        return number_format($val, 0, ',', '.');
-    } else {
-        return number_format($val, 2, '.', ',');
+// ========================================================================
+// 4. LOGIKA PERMISSION EDIT NOTE (HANYA ADMIN & DIVISI FINANCE)
+// ========================================================================
+$user_id_session = $_SESSION['user_id'];
+$user_role_session = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 'standard';
+$is_finance = false;
+
+$cek_div = $conn->query("SELECT d.name FROM users u LEFT JOIN divisions d ON u.division_id = d.id WHERE u.id = $user_id_session");
+if ($cek_div && $cek_div->num_rows > 0) {
+    $row_div = $cek_div->fetch_assoc();
+    if (!empty($row_div['name']) && stripos($row_div['name'], 'finance') !== false) {
+        $is_finance = true;
     }
 }
+
+// Berikan hak 'contenteditable' JIKA user adalah Admin ATAU anggota divisi Finance
+$can_edit_note = ($user_role_session === 'admin' || $is_finance) ? 'contenteditable="true"' : '';
+
+
+// 5. SETTING CURRENCY & FORMATTING
+$is_intl = ($quo['currency'] !== 'IDR');
+function format_money($num, $is_intl) {
+    if ($is_intl) {
+        return number_format((float)$num, 2, '.', ','); 
+    } else {
+        return number_format((float)$num, 0, ',', '.');
+    }
+}
+
+// 6. DEFAULT REMARKS
+$remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the number quotation if open the PO\n- Please send the NPWP Company if open the PO";
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quotation <?= $quot['quotation_no'] ?></title>
+    <title>Quotation <?= $quo['quotation_no'] ?></title>
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 11px; margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; }
-        @page { margin: 1.5cm; size: A4; }
         
+        /* Set Kertas Landscape Sesuai Standar Quotation */
+        @page { margin: 1cm; size: A4 landscape; }
+
         .no-print { background: #f8f9fa; padding: 10px; text-align: center; border-bottom: 1px solid #ddd; }
         .btn-print { background: #0d6efd; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        
+        /* Efek kuning saat area bisa diedit di-hover */
         [contenteditable="true"]:hover { background-color: #fffdd0; outline: 1px dashed #999; cursor: text; }
 
-        .watermark-container { position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%); width: 80%; z-index: -1000; opacity: 0.08; pointer-events: none; }
-        .watermark-img { width: 100%; height: auto; }
+        .header-table { width: 100%; margin-bottom: 15px; }
+        .logo { max-height: 50px; margin-bottom: 5px; }
+        .company-addr { font-size: 10px; color: #333; max-width: 350px; line-height: 1.3; }
+        .doc-title { text-align: right; font-size: 24px; font-weight: bold; text-transform: uppercase; vertical-align: bottom; }
+
+        .info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1px solid #000; }
+        .info-table td { border: 1px solid #000; padding: 8px; vertical-align: top; width: 50%; }
         
-        .header-table { width: 100%; margin-bottom: 20px; }
-        .logo { max-height: 60px; margin-bottom: 5px; }
-        .doc-title { text-align: right; font-size: 24px; font-weight: bold; text-transform: uppercase; padding-top: 20px; }
-        
-        .info-wrapper { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; border: 1px solid #000; }
-        .info-box { width: 50%; padding: 10px; vertical-align: top; }
-        .border-right { border-right: 1px solid #000; }
-        .inner-table { width: 100%; font-size: 11px; }
-        .inner-table td { padding-bottom: 3px; vertical-align: top; }
-        .lbl { width: 80px; font-weight: bold; } 
-        .sep { width: 10px; text-align: center; }
-        
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+        .inner-info { width: 100%; font-size: 11px; border-collapse: collapse; }
+        .inner-info td { padding: 2px 0; vertical-align: top; }
+        .lbl { width: 70px; font-weight: bold; }
+        .sep { width: 15px; text-align: center; }
+
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; border: 1px solid #000; }
         .items-table th { border: 1px solid #000; background-color: #f2f2f2; padding: 8px; text-align: center; font-weight: bold; }
-        .items-table td { border: 1px solid #000; padding: 6px 8px; vertical-align: middle; }
+        .items-table td { border: 1px solid #000; padding: 8px; vertical-align: middle; }
         .text-center { text-align: center; }
         .text-right { text-align: right; }
-        
-        .summary-row td { border: 1px solid #000; padding: 6px 8px; font-weight: bold; }
-        .label-cell { background-color: #fff; text-align: right; }
-        .value-cell { text-align: right; }
-        .border-none { border: none !important; }
 
-        .remark-box { margin-top: 15px; font-size: 10px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 10px; }
-        .remark-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; display: block; }
-        
-        /* SIGNATURE STYLE */
-        .sign-table { width: 100%; margin-top: 40px; page-break-inside: avoid; }
-        .sign-cell { text-align: center; vertical-align: bottom; }
-        .sign-img { 
-            display: block; margin: 10px auto; 
-            width: auto; height: auto; 
-            max-width: 250px; max-height: 120px; 
-            object-fit: contain; 
-        }
+        .footer-table { width: 100%; margin-top: 20px; page-break-inside: avoid; }
+        .footer-table td { vertical-align: top; }
+        .footer-left { width: 60%; }
+        .footer-right { width: 40%; text-align: center; padding-top: 20px; }
+
+        .remarks-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; display: inline-block; }
+        .sign-company { font-size: 11px; margin-bottom: 10px; }
+        .sign-img { display: block; margin: 10px auto; max-width: 150px; max-height: 80px; object-fit: contain; }
         .sign-name { font-weight: bold; text-decoration: underline; }
-        .no-sign-box { height: 100px; line-height: 100px; color: #ccc; border: 1px dashed #ccc; margin: 10px auto; width: 180px; font-size: 10px; }
-        
-        @media print { 
+        .no-sign-box { height: 60px; line-height:60px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:100px; font-size: 10px; }
+
+        @media print {
             .no-print { display: none; }
             [contenteditable="true"]:hover { background: none; outline: none; }
         }
     </style>
 </head>
-<body>
+<body onload="window.print()">
 
     <div class="no-print">
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
-        <div style="margin-top:5px; color:red; font-size:11px;">* Klik angka untuk edit manual sebelum print.</div>
-    </div>
-
-    <div class="watermark-container">
-        <img src="../uploads/<?= $sets['company_watermark'] ?>" class="watermark-img" onerror="this.style.display='none'">
+        <div style="margin-top:5px; color:red; font-size:11px;">
+            * Klik area teks (seperti Remarks, Harga, Dll) untuk edit manual sebelum print.<br>
+            <span style="color:#666;">(Hak Edit diberikan otomatis khusus Admin & Divisi Finance)</span>
+        </div>
     </div>
 
     <table class="header-table">
@@ -123,28 +130,27 @@ function smart_format($num, $curr = 'IDR') {
                 <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
                 <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
             </td>
-            <td align="right" valign="top"><div class="doc-title">QUOTATION</div></td>
+            <td align="right" valign="bottom"><div class="doc-title">QUOTATION</div></td>
         </tr>
     </table>
 
-    <table class="info-wrapper">
+    <table class="info-table">
         <tr>
-            <td class="info-box border-right">
-                <table class="inner-table">
-                    <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($quot['company_name']) ?></strong></td></tr>
-                    <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($quot['c_address'])) ?></td></tr>
-                    <tr><td class="lbl">Attn.</td><td class="sep">:</td><td><?= htmlspecialchars($quot['pic_name']) ?> (<?= htmlspecialchars($quot['pic_phone']) ?>)</td></tr>
+            <td>
+                <table class="inner-info">
+                    <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($quo['company_name']) ?></strong></td></tr>
+                    <tr><td class="lbl">Address</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= nl2br(htmlspecialchars($quo['c_address'])) ?></td></tr>
+                    <tr><td class="lbl">Attn.</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= htmlspecialchars($quo['pic_name']) ?> <?= !empty($quo['pic_phone']) ? "(".htmlspecialchars($quo['pic_phone']).")" : "" ?></td></tr>
                 </table>
             </td>
-            <td class="info-box">
-                <table class="inner-table">
-                    <tr><td class="lbl">Quotation</td><td class="sep">:</td><td><strong><?= $quot['quotation_no'] ?></strong></td></tr>
-                    <tr><td class="lbl">Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($quot['quotation_date'])) ?></td></tr>
-                    <tr><td class="lbl">Currency</td><td class="sep">:</td><td><?= $quot['currency'] ?></td></tr>
-                    <tr><td colspan="3" style="height:5px"></td></tr>
-                    <tr><td class="lbl">Contact</td><td class="sep">:</td><td><?= $quot['sales_name'] ?></td></tr>
-                    <tr><td class="lbl">Email</td><td class="sep">:</td><td><?= $quot['sales_email'] ?></td></tr>
-                    <tr><td class="lbl">Tel</td><td class="sep">:</td><td><?= $quot['sales_phone'] ?></td></tr>
+            <td>
+                <table class="inner-info">
+                    <tr><td class="lbl">Quotation</td><td class="sep">:</td><td><strong><?= $quo['quotation_no'] ?></strong></td></tr>
+                    <tr><td class="lbl">Date</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= date('d/m/Y', strtotime($quo['quotation_date'])) ?></td></tr>
+                    <tr><td class="lbl">Currency</td><td class="sep">:</td><td><?= $quo['currency'] ?></td></tr>
+                    <tr><td class="lbl">Contact</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= htmlspecialchars($quo['sales_name']) ?></td></tr>
+                    <tr><td class="lbl">Email</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= htmlspecialchars($quo['sales_email']) ?></td></tr>
+                    <tr><td class="lbl">Tel</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= htmlspecialchars($quo['sales_phone']) ?></td></tr>
                 </table>
             </td>
         </tr>
@@ -154,107 +160,61 @@ function smart_format($num, $curr = 'IDR') {
         <thead>
             <tr>
                 <th width="5%">No</th>
-                <th width="35%">Item</th>
-                <th width="8%">Qty</th>
-                <th width="15%">Unit Price (<?= $quot['currency'] ?>)</th>
-                <th width="20%">Description</th>
-                <th width="17%">Charge Mode</th>
+                <th width="30%">Item</th>
+                <th width="10%">Qty</th>
+                <th width="15%">Unit Price (<?= $quo['currency'] ?>)</th>
+                <th width="25%">Description</th>
+                <th width="15%">Charge Mode</th>
             </tr>
         </thead>
         <tbody>
-            <?php 
-                $no = 1; 
-                $totalQuot = 0;
-                while($item = $items->fetch_assoc()): 
-                    $sub = $item['qty'] * $item['unit_price'];
-                    $totalQuot += $sub;
-            ?>
+            <?php $no = 1; foreach($itemsData as $item): ?>
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
-                <td><div contenteditable="true"><?= htmlspecialchars($item['item_name']) ?></div></td>
-                <td class="text-center" contenteditable="true"><?= smart_format($item['qty'], $quot['currency']) ?></td>
-                <td class="text-right" contenteditable="true"><?= smart_format($item['unit_price'], $quot['currency']) ?></td>
-                <td><div contenteditable="true"><?= htmlspecialchars($item['description']) ?></div></td>
-                <td class="text-center" contenteditable="true"><?= htmlspecialchars($item['card_type']) ?></td>
-            </tr>
-            <?php endwhile; ?>
-
-            <!-- <tr class="summary-row">
-                <td colspan="4" class="border-none"></td>
-                <td class="label-cell">Total</td>
-                <td class="value-cell" contenteditable="true"><?= smart_format($totalQuot, $quot['currency']) ?></td>
-            </tr> -->
-
-            <?php foreach($adjData as $adj): ?>
-            <tr class="summary-row">
-                <td colspan="4" class="border-none"></td>
-                <td class="label-cell" style="font-weight:normal; font-style:italic;" contenteditable="true"><?= htmlspecialchars($adj['label']) ?></td>
-                <td class="value-cell" style="font-weight:normal;" contenteditable="true"><?= smart_format($adj['amount'], $quot['currency']) ?></td>
+                <td <?= $can_edit_note ?>><?= htmlspecialchars($item['item_name']) ?></td>
+                <td class="text-center" <?= $can_edit_note ?>><?= floatval($item['qty']) ?></td> 
+                <td class="text-right" <?= $can_edit_note ?>><?= format_money($item['unit_price'], $is_intl) ?></td>
+                <td <?= $can_edit_note ?>><?= htmlspecialchars($item['description']) ?></td>
+                <td class="text-center" <?= $can_edit_note ?>><?= htmlspecialchars($item['card_type']) ?></td>
             </tr>
             <?php endforeach; ?>
-
         </tbody>
     </table>
 
-    <div class="remark-box">
-        <span class="remark-title">REMARKS :</span>
-        <div contenteditable="true">
-        <?php 
-        if (!empty($quot['remarks'])) {
-            echo nl2br(htmlspecialchars($quot['remarks']));
-        } else {
-            echo "- Please required the number quotation if open the PO<br>";
-            echo "- Please send the NPWP Company if open the PO";
-        }
-        ?>
-        </div>
-    </div>
-
-    <table class="sign-table">
+    <table class="footer-table">
         <tr>
-            <td width="60%"></td>
-            <td width="40%" class="sign-cell">
-                <div style="margin-bottom: 10px;">PT. Linksfield Networks Indonesia</div>
-                
+            <td class="footer-left">
+                <div class="remarks-title">REMARKS :</div>
+                <div <?= $can_edit_note ?> style="line-height: 1.5; white-space: pre-wrap;"><?= htmlspecialchars($remarks) ?></div>
+            </td>
+            <td class="footer-right">
+                <div class="sign-company">PT. Linksfield Networks Indonesia</div>
                 <?php 
-                    $signPath = '';
-                    $dbFile = $quot['sales_sign'];
-                    $userId = $quot['created_by_user_id']; 
-
-                    if (!empty($dbFile) && file_exists('../uploads/signatures/' . $dbFile)) {
-                        $signPath = '../uploads/signatures/' . $dbFile;
-                    } 
-                    elseif (!empty($userId)) {
-                        $files = glob('../uploads/signatures/SIG_*_' . $userId . '_*.png');
-                        if ($files && count($files) > 0) {
-                            $signPath = $files[0]; 
+                    $signPath = ''; $signerName = 'Niawati'; $baseDir = dirname(__DIR__);
+                    $sqlNia = "SELECT id, username, signature_file FROM users WHERE username LIKE '%Niawati%' OR email LIKE '%nia@%' LIMIT 1";
+                    $resNia = $conn->query($sqlNia);
+                    $nia = $resNia->fetch_assoc();
+                    if ($nia) {
+                        $signerName = $nia['username']; $niaId = $nia['id'];
+                        if (!empty($nia['signature_file']) && file_exists($baseDir . '/uploads/signatures/' . $nia['signature_file'])) {
+                            $signPath = '../uploads/signatures/' . $nia['signature_file'];
+                        } elseif (count(glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png')) > 0) {
+                            $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png');
+                            $signPath = '../uploads/signatures/' . basename($files[0]);
                         }
                     }
-
-                    if (empty($signPath) && !empty($userId)) {
-                        $files = glob('../uploads/SIG_*_' . $userId . '_*.png');
-                        if ($files && count($files) > 0) {
-                            $signPath = $files[0];
-                        }
-                    }
-
-                    if (empty($signPath) && file_exists('../assets/images/signature.png')) {
+                    if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
                         $signPath = '../assets/images/signature.png';
                     }
                 ?>
-
                 <?php if (!empty($signPath)): ?>
                     <img src="<?= $signPath ?>" class="sign-img">
                 <?php else: ?>
-                    <div class="no-sign-box">
-                        <span style="font-size:9px; color:red;">(Signature Not Found)</span>
-                    </div>
+                    <div class="no-sign-box"><span style="font-size:9px; color:red;">(Signature Not Found)</span></div>
                 <?php endif; ?>
-
-                <div class="sign-name" contenteditable="true"><?= htmlspecialchars($quot['sales_name']) ?></div>
+                <div class="sign-name" <?= $can_edit_note ?>><?= htmlspecialchars($signerName) ?></div>
             </td>
         </tr>
     </table>
-
 </body>
 </html>
