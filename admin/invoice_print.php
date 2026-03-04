@@ -52,26 +52,30 @@ $is_international = ($inv_type == 'International');
 // A. SETTING PAJAK
 $tax_rate = $is_international ? 0 : 0.11;
 
-// B. SETTING PAYMENT DETAILS & NOTE
+// B. SETTING PAYMENT DETAILS & NOTE (Diubah menjadi Array agar mudah dibuat tabel yang sejajar)
 if ($is_international) {
     $payment_title = "Payment Method (USD)";
     $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
-    $payment_details = "Banking Nation      : Indonesia\n" .
-                       "Bank Name           : PT. Bank Central Asia (BCA)\n" .
-                       "Bank Address        : Jl. M. H. Thamrin No. 1 Kec. Menteng, Kota Jakarta Pusat, DKI Jakarta\n" .
-                       "SWIFT CODE          : CENAIDJAXXX\n" .
-                       "Acc No              : 2060802761\n" .
-                       "Acc Name            : PT Linksfield Networks Indonesia\n" .
-                       "Settlement Currency : USD";
+    $payment_details = [
+        "Banking Nation"      => "Indonesia",
+        "Bank Name"           => "PT. Bank Central Asia (BCA)",
+        "Bank Address"        => "Jl. M. H. Thamrin No. 1 Kec. Menteng, Kota Jakarta Pusat, DKI Jakarta",
+        "SWIFT CODE"          => "CENAIDJAXXX",
+        "Acc No"              => "2060802761",
+        "Acc Name"            => "PT Linksfield Networks Indonesia",
+        "Settlement Currency" => "USD"
+    ];
 } else {
     $payment_title = "Payment Method (IDR)";
     $final_note = isset($sets['invoice_note_default']) ? $sets['invoice_note_default'] : '';
     $special_note_usd = ""; 
-    $payment_details = "Acc Name        : PT. LINKSFIELD NETWORKS INDONESIA\n" .
-                       "Bank Name       : BCA (Bank Central Asia)\n" .
-                       "Acc No          : 2060752705\n" .
-                       "SWIFT CODE      : CENAIDJA\n" .
-                       "Bank Address    : Jl. M. H. Thamrin No. 1 Kec. Menteng";
+    $payment_details = [
+        "Acc Name"     => "PT. LINKSFIELD NETWORKS INDONESIA",
+        "Bank Name"    => "BCA (Bank Central Asia)",
+        "Acc No"       => "2060752705",
+        "SWIFT CODE"   => "CENAIDJA",
+        "Bank Address" => "Jl. M. H. Thamrin No. 1 Kec. Menteng"
+    ];
 }
 
 // FORMAT ANGKA
@@ -232,7 +236,6 @@ function format_money($num, $is_intl) {
                     $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
                 }
                 
-                // Total tidak ditambah Adjustment karena Adjustment hanya info Termin / DP
                 $totalInvoice = $grandTotal + $vatAmount;
             ?>
             
@@ -284,10 +287,16 @@ function format_money($num, $is_intl) {
                 </div>
 
                 <div style="font-size: 11px;">
-                    <span style="font-weight: bold; margin-bottom: 5px; display: block;"><?= $payment_title ?></span>
-                    <div style="line-height: 1.5; white-space: pre-line;" contenteditable="true">
-                        <?= htmlspecialchars($payment_details) ?>
-                    </div>
+                    <span style="font-weight: bold; margin-bottom: 2px; display: block;"><?= $payment_title ?></span>
+                    <table style="width: 100%; font-size: 11px; line-height: 1.4; border-collapse: collapse;" contenteditable="true">
+                        <?php foreach($payment_details as $label => $value): ?>
+                        <tr>
+                            <td style="width: 100px; vertical-align: top; padding-bottom: 2px;"><?= htmlspecialchars($label) ?></td>
+                            <td style="width: 15px; vertical-align: top; text-align: center; padding-bottom: 2px;">:</td>
+                            <td style="vertical-align: top; padding-bottom: 2px;"><?= htmlspecialchars($value) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </table>
                 </div>
             </td>
 
