@@ -45,6 +45,23 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
+// 5. CEK PERMISSION UNTUK EDIT NOTE (Hanya Admin & Divisi Finance)
+$user_id_session = $_SESSION['user_id'];
+$user_role_session = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 'standard';
+$is_finance = false;
+
+$cek_div = $conn->query("SELECT d.name FROM users u LEFT JOIN divisions d ON u.division_id = d.id WHERE u.id = $user_id_session");
+if ($cek_div && $cek_div->num_rows > 0) {
+    $row_div = $cek_div->fetch_assoc();
+    if (!empty($row_div['name']) && stripos($row_div['name'], 'finance') !== false) {
+        $is_finance = true;
+    }
+}
+
+// Berikan hak 'contenteditable' jika user adalah Admin atau divisi Finance
+$can_edit_note = ($user_role_session === 'admin' || $is_finance) ? 'contenteditable="true"' : '';
+
+
 // --- LOGIKA TIPE INVOICE (DOMESTIC / INTERNATIONAL) ---
 $inv_type = isset($inv['invoice_type']) ? $inv['invoice_type'] : 'Domestic'; 
 $is_international = ($inv_type == 'International');
@@ -52,7 +69,7 @@ $is_international = ($inv_type == 'International');
 // A. SETTING PAJAK
 $tax_rate = $is_international ? 0 : 0.11;
 
-// B. SETTING PAYMENT DETAILS & NOTE (Diubah menjadi Array agar mudah dibuat tabel yang sejajar)
+// B. SETTING PAYMENT DETAILS & NOTE (Format Array agar bisa dirender ke tabel sejajar)
 if ($is_international) {
     $payment_title = "Payment Method (USD)";
     $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
@@ -276,11 +293,11 @@ function format_money($num, $is_intl) {
                 <div style="font-style: italic; font-size: 10px; margin-bottom: 20px;">
                     <strong>Note :</strong><br>
                     <?php if($is_international): ?>
-                        <div style="margin-bottom:5px; color:#000;">
+                        <div <?= $can_edit_note ?> style="margin-bottom:5px; color:#000;">
                             <?= $special_note_usd ?>
                         </div>
                     <?php else: ?>
-                        <div contenteditable="true" style="margin-bottom:5px; color:#000;">
+                        <div <?= $can_edit_note ?> style="margin-bottom:5px; color:#000;">
                             <?= nl2br(htmlspecialchars($final_note)) ?>
                         </div>
                     <?php endif; ?>
@@ -288,10 +305,10 @@ function format_money($num, $is_intl) {
 
                 <div style="font-size: 11px;">
                     <span style="font-weight: bold; margin-bottom: 2px; display: block;"><?= $payment_title ?></span>
-                    <table style="width: 100%; font-size: 11px; line-height: 1.4; border-collapse: collapse;" contenteditable="true">
+                    <table style="width: 100%; font-size: 11px; line-height: 1.4; border-collapse: collapse;" <?= $can_edit_note ?>>
                         <?php foreach($payment_details as $label => $value): ?>
                         <tr>
-                            <td style="width: 100px; vertical-align: top; padding-bottom: 2px;"><?= htmlspecialchars($label) ?></td>
+                            <td style="width: 90px; vertical-align: top; padding-bottom: 2px;"><?= htmlspecialchars($label) ?></td>
                             <td style="width: 15px; vertical-align: top; text-align: center; padding-bottom: 2px;">:</td>
                             <td style="vertical-align: top; padding-bottom: 2px;"><?= htmlspecialchars($value) ?></td>
                         </tr>
