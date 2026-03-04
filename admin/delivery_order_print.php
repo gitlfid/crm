@@ -172,10 +172,6 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                             <td><div contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div></td>
                         </tr>
                         <tr>
-                            <td class="lbl">Contact</td><td class="sep">:</td>
-                            <td><div contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div></td>
-                        </tr>
-                        <tr>
                             <td class="lbl">Phone</td><td class="sep">:</td>
                             <td><div contenteditable="true"><?= htmlspecialchars($display_phone ?? '') ?></div></td>
                         </tr>
@@ -191,6 +187,10 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                         <tr>
                             <td class="lbl">Delivery No</td><td class="sep">:</td>
                             <td><strong contenteditable="true"><?= $do['do_number'] ?? '-' ?></strong></td>
+                        </tr>
+                         <tr>
+                            <td class="lbl">Contact</td><td class="sep">:</td>
+                            <td><div contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div></td>
                         </tr>
                     </table>
                 </td>
