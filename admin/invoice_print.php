@@ -56,22 +56,22 @@ $tax_rate = $is_international ? 0 : 0.11;
 if ($is_international) {
     $payment_title = "Payment Method (USD)";
     $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
-    $payment_details = "Banking Nation : Indonesia\n" .
-                       "Bank Name : PT. Bank Central Asia (BCA)\n" .
-                       "Bank Address : Jl. M. H. Thamrin No. 1 Kec. Menteng, Kota Jakarta Pusat, DKI Jakarta\n" .
-                       "SWIFT CODE : CENAIDJAXXX\n" .
-                       "Acc No : 2060802761\n" .
-                       "Acc Name : PT Linksfield Networks Indonesia\n" .
+    $payment_details = "Banking Nation      : Indonesia\n" .
+                       "Bank Name           : PT. Bank Central Asia (BCA)\n" .
+                       "Bank Address        : Jl. M. H. Thamrin No. 1 Kec. Menteng, Kota Jakarta Pusat, DKI Jakarta\n" .
+                       "SWIFT CODE          : CENAIDJAXXX\n" .
+                       "Acc No              : 2060802761\n" .
+                       "Acc Name            : PT Linksfield Networks Indonesia\n" .
                        "Settlement Currency : USD";
 } else {
     $payment_title = "Payment Method (IDR)";
     $final_note = isset($sets['invoice_note_default']) ? $sets['invoice_note_default'] : '';
     $special_note_usd = ""; 
-    $payment_details = "Acc Name : PT. LINKSFIELD NETWORKS INDONESIA\n" .
-                       "Bank Name : BCA (Bank Central Asia)\n" .
-                       "Acc No : 2060752705\n" .
-                       "SWIFT CODE : CENAIDJA\n" .
-                       "Bank Address : Jl. M. H. Thamrin No. 1 Kec. Menteng";
+    $payment_details = "Acc Name        : PT. LINKSFIELD NETWORKS INDONESIA\n" .
+                       "Bank Name       : BCA (Bank Central Asia)\n" .
+                       "Acc No          : 2060752705\n" .
+                       "SWIFT CODE      : CENAIDJA\n" .
+                       "Bank Address    : Jl. M. H. Thamrin No. 1 Kec. Menteng";
 }
 
 // FORMAT ANGKA
