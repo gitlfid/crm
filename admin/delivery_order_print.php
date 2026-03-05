@@ -190,7 +190,7 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                         </tr>
                          <tr>
                             <td class="lbl">Contact Person</td><td class="sep">:</td>
-                            <td class="sep"><div contenteditable="true"><?= htmlspecialchars('Niawati') ?></div></td>
+                            <td><div contenteditable="true" class="sep"><?= htmlspecialchars('Niawati') ?></div></td>
                         </tr>
                         <tr>
                             <td class="lbl">Email</td><td class="sep">:</td><td>Nia@linksfield.net</td>
