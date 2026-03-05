@@ -343,9 +343,9 @@ function getSpelledOutNumber($number) {
                 
                 $totalInvoice = $grandTotal + $vatAmount;
                 
-                // MENGUBAH TOTAL INVOICE MENJADI TERBILANG
+                // MENGUBAH TOTAL INVOICE MENJADI TERBILANG (TANPA KATA "ONLY" DAN TANPA PAGAR)
                 $currency_text = $is_international ? ($inv['currency'] == 'USD' ? "US Dollars" : $inv['currency']) : "Rupiah";
-                $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text . " Only";
+                $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text;
             ?>
             
             <tr class="summary-row">
@@ -386,7 +386,7 @@ function getSpelledOutNumber($number) {
                 <div style="font-size: 11px; margin-bottom: 15px;">
                     <span style="font-weight: bold;">Amount in words :</span><br>
                     <div <?= $can_edit_note ?> style="font-style: italic; margin-top: 3px; line-height: 1.4; max-width: 90%;">
-                        # <?= htmlspecialchars($amountInWords) ?> #
+                        <?= htmlspecialchars($amountInWords) ?>
                     </div>
                 </div>
 
