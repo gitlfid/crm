@@ -45,7 +45,7 @@ $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 
-// 5. CEK PERMISSION UNTUK EDIT NOTE (Hanya Admin & Divisi Finance)
+// 5. CEK PERMISSION UNTUK EDIT NOTE & TOTAL (Hanya Admin & Divisi Finance)
 $user_id_session = $_SESSION['user_id'];
 $user_role_session = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 'standard';
 $is_finance = false;
@@ -280,7 +280,7 @@ function format_money($num, $is_intl) {
 
             <tr class="summary-row">
                 <td colspan="4" class="border-none"></td>
-                <td class="label-cell">Total</td>
+                <td class="label-cell" <?= $can_edit_note ?>>Total</td>
                 <td class="value-cell" contenteditable="true"><?= format_money($totalInvoice, $is_international) ?></td>
             </tr>
 
