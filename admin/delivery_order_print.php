@@ -189,11 +189,11 @@ while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_val
                             <td><strong contenteditable="true"><?= $do['do_number'] ?? '-' ?></strong></td>
                         </tr>
                          <tr>
-                            <td class="lbl">Contact Person</td><td class="sep">: Nia</td>
+                            <td class="lbl">Contact Person</td><td class="sep">:</td><td class="sep">Nia</td>
                             <!-- <td><div contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div></td> -->
                         </tr>
                         <tr>
-                            <td class="lbl">Email</td><td class="sep">: Nia@linksfield.net</td>
+                            <td class="lbl">Email</td><td class="sep">:</td><td class="sep">Nia@linksfield.net</td>
                             <!-- <td><div contenteditable="true"><?= htmlspecialchars($display_pic ?? '') ?></div></td> -->
                         </tr>
                     </table>
