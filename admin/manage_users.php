@@ -11,7 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Load Konfigurasi & Fungsi DULUAN (Best Practice)
 require_once '../config/database.php'; 
-include '../config/functions.php'; 
+// include '../config/functions.php'; // Sesuaikan jika ada fungsi eksternal
 
 // --- PERMISSION CHECK ---
 $can_access = false;
@@ -78,7 +78,7 @@ function setTailwindMsg($type, $text, $icon) {
         'warning' => 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400'
     ];
     $c = $colors[$type];
-    return "<div class='p-4 mb-6 rounded-xl border flex items-center gap-3 text-sm font-bold shadow-sm animate-fade-in-up $c'><i class='ph-fill $icon text-xl'></i> $text</div>";
+    return "<div class='p-4 mb-6 rounded-2xl border flex items-center gap-4 text-sm font-bold shadow-sm animate-fade-in-up $c'><div class='w-10 h-10 rounded-full bg-white/50 dark:bg-black/20 flex items-center justify-center shrink-0'><i class='ph-fill $icon text-xl'></i></div> <div>$text</div></div>";
 }
 
 // =========================================
@@ -107,7 +107,7 @@ if (isset($_POST['add_user'])) {
     
     if (empty($msg)) {
         $cek = $conn->query("SELECT id FROM users WHERE email = '$email' OR username = '$username'");
-        if($cek->num_rows > 0) {
+        if($cek && $cek->num_rows > 0) {
             $msg = setTailwindMsg('danger', 'Username atau Email sudah terdaftar!', 'ph-warning-circle');
         } else {
             $pass_raw = generateRandomPassword(10);
@@ -118,7 +118,7 @@ if (isset($_POST['add_user'])) {
             
             if ($conn->query($sql)) {
                 if (function_exists('sendEmailNotification')) {
-                    $emailSubject = "Selamat Datang di Helpdesk System";
+                    $emailSubject = "Selamat Datang di System";
                     $emailBody = "Halo $username,<br><br>Akun Anda telah dibuat.<br><strong>Email:</strong> $email_clean<br><strong>Password:</strong> $pass_raw<br><br>Silakan login dan segera ganti password Anda.";
                     sendEmailNotification($email_clean, $emailSubject, $emailBody);
                 }
@@ -164,9 +164,9 @@ if (isset($_POST['reset_password'])) {
         $new_hash = password_hash($new_pass, PASSWORD_DEFAULT);
         if ($conn->query("UPDATE users SET password='$new_hash', must_change_password=1 WHERE id=$id")) {
             if (function_exists('sendEmailNotification')) {
-                sendEmailNotification(trim($uData['email']), "Reset Password Helpdesk", "Password baru Anda: $new_pass <br><br> Harap segera login dan ganti password ini.");
+                sendEmailNotification(trim($uData['email']), "Reset Password", "Password baru Anda: $new_pass <br><br> Harap segera login dan ganti password ini.");
             }
-            $msg = setTailwindMsg('warning', 'Password berhasil direset. Password baru telah dikirim ke email user.', 'ph-key');
+            $msg = setTailwindMsg('warning', 'Password berhasil direset. Password baru telah dibuat (cek email user).', 'ph-key');
         }
     }
 }
@@ -183,10 +183,12 @@ if (isset($_POST['delete_user'])) {
 }
 
 // --- FETCH DATA ---
-$users = $conn->query("SELECT u.*, d.name as div_name FROM users u LEFT JOIN divisions d ON u.division_id = d.id ORDER BY u.id DESC");
+$users = $conn->query("SELECT u.*, d.name as div_name FROM users u LEFT JOIN divisions d ON u.division_id = d.id ORDER BY u.role ASC, u.id DESC");
 $divisions = []; 
 $dRes = $conn->query("SELECT * FROM divisions");
-while($d = $dRes->fetch_assoc()) $divisions[] = $d;
+if($dRes) {
+    while($d = $dRes->fetch_assoc()) $divisions[] = $d;
+}
 
 // --- LOAD VIEWS ---
 $page_title = "Manage Users";
@@ -195,124 +197,145 @@ include 'includes/sidebar.php';
 ?>
 
 <style>
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
-    .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+    .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .modern-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+    .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .modern-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .dark .modern-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
 </style>
 
-<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto min-h-screen bg-slate-50 dark:bg-[#1A222C] transition-colors duration-300">
+<div class="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto space-y-6 animate-fade-in-up">
     
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 animate-fade-in-up">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-2">
         <div>
-            <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Manage Users</h1>
-            <p class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Kelola daftar pengguna, atur hak akses peran (Role), dan kuota cuti staf.</p>
+            <h1 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 flex items-center justify-center text-xl shadow-inner">
+                    <i class="ph-bold ph-users-three"></i>
+                </div>
+                Manage Users
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Kelola daftar pengguna, atur hak akses peran (Role), dan kuota cuti staf.</p>
         </div>
-        <button onclick="openModal('addUserModal')" class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-indigo-600/30 transition-all transform hover:-translate-y-0.5 active:scale-95 whitespace-nowrap">
-            <i class="ph-bold ph-user-plus text-lg"></i> Tambah User
-        </button>
+        <div class="flex items-center gap-3">
+            <button onclick="openModal('addUserModal')" class="group inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-1 active:scale-95 whitespace-nowrap overflow-hidden relative">
+                <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+                <i class="ph-bold ph-user-plus text-lg relative z-10"></i> 
+                <span class="relative z-10">Tambah User</span>
+            </button>
+        </div>
     </div>
 
     <?= $msg ?>
 
-    <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-fade-in-up" style="animation-delay: 0.1s;">
-        <div class="overflow-x-auto custom-scrollbar w-full pb-10">
-            <table class="w-full text-left border-collapse whitespace-nowrap">
-                <thead class="bg-slate-50/80 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-black">
+    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300">
+        <div class="overflow-x-auto modern-scrollbar w-full">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50/50 dark:bg-slate-800/30">
                     <tr>
-                        <th class="px-5 py-3.5">Full Name & Email</th>
-                        <th class="px-5 py-3.5">Role & Division</th>
-                        <th class="px-5 py-3.5">Job Title</th>
-                        <th class="px-5 py-3.5 text-center">Leave Quota</th>
-                        <th class="px-5 py-3.5 text-center">Status Pass</th>
-                        <th class="px-5 py-3.5 text-center">Sign</th>
-                        <th class="px-5 py-3.5 text-center">Actions</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">User Profile</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Role & Division</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Job Title</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Quota</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Security</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Sign</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-[11px]">
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50">
                     <?php if($users && $users->num_rows > 0): ?>
                         <?php while($row = $users->fetch_assoc()): ?>
-                        <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/80 transition-colors group">
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
-                            <td class="px-5 py-3 align-middle">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black text-sm shrink-0 border border-indigo-100 dark:border-indigo-500/20">
+                            <td class="px-6 py-4 align-middle">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-100 to-indigo-50 dark:from-indigo-500/20 dark:to-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black text-sm uppercase shrink-0 ring-2 ring-white dark:ring-[#24303F] shadow-sm">
                                         <?= strtoupper(substr($row['username'], 0, 1)) ?>
                                     </div>
                                     <div>
-                                        <div class="font-bold text-slate-800 dark:text-slate-200 text-xs mb-0.5">
+                                        <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-0.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                                             <?= htmlspecialchars($row['username']) ?>
                                         </div>
-                                        <div class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                        <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                            <i class="ph-fill ph-envelope-simple text-slate-400"></i>
                                             <?= htmlspecialchars($row['email']) ?>
                                         </div>
                                     </div>
                                 </div>
                             </td>
 
-                            <td class="px-5 py-3 align-middle">
-                                <?php if($row['role'] == 'admin'): ?>
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 mb-1">
-                                        ADMIN
-                                    </span>
-                                <?php else: ?>
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 mb-1">
-                                        STANDARD
-                                    </span>
-                                <?php endif; ?>
-                                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
-                                    <?= $row['div_name'] ?? '- NO DIVISION -' ?>
+                            <td class="px-6 py-4 align-middle">
+                                <div class="flex flex-col items-start gap-1.5">
+                                    <?php if($row['role'] == 'admin'): ?>
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20">
+                                            <i class="ph-fill ph-shield-check"></i> ADMIN
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20">
+                                            <i class="ph-fill ph-user"></i> STANDARD
+                                        </span>
+                                    <?php endif; ?>
+                                    
+                                    <div class="text-xs text-slate-600 dark:text-slate-400 font-bold truncate max-w-[150px]" title="<?= htmlspecialchars($row['div_name'] ?? 'No Division') ?>">
+                                        <?= htmlspecialchars($row['div_name'] ?? '- NO DIVISION -') ?>
+                                    </div>
                                 </div>
                             </td>
 
-                            <td class="px-5 py-3 align-middle">
-                                <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-600 text-[10px]">
+                            <td class="px-6 py-4 align-middle">
+                                <span class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-700/50 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-600 text-xs">
                                     <?= htmlspecialchars($row['job_title']) ?>
                                 </span>
                             </td>
 
-                            <td class="px-5 py-3 align-middle text-center">
-                                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 font-black text-xs border border-indigo-100 dark:border-indigo-500/20">
+                            <td class="px-6 py-4 align-middle text-center">
+                                <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 font-black text-sm border border-blue-100 dark:border-blue-500/20 shadow-sm" title="Sisa Cuti: <?= $row['leave_quota'] ?> Hari">
                                     <?= $row['leave_quota'] ?>
                                 </span>
                             </td>
 
-                            <td class="px-5 py-3 align-middle text-center">
+                            <td class="px-6 py-4 align-middle text-center">
                                 <?php if($row['must_change_password'] == 1): ?>
-                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 text-[9px] font-bold uppercase tracking-widest">
-                                        <i class="ph-fill ph-warning-circle text-[11px]"></i> Harus Ganti
+                                    <span class="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 text-[10px] font-bold uppercase tracking-widest" title="User harus mengganti password saat login">
+                                        <i class="ph-fill ph-warning-circle text-xs"></i> Change Pass
                                     </span>
                                 <?php else: ?>
-                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 text-[9px] font-bold uppercase tracking-widest">
-                                        <i class="ph-fill ph-check-circle text-[11px]"></i> Aman
+                                    <span class="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                                        <i class="ph-fill ph-check-circle text-xs"></i> Aman
                                     </span>
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-5 py-3 align-middle text-center">
+                            <td class="px-6 py-4 align-middle text-center">
                                 <?php if($row['signature']): ?>
-                                    <i class="ph-fill ph-check-circle text-emerald-500 text-xl" title="Signature Uploaded"></i>
+                                    <div class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center mx-auto" title="Signature Uploaded">
+                                        <i class="ph-bold ph-pen-nib text-lg"></i>
+                                    </div>
                                 <?php else: ?>
-                                    <i class="ph-bold ph-minus text-slate-300 dark:text-slate-600 text-xl" title="No Signature"></i>
+                                    <div class="w-8 h-8 rounded-full bg-slate-50 text-slate-300 dark:bg-slate-800 dark:text-slate-600 flex items-center justify-center mx-auto" title="No Signature">
+                                        <i class="ph-bold ph-minus text-lg"></i>
+                                    </div>
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-5 py-3 align-middle text-center">
-                                <div class="flex items-center justify-center gap-1.5">
+                            <td class="px-6 py-4 align-middle text-center">
+                                <div class="flex items-center justify-center gap-2">
                                     
                                     <?php $userJson = htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>
-                                    <button onclick='openEditModal(<?= $userJson ?>)' class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600 dark:bg-slate-700 dark:hover:bg-blue-500/20 dark:text-slate-300 dark:hover:text-blue-400 transition-all active:scale-95 flex items-center justify-center" title="Edit User">
-                                        <i class="ph-bold ph-pencil-simple text-[13px]"></i>
+                                    
+                                    <button onclick='openEditModal(<?= $userJson ?>)' class="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-blue-600 dark:hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-95" title="Edit User">
+                                        <i class="ph-bold ph-pencil-simple text-sm"></i>
                                     </button>
 
-                                    <button onclick="openResetModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-600 dark:bg-slate-700 dark:hover:bg-amber-500/20 dark:text-slate-300 dark:hover:text-amber-400 transition-all active:scale-95 flex items-center justify-center" title="Reset Password">
-                                        <i class="ph-bold ph-key text-[13px]"></i>
+                                    <button onclick="openResetModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 hover:bg-amber-500 hover:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-amber-500 dark:hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-95" title="Reset Password">
+                                        <i class="ph-bold ph-key text-sm"></i>
                                     </button>
 
-                                    <button onclick="openDeleteModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 dark:bg-slate-700 dark:hover:bg-rose-500/20 dark:text-slate-300 dark:hover:text-rose-400 transition-all active:scale-95 flex items-center justify-center" title="Hapus User">
-                                        <i class="ph-bold ph-trash text-[13px]"></i>
+                                    <button onclick="openDeleteModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 hover:bg-rose-600 hover:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-rose-600 dark:hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-95" title="Hapus User">
+                                        <i class="ph-bold ph-trash text-sm"></i>
                                     </button>
 
                                 </div>
@@ -321,10 +344,13 @@ include 'includes/sidebar.php';
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="7" class="px-5 py-12 text-center">
+                            <td colspan="7" class="px-6 py-16 text-center">
                                 <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
-                                    <i class="ph-fill ph-users text-4xl mb-3 opacity-50"></i>
-                                    <p class="text-xs font-medium">Belum ada data pengguna yang terdaftar.</p>
+                                    <div class="w-20 h-20 rounded-3xl bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
+                                        <i class="ph-fill ph-users text-4xl text-slate-300 dark:text-slate-600"></i>
+                                    </div>
+                                    <h4 class="font-black text-slate-700 dark:text-slate-200 text-base mb-1">Tidak Ada Data Pengguna</h4>
+                                    <p class="text-sm font-medium">Belum ada akun pengguna yang terdaftar di dalam sistem.</p>
                                 </div>
                             </td>
                         </tr>
@@ -332,211 +358,328 @@ include 'includes/sidebar.php';
                 </tbody>
             </table>
         </div>
+        
+        <?php if($users && $users->num_rows > 0): ?>
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-center">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest bg-white dark:bg-[#1A222C] px-4 py-1.5 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm">
+                Total Pengguna: <span class="text-indigo-600 dark:text-indigo-400 ml-1"><?= $users->num_rows ?> Akun</span>
+            </p>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
-<div id="addUserModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl flex flex-col">
-        <form method="POST" enctype="multipart/form-data">
-            <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-indigo-600 text-white rounded-t-3xl sticky top-0 z-10">
-                <h3 class="text-sm font-bold flex items-center gap-2"><i class="ph-bold ph-user-plus text-lg"></i> Tambah User Baru</h3>
-                <button type="button" onclick="closeModal('addUserModal')" class="text-white/70 hover:text-white transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+<div id="addUserModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('addUserModal')"></div>
+    
+    <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all scale-95 opacity-0 modal-box">
+        <form method="POST" enctype="multipart/form-data" class="flex flex-col h-full">
+            
+            <div class="px-6 py-5 border-b border-indigo-500/20 bg-indigo-600 text-white flex justify-between items-center shrink-0">
+                <h3 class="text-base font-black flex items-center gap-2"><i class="ph-bold ph-user-plus text-xl"></i> Tambah User Baru</h3>
+                <button type="button" onclick="closeModal('addUserModal')" class="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/40 transition-colors">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap <span class="text-rose-500">*</span></label>
-                    <input type="text" name="username" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all font-bold" required>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Email Aktif <span class="text-rose-500">*</span></label>
-                    <input type="email" name="email" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" required>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nomor Telepon</label>
-                    <input type="text" name="phone" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Hak Akses (Role) <span class="text-rose-500">*</span></label>
-                    <select name="role" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all font-bold" required>
-                        <option value="standard">Standard User</option>
-                        <option value="admin">Administrator</option>
-                    </select>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Divisi Departemen <span class="text-rose-500">*</span></label>
-                    <select name="division_id" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" required>
-                        <option value="">-- Pilih Divisi --</option>
-                        <?php foreach($divisions as $div): ?><option value="<?= $div['id'] ?>"><?= $div['name'] ?></option><?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Jabatan / Job Title <span class="text-rose-500">*</span></label>
-                    <select name="job_title" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" required>
-                        <option value="Staff">Staff</option><option value="Manager">Manager</option><option value="General Manager">General Manager</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Jatah Cuti Tahunan (Hari) <span class="text-rose-500">*</span></label>
-                    <input type="number" name="leave_quota" class="w-full px-4 py-2.5 bg-indigo-50 dark:bg-slate-900 border border-indigo-200 dark:border-slate-700 rounded-xl text-xs font-black text-indigo-600 dark:text-indigo-400 focus:ring-2 focus:ring-indigo-500 outline-none transition-all" value="12" required>
-                </div>
-                
-                <div class="md:col-span-2 mt-2 pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2"><i class="ph-bold ph-pen-nib"></i> Digital Signature</label>
+            
+            <div class="p-6 overflow-y-auto modern-scrollbar flex-1 bg-slate-50/30 dark:bg-slate-800/20">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
-                    <div class="relative h-40 w-full border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden group">
-                        <canvas id="add-sig-canvas" class="absolute inset-0 w-full h-full z-10 cursor-crosshair"></canvas>
-                        <div id="add-sig-placeholder" class="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold pointer-events-none transition-opacity group-hover:opacity-50">Tulis Tanda Tangan Di Sini</div>
+                    <div class="space-y-4">
+                        <h4 class="text-sm font-black text-slate-800 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4"><i class="ph-fill ph-identification-card text-indigo-500 mr-2"></i>Data Personal</h4>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Nama Lengkap <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <i class="ph-bold ph-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" name="username" required class="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Email Aktif <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <i class="ph-bold ph-envelope-simple absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="email" name="email" required class="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Nomor Telepon</label>
+                            <div class="relative">
+                                <i class="ph-bold ph-phone absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" name="phone" class="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-sm">
+                            </div>
+                        </div>
                     </div>
-                    <input type="hidden" name="signature_data" id="add-sig-data">
-                    <button type="button" onclick="clearAddSign()" class="mt-2 text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors"><i class="ph-bold ph-eraser"></i> Bersihkan Canvas</button>
-                    
-                    <div class="flex items-center gap-4 my-4">
-                        <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ATAU UPLOAD FILE</span>
-                        <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+
+                    <div class="space-y-4">
+                        <h4 class="text-sm font-black text-slate-800 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4"><i class="ph-fill ph-briefcase text-indigo-500 mr-2"></i>Akses & Posisi</h4>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Hak Akses <span class="text-rose-500">*</span></label>
+                                <div class="relative">
+                                    <select name="role" required class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 dark:text-white appearance-none outline-none transition-all shadow-sm">
+                                        <option value="standard">Standard</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                    <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Kuota Cuti <span class="text-rose-500">*</span></label>
+                                <input type="number" name="leave_quota" value="12" required class="w-full px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-xl text-sm font-black text-indigo-600 dark:text-indigo-400 focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all text-center shadow-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Divisi Departemen <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <select name="division_id" required class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 dark:text-white appearance-none outline-none transition-all shadow-sm">
+                                    <option value="">-- Pilih Divisi --</option>
+                                    <?php foreach($divisions as $div): ?><option value="<?= $div['id'] ?>"><?= htmlspecialchars($div['name']) ?></option><?php endforeach; ?>
+                                </select>
+                                <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Jabatan (Job Title) <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <select name="job_title" required class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 dark:text-white appearance-none outline-none transition-all shadow-sm">
+                                    <option value="Staff">Staff</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="General Manager">General Manager</option>
+                                </select>
+                                <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
                     </div>
                     
-                    <input type="file" name="signature_file" class="w-full block text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-300 dark:hover:file:bg-slate-700 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-xl" accept="image/png">
-                    <p class="text-[10px] text-slate-400 mt-1 italic">Hanya mendukung format file .PNG transparan.</p>
+                    <div class="md:col-span-2 mt-4 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#24303F] shadow-sm">
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="block text-xs font-bold text-slate-800 dark:text-white uppercase tracking-widest"><i class="ph-bold ph-pen-nib text-indigo-500 mr-1"></i> Digital Signature</label>
+                            <button type="button" onclick="clearAddSign()" class="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors flex items-center gap-1"><i class="ph-bold ph-eraser"></i> Bersihkan Canvas</button>
+                        </div>
+                        
+                        <div class="relative h-48 w-full border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden group">
+                            <canvas id="add-sig-canvas" class="absolute inset-0 w-full h-full z-10 cursor-crosshair"></canvas>
+                            <div id="add-sig-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 pointer-events-none transition-opacity group-hover:opacity-50">
+                                <i class="ph-fill ph-signature text-4xl mb-2 opacity-30"></i>
+                                <span class="text-xs font-bold">Tulis Tanda Tangan Anda Di Sini</span>
+                            </div>
+                        </div>
+                        <input type="hidden" name="signature_data" id="add-sig-data">
+                        
+                        <div class="flex items-center gap-4 my-5">
+                            <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700">ATAU UPLOAD FILE</span>
+                            <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                        </div>
+                        
+                        <input type="file" name="signature_file" accept="image/png" class="w-full block text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-500/10 dark:file:text-indigo-400 dark:hover:file:bg-indigo-500/20 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 transition-all">
+                        <p class="text-[10px] text-slate-400 mt-2 italic flex items-center gap-1"><i class="ph-fill ph-info"></i> Hanya mendukung format file .PNG transparan (tanpa background).</p>
+                    </div>
+
                 </div>
             </div>
             
-            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-3xl">
-                <button type="button" onclick="closeModal('addUserModal')" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-xs">Batal</button>
-                <button type="submit" name="add_user" onclick="saveAddSign()" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-500/30 flex items-center gap-2">
-                    <i class="ph-bold ph-floppy-disk text-sm"></i> Simpan User
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-white dark:bg-[#24303F] shrink-0 rounded-b-3xl">
+                <button type="button" onclick="closeModal('addUserModal')" class="px-5 py-2.5 rounded-xl font-bold text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Batal</button>
+                <button type="submit" name="add_user" onclick="saveAddSign()" class="px-6 py-2.5 rounded-xl font-bold text-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm active:scale-95 flex items-center gap-2">
+                    <i class="ph-bold ph-floppy-disk text-lg"></i> Simpan User
                 </button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="editUserModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto custom-scrollbar transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl flex flex-col">
-        <form method="POST" enctype="multipart/form-data">
-            <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-blue-600 text-white rounded-t-3xl sticky top-0 z-10">
-                <h3 class="text-sm font-bold flex items-center gap-2"><i class="ph-bold ph-pencil-simple text-lg"></i> Edit Data User</h3>
-                <button type="button" onclick="closeModal('editUserModal')" class="text-white/70 hover:text-white transition-colors"><i class="ph-bold ph-x text-lg"></i></button>
+<div id="editUserModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('editUserModal')"></div>
+    
+    <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all scale-95 opacity-0 modal-box">
+        <form method="POST" enctype="multipart/form-data" class="flex flex-col h-full">
+            
+            <div class="px-6 py-5 border-b border-blue-500/20 bg-blue-600 text-white flex justify-between items-center shrink-0">
+                <h3 class="text-base font-black flex items-center gap-2"><i class="ph-bold ph-pencil-simple text-xl"></i> Edit Data User</h3>
+                <button type="button" onclick="closeModal('editUserModal')" class="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/40 transition-colors">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
-            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+            
+            <div class="p-6 overflow-y-auto modern-scrollbar flex-1 bg-slate-50/30 dark:bg-slate-800/20">
                 <input type="hidden" name="edit_id" id="edit_id">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nama Lengkap <span class="text-rose-500">*</span></label>
-                    <input type="text" name="username" id="edit_username" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all font-bold" required>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Email Aktif <span class="text-rose-500">*</span></label>
-                    <input type="email" name="email" id="edit_email" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all" required>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Nomor Telepon</label>
-                    <input type="text" name="phone" id="edit_phone" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Hak Akses (Role) <span class="text-rose-500">*</span></label>
-                    <select name="role" id="edit_role" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all font-bold" required>
-                        <option value="standard">Standard User</option>
-                        <option value="admin">Administrator</option>
-                    </select>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Divisi Departemen <span class="text-rose-500">*</span></label>
-                    <select name="division_id" id="edit_division" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all" required>
-                        <option value="">-- Pilih Divisi --</option>
-                        <?php foreach($divisions as $div): ?><option value="<?= $div['id'] ?>"><?= $div['name'] ?></option><?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Jabatan / Job Title <span class="text-rose-500">*</span></label>
-                    <select name="job_title" id="edit_job_title" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 dark:text-white outline-none transition-all" required>
-                        <option value="Staff">Staff</option><option value="Manager">Manager</option><option value="General Manager">General Manager</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Jatah Cuti Tahunan (Hari) <span class="text-rose-500">*</span></label>
-                    <input type="number" name="leave_quota" id="edit_quota" class="w-full px-4 py-2.5 bg-blue-50 dark:bg-slate-900 border border-blue-200 dark:border-slate-700 rounded-xl text-xs font-black text-blue-600 dark:text-blue-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all" required>
-                </div>
-                
-                <div class="md:col-span-2 mt-2 pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2"><i class="ph-bold ph-pen-nib"></i> Update Signature</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
-                    <div class="relative h-40 w-full border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden group">
-                        <canvas id="edit-sig-canvas" class="absolute inset-0 w-full h-full z-10 cursor-crosshair"></canvas>
-                        <div id="edit-sig-placeholder" class="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold pointer-events-none transition-opacity group-hover:opacity-50">Tulis Tanda Tangan Baru (Opsional)</div>
+                    <div class="space-y-4">
+                        <h4 class="text-sm font-black text-slate-800 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4"><i class="ph-fill ph-identification-card text-blue-500 mr-2"></i>Data Personal</h4>
+                        
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Nama Lengkap <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <i class="ph-bold ph-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" name="username" id="edit_username" required class="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/50 outline-none dark:text-white transition-all shadow-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Email Aktif <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <i class="ph-bold ph-envelope-simple absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="email" name="email" id="edit_email" required class="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/50 outline-none dark:text-white transition-all shadow-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Nomor Telepon</label>
+                            <div class="relative">
+                                <i class="ph-bold ph-phone absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" name="phone" id="edit_phone" class="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/50 outline-none dark:text-white transition-all shadow-sm">
+                            </div>
+                        </div>
                     </div>
-                    <input type="hidden" name="edit_signature_data" id="edit-sig-data">
-                    <button type="button" onclick="clearEditSign()" class="mt-2 text-[10px] font-bold text-rose-500 hover:text-rose-700 transition-colors"><i class="ph-bold ph-eraser"></i> Bersihkan Canvas</button>
-                    
-                    <div class="flex items-center gap-4 my-4">
-                        <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ATAU UPLOAD FILE</span>
-                        <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+
+                    <div class="space-y-4">
+                        <h4 class="text-sm font-black text-slate-800 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4"><i class="ph-fill ph-briefcase text-blue-500 mr-2"></i>Akses & Posisi</h4>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Hak Akses <span class="text-rose-500">*</span></label>
+                                <div class="relative">
+                                    <select name="role" id="edit_role" required class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/50 dark:text-white appearance-none outline-none transition-all shadow-sm">
+                                        <option value="standard">Standard</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                    <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Kuota Cuti <span class="text-rose-500">*</span></label>
+                                <input type="number" name="leave_quota" id="edit_quota" required class="w-full px-4 py-2.5 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl text-sm font-black text-blue-600 dark:text-blue-400 focus:ring-2 focus:ring-blue-500/50 outline-none transition-all text-center shadow-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Divisi Departemen <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <select name="division_id" id="edit_division" required class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/50 dark:text-white appearance-none outline-none transition-all shadow-sm">
+                                    <option value="">-- Pilih Divisi --</option>
+                                    <?php foreach($divisions as $div): ?><option value="<?= $div['id'] ?>"><?= htmlspecialchars($div['name']) ?></option><?php endforeach; ?>
+                                </select>
+                                <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5">Jabatan (Job Title) <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <select name="job_title" id="edit_job_title" required class="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500/50 dark:text-white appearance-none outline-none transition-all shadow-sm">
+                                    <option value="Staff">Staff</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="General Manager">General Manager</option>
+                                </select>
+                                <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                            </div>
+                        </div>
                     </div>
                     
-                    <input type="file" name="edit_signature_file" class="w-full block text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-300 dark:hover:file:bg-slate-700 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-xl" accept="image/png">
+                    <div class="md:col-span-2 mt-4 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#24303F] shadow-sm">
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="block text-xs font-bold text-slate-800 dark:text-white uppercase tracking-widest"><i class="ph-bold ph-pen-nib text-blue-500 mr-1"></i> Update Digital Signature</label>
+                            <button type="button" onclick="clearEditSign()" class="text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors flex items-center gap-1"><i class="ph-bold ph-eraser"></i> Bersihkan Canvas</button>
+                        </div>
+                        
+                        <div class="relative h-48 w-full border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden group">
+                            <canvas id="edit-sig-canvas" class="absolute inset-0 w-full h-full z-10 cursor-crosshair"></canvas>
+                            <div id="edit-sig-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 pointer-events-none transition-opacity group-hover:opacity-50">
+                                <i class="ph-fill ph-signature text-4xl mb-2 opacity-30"></i>
+                                <span class="text-xs font-bold">Tulis Ulang Tanda Tangan (Abaikan jika tidak diubah)</span>
+                            </div>
+                        </div>
+                        <input type="hidden" name="edit_signature_data" id="edit-sig-data">
+                        
+                        <div class="flex items-center gap-4 my-5">
+                            <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800 px-3 py-1 rounded-full border border-slate-100 dark:border-slate-700">ATAU UPLOAD FILE</span>
+                            <div class="h-px bg-slate-200 dark:bg-slate-700 flex-1"></div>
+                        </div>
+                        
+                        <input type="file" name="edit_signature_file" accept="image/png" class="w-full block text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-500/10 dark:file:text-blue-400 dark:hover:file:bg-blue-500/20 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 transition-all">
+                    </div>
+
                 </div>
             </div>
             
-            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-3xl">
-                <button type="button" onclick="closeModal('editUserModal')" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-xs">Batal</button>
-                <button type="submit" name="edit_user" onclick="saveEditSign()" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/30 flex items-center gap-2">
-                    <i class="ph-bold ph-check text-sm"></i> Update Data
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-white dark:bg-[#24303F] shrink-0 rounded-b-3xl">
+                <button type="button" onclick="closeModal('editUserModal')" class="px-5 py-2.5 rounded-xl font-bold text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">Batal</button>
+                <button type="submit" name="edit_user" onclick="saveEditSign()" class="px-6 py-2.5 rounded-xl font-bold text-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm active:scale-95 flex items-center gap-2">
+                    <i class="ph-bold ph-check text-lg"></i> Update Data
                 </button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="resetModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl flex flex-col overflow-hidden text-center">
+<div id="resetModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('resetModal')"></div>
+    <div class="relative bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300 modal-box text-center overflow-hidden flex flex-col">
         <form method="POST">
             <div class="pt-8 pb-6 px-6">
-                <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-500 dark:bg-amber-500/20 dark:text-amber-400 flex items-center justify-center mx-auto mb-4">
-                    <i class="ph-fill ph-key text-3xl"></i>
+                <div class="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center mx-auto mb-5 border border-amber-100 dark:border-amber-500/20">
+                    <i class="ph-fill ph-password text-4xl text-amber-500 dark:text-amber-400"></i>
                 </div>
-                <h3 class="text-lg font-extrabold text-slate-800 dark:text-white mb-2">Reset Password?</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Password baru akan di-generate secara otomatis dan dikirimkan ke email <strong id="resetName" class="text-slate-700 dark:text-slate-300"></strong>.</p>
+                <h3 class="text-xl font-black text-slate-800 dark:text-white mb-2">Reset Password?</h3>
+                <p class="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed">Password baru akan otomatis dibuat dan dikirimkan ke email <br><strong id="resetName" class="text-slate-700 dark:text-slate-200 mt-1 inline-block"></strong>.</p>
                 <input type="hidden" name="reset_id" id="reset_id_input">
             </div>
-            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 grid grid-cols-2 gap-3">
-                <button type="button" onclick="closeModal('resetModal')" class="py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-xs">Batal</button>
-                <button type="submit" name="reset_password" class="py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-md shadow-amber-500/30">Ya, Reset</button>
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 grid grid-cols-2 gap-3 shrink-0 rounded-b-3xl">
+                <button type="button" onclick="closeModal('resetModal')" class="py-3 rounded-xl font-bold text-sm text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">Batal</button>
+                <button type="submit" name="reset_password" class="py-3 rounded-xl font-bold text-sm text-white bg-amber-500 hover:bg-amber-600 transition-all shadow-md shadow-amber-500/30 active:scale-95">Ya, Reset</button>
             </div>
         </form>
     </div>
 </div>
 
-<div id="deleteModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl flex flex-col overflow-hidden text-center">
+<div id="deleteModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('deleteModal')"></div>
+    <div class="relative bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300 modal-box text-center overflow-hidden flex flex-col">
         <form method="POST">
             <div class="pt-8 pb-6 px-6">
-                <div class="w-16 h-16 rounded-full bg-rose-100 text-rose-500 dark:bg-rose-500/20 dark:text-rose-400 flex items-center justify-center mx-auto mb-4">
-                    <i class="ph-fill ph-warning-circle text-3xl"></i>
+                <div class="w-20 h-20 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mx-auto mb-5 border border-rose-100 dark:border-rose-500/20">
+                    <i class="ph-fill ph-warning-circle text-4xl text-rose-500 dark:text-rose-400"></i>
                 </div>
-                <h3 class="text-lg font-extrabold text-slate-800 dark:text-white mb-2">Hapus Pengguna?</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Apakah Anda yakin ingin menghapus akses untuk <strong id="deleteName" class="text-slate-700 dark:text-slate-300"></strong> secara permanen?</p>
+                <h3 class="text-xl font-black text-slate-800 dark:text-white mb-2">Hapus Akses Pengguna?</h3>
+                <p class="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed">Anda yakin ingin menghapus akses untuk <strong id="deleteName" class="text-rose-500 dark:text-rose-400"></strong> secara permanen?</p>
                 <input type="hidden" name="delete_id" id="delete_id_input">
             </div>
-            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 grid grid-cols-2 gap-3">
-                <button type="button" onclick="closeModal('deleteModal')" class="py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-xs">Batal</button>
-                <button type="submit" name="delete_user" class="py-2.5 rounded-xl text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 transition-colors shadow-md shadow-rose-500/30">Ya, Hapus</button>
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 grid grid-cols-2 gap-3 shrink-0 rounded-b-3xl">
+                <button type="button" onclick="closeModal('deleteModal')" class="py-3 rounded-xl font-bold text-sm text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 border border-transparent hover:border-slate-200 dark:hover:border-slate-600 transition-all">Batal</button>
+                <button type="submit" name="delete_user" class="py-3 rounded-xl font-bold text-sm text-white bg-rose-600 hover:bg-rose-700 transition-all shadow-md shadow-rose-500/30 active:scale-95">Ya, Hapus</button>
             </div>
         </form>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+
 <script>
-    // --- CUSTOM MODAL HANDLERS ---
+    // --- CUSTOM MODAL HANDLERS (Tailwind Vanilla JS) ---
     function openModal(id) {
         const modal = document.getElementById(id);
         const box = modal.querySelector('.modal-box');
+        
+        // Remove hidden to make it display:flex
         modal.classList.remove('hidden');
+        
+        // Use timeout to allow CSS transition to work after display:flex is applied
         setTimeout(() => {
-            modal.classList.remove('opacity-0');
             box.classList.remove('scale-95', 'opacity-0');
+            box.classList.add('scale-100', 'opacity-100');
             
-            // Adjust canvas inside modal specific
+            // Adjust canvas specifically for Add/Edit Modals
             if(id === 'addUserModal') {
                 resizeCanvas(document.getElementById('add-sig-canvas'));
                 addPad.clear(); 
@@ -547,20 +690,24 @@ include 'includes/sidebar.php';
                 editPad.clear(); 
                 document.getElementById('edit-sig-placeholder').style.display = 'flex';
             }
-        }, 10);
+        }, 50);
     }
 
     function closeModal(id) {
         const modal = document.getElementById(id);
         const box = modal.querySelector('.modal-box');
-        modal.classList.add('opacity-0');
+        
+        // Trigger CSS transition out
+        box.classList.remove('scale-100', 'opacity-100');
         box.classList.add('scale-95', 'opacity-0');
+        
+        // Wait for transition to finish before hiding element completely
         setTimeout(() => {
             modal.classList.add('hidden');
         }, 300);
     }
 
-    // Modal Triggers
+    // Modal Triggers for Data Binding
     function openEditModal(data) {
         document.getElementById("edit_id").value = data.id;
         document.getElementById("edit_username").value = data.username;
@@ -591,14 +738,25 @@ include 'includes/sidebar.php';
     function initSignaturePad(canvasId, placeholderId) {
         var canvas = document.getElementById(canvasId);
         var placeholder = document.getElementById(placeholderId);
-        var pad = new SignaturePad(canvas, { backgroundColor: 'rgba(255, 255, 255, 0)', penColor: '#1e293b' });
-        pad.addEventListener("beginStroke", () => { if(placeholder) placeholder.style.display = 'none'; });
+        
+        // Adjust pen color based on dark mode class on HTML tag
+        const isDarkMode = document.documentElement.classList.contains('dark');
+        const penCol = isDarkMode ? '#e2e8f0' : '#1e293b'; // slate-200 for dark mode, slate-800 for light
+
+        var pad = new SignaturePad(canvas, { 
+            backgroundColor: 'rgba(255, 255, 255, 0)', 
+            penColor: penCol 
+        });
+        
+        pad.addEventListener("beginStroke", () => { 
+            if(placeholder) placeholder.style.display = 'none'; 
+        });
         return pad;
     }
 
+    // This function must run AFTER the modal is visible so offsetWidth is not 0
     function resizeCanvas(canvas) {
         var ratio = Math.max(window.devicePixelRatio || 1, 1);
-        // Use offsetWidth to accurately get container size
         canvas.width = canvas.offsetWidth * ratio;
         canvas.height = canvas.offsetHeight * ratio;
         canvas.getContext("2d").scale(ratio, ratio);
@@ -609,11 +767,27 @@ include 'includes/sidebar.php';
         editPad = initSignaturePad('edit-sig-canvas', 'edit-sig-placeholder');
     });
 
-    function clearAddSign() { addPad.clear(); document.getElementById('add-sig-placeholder').style.display = 'flex'; }
-    function saveAddSign() { if(!addPad.isEmpty()) document.getElementById('add-sig-data').value = addPad.toDataURL('image/png'); }
+    function clearAddSign() { 
+        addPad.clear(); 
+        document.getElementById('add-sig-placeholder').style.display = 'flex'; 
+    }
     
-    function clearEditSign() { editPad.clear(); document.getElementById('edit-sig-placeholder').style.display = 'flex'; }
-    function saveEditSign() { if(!editPad.isEmpty()) document.getElementById('edit-sig-data').value = editPad.toDataURL('image/png'); }
+    function saveAddSign() { 
+        if(!addPad.isEmpty()) {
+            document.getElementById('add-sig-data').value = addPad.toDataURL('image/png'); 
+        }
+    }
+    
+    function clearEditSign() { 
+        editPad.clear(); 
+        document.getElementById('edit-sig-placeholder').style.display = 'flex'; 
+    }
+    
+    function saveEditSign() { 
+        if(!editPad.isEmpty()) {
+            document.getElementById('edit-sig-data').value = editPad.toDataURL('image/png'); 
+        }
+    }
 </script>
 
 <?php include 'includes/footer.php'; ?>
