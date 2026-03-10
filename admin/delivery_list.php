@@ -9,7 +9,7 @@ include '../config/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
-// --- 1. AUTO-UPDATE DATABASE SCHEMA (FIXED) ---
+// --- 1. AUTO-UPDATE DATABASE SCHEMA ---
 // Mengecek apakah kolom sudah ada sebelum melakukan ALTER TABLE agar tidak error Duplicate
 $new_columns = [
     'client_id' => 'INT NULL',
@@ -26,7 +26,6 @@ $new_columns = [
 foreach($new_columns as $col => $type) {
     $check_col = $conn->query("SHOW COLUMNS FROM deliveries LIKE '$col'");
     if ($check_col && $check_col->num_rows == 0) {
-        // Kolom belum ada, maka tambahkan
         $conn->query("ALTER TABLE deliveries ADD COLUMN $col $type");
     }
 }
@@ -92,23 +91,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // B. PROCESS DELIVERY (HR)
-    if (isset($_POST['process_hr_delivery'])) {
+    // B. PROCESS DELIVERY STAGE 1 (HR) - Simpan Data Klien Saja
+    if (isset($_POST['process_hr_info'])) {
         $id = intval($_POST['delivery_id']);
         $address = $conn->real_escape_string($_POST['address']);
         $pic_name = $conn->real_escape_string($_POST['pic_name']);
         $pic_phone = $conn->real_escape_string($_POST['pic_phone']);
         $courier = $conn->real_escape_string($_POST['courier_name']);
-        $tracking = $conn->real_escape_string($_POST['tracking_number']);
         
-        // Status berubah jadi on_going karena resi sudah diisi
+        // Simpan info namun status tetap waiting_hr
         $sql = "UPDATE deliveries SET 
                 address = '$address', receiver_name = '$pic_name', pic_phone = '$pic_phone', 
-                courier_name = '$courier', tracking_number = '$tracking', status = 'on_going' 
+                courier_name = '$courier'
                 WHERE id = $id";
                 
         if($conn->query($sql)) {
-            echo "<script>alert('Data berhasil diproses & masuk ke On Going!'); window.location='delivery_list.php?tab=process';</script>";
+            echo "<script>alert('Data Alamat dan PIC berhasil disimpan! Silakan lanjut input Resi/Tracking.'); window.location='delivery_list.php?tab=process';</script>";
+        }
+    }
+
+    // C. PROCESS DELIVERY STAGE 2 (HR) - Input Resi & Pindah ke On Going
+    if (isset($_POST['process_hr_resi'])) {
+        $id = intval($_POST['delivery_id']);
+        $tracking = $conn->real_escape_string($_POST['tracking_number']);
+        
+        // Pindah status ke on_going
+        $sql = "UPDATE deliveries SET tracking_number = '$tracking', status = 'on_going' WHERE id = $id";
+                
+        if($conn->query($sql)) {
+            echo "<script>alert('Resi berhasil diinput! Data dipindahkan ke tab On Going.'); window.location='delivery_list.php?tab=ongoing';</script>";
         }
     }
 }
@@ -198,7 +209,6 @@ include 'includes/sidebar.php';
                 <div><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Completed</p><h3 class="text-2xl font-black text-slate-800 dark:text-white"><?= $data_complete->num_rows ?></h3></div>
             </div>
         </div>
-        
         <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6 text-center text-slate-500 dark:text-slate-400">
             <i class="ph-fill ph-chart-polar text-6xl mb-3 opacity-20"></i>
             <h4 class="font-bold text-slate-700 dark:text-slate-300">Welcome to Delivery Hub</h4>
@@ -207,7 +217,6 @@ include 'includes/sidebar.php';
     </div>
 
     <div id="content-submit" class="tab-content <?= $active_tab=='submit'?'block':'hidden' ?> animate-fade-in-up" style="animation-delay: 0.2s;">
-        
         <?php if($is_it): ?>
         <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
             <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/50 dark:bg-indigo-900/10">
@@ -337,34 +346,58 @@ include 'includes/sidebar.php';
                             <th class="px-5 py-3">Submission Details</th>
                             <th class="px-5 py-3">Package Info</th>
                             <th class="px-5 py-3 text-center">Reference Docs</th>
-                            <th class="px-5 py-3 text-center">Action</th>
+                            <th class="px-5 py-3 text-center">Action (2 Steps)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50 text-[11px]">
                         <?php if($data_waiting->num_rows > 0): $data_waiting->data_seek(0); while($row = $data_waiting->fetch_assoc()): ?>
+                        <?php 
+                            // Pengecekan apakah tahap 1 (Alamat/Klien Info) sudah terisi lengkap
+                            $is_info_ready = (!empty($row['address']) && !empty($row['receiver_name']) && !empty($row['courier_name']));
+                        ?>
                         <tr class="hover:bg-slate-50/60 dark:hover:bg-slate-800/80 transition-colors">
-                            <td class="px-5 py-4">
+                            <td class="px-5 py-4 align-top">
                                 <div class="font-bold text-slate-800 dark:text-slate-200 text-xs"><?= htmlspecialchars($row['client_name']) ?></div>
-                                <div class="text-[10px] text-slate-500 mt-1"><i class="ph-fill ph-clock"></i> <?= date('d M Y, H:i', strtotime($row['delivery_date'])) ?></div>
+                                <div class="text-[10px] text-slate-500 mt-1 mb-2"><i class="ph-fill ph-clock"></i> <?= date('d M Y, H:i', strtotime($row['delivery_date'])) ?></div>
+                                
+                                <?php if($is_info_ready): ?>
+                                    <div class="p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-700">
+                                        <div class="font-bold text-slate-600 dark:text-slate-300 text-[10px] flex items-center gap-1"><i class="ph-fill ph-user-circle"></i> <?= htmlspecialchars($row['receiver_name']) ?> (<?= htmlspecialchars($row['pic_phone']) ?>)</div>
+                                        <div class="text-slate-500 text-[10px] mt-0.5 line-clamp-1" title="<?= htmlspecialchars($row['address']) ?>"><i class="ph-fill ph-map-pin"></i> <?= htmlspecialchars($row['address']) ?></div>
+                                    </div>
+                                <?php endif; ?>
                             </td>
-                            <td class="px-5 py-4">
+                            <td class="px-5 py-4 align-top">
                                 <div class="font-bold text-indigo-600 dark:text-indigo-400"><?= htmlspecialchars($row['item_name']) ?> <span class="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 rounded ml-1 text-[10px]">x<?= $row['qty'] ?></span></div>
                                 <div class="text-[10px] text-slate-500 mt-1">Pkg: <?= htmlspecialchars($row['data_package']) ?></div>
                             </td>
-                            <td class="px-5 py-4 text-center">
+                            <td class="px-5 py-4 align-top text-center">
                                 <div class="flex flex-col gap-1 items-center font-mono text-[9px] text-slate-500">
                                     <?php if($row['invoice_no']) echo "<div>INV: {$row['invoice_no']}</div>"; ?>
                                     <?php if($row['po_no']) echo "<div>PO: {$row['po_no']}</div>"; ?>
                                     <?php if($row['do_no']) echo "<div>DO: {$row['do_no']}</div>"; ?>
                                 </div>
                             </td>
-                            <td class="px-5 py-4 text-center">
+                            <td class="px-5 py-4 align-top w-40">
                                 <?php if($is_hr): ?>
-                                    <button onclick='openProcessModal(<?= json_encode($row) ?>)' class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-1.5 px-4 rounded-lg shadow-sm transition-colors text-[10px] uppercase tracking-widest flex items-center gap-1.5 mx-auto">
-                                        <i class="ph-bold ph-pencil-line text-sm"></i> Process
-                                    </button>
+                                    <div class="flex flex-col gap-2">
+                                        <?php $jsonRow = htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>
+                                        <button onclick='openProcessInfoModal(<?= $jsonRow ?>)' class="w-full <?= $is_info_ready ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200 dark:bg-slate-700 dark:text-slate-300' : 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm' ?> font-bold py-2 px-3 rounded-lg transition-colors text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 active:scale-95">
+                                            <i class="ph-bold <?= $is_info_ready ? 'ph-pencil-simple' : 'ph-pencil-line' ?> text-sm"></i> <?= $is_info_ready ? 'Edit Alamat' : '1. Isi Alamat' ?>
+                                        </button>
+                                        
+                                        <?php if($is_info_ready): ?>
+                                            <button onclick="openResiModal(<?= $row['id'] ?>)" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg shadow-sm transition-colors text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 active:scale-95">
+                                                <i class="ph-bold ph-barcode text-sm"></i> 2. Input Resi
+                                            </button>
+                                        <?php else: ?>
+                                            <button disabled class="w-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600 font-bold py-2 px-3 rounded-lg text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-not-allowed border border-slate-200 dark:border-slate-700" title="Isi alamat terlebih dahulu">
+                                                <i class="ph-bold ph-lock text-sm"></i> Input Resi
+                                            </button>
+                                        <?php endif; ?>
+                                    </div>
                                 <?php else: ?>
-                                    <span class="text-slate-400 italic text-[10px]">- Restricted -</span>
+                                    <div class="text-center text-slate-400 italic text-[10px]">- Restricted -</div>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -469,46 +502,73 @@ include 'includes/sidebar.php';
 
 </div>
 
-<div id="processModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
+<div id="processInfoModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
     <div class="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-2xl transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl flex flex-col overflow-hidden">
         <form method="POST">
             <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 bg-amber-500 text-white flex justify-between items-center">
-                <h3 class="text-sm font-bold flex items-center gap-2"><i class="ph-bold ph-pencil-line text-lg"></i> Process Delivery (HR)</h3>
-                <button type="button" onclick="closeModal('processModal')" class="text-white/70 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
+                <h3 class="text-sm font-bold flex items-center gap-2"><i class="ph-bold ph-map-pin-line text-lg"></i> Tahap 1: Lengkapi Alamat & Klien</h3>
+                <button type="button" onclick="closeModal('processInfoModal')" class="text-white/70 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
             
             <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-                <input type="hidden" name="delivery_id" id="modal_del_id">
+                <input type="hidden" name="delivery_id" id="modal_info_id">
                 
                 <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Alamat Pengiriman Client <span class="text-rose-500">*</span></label>
-                    <textarea name="address" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all resize-none" rows="3" required placeholder="Masukkan alamat lengkap tujuan..."></textarea>
+                    <textarea name="address" id="modal_address" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all resize-none" rows="3" required placeholder="Masukkan alamat lengkap tujuan..."></textarea>
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">PIC Name <span class="text-rose-500">*</span></label>
-                    <input type="text" name="pic_name" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all" required>
+                    <input type="text" name="pic_name" id="modal_pic_name" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all" required>
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">PIC Phone <span class="text-rose-500">*</span></label>
-                    <input type="text" name="pic_phone" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all" required>
+                    <input type="text" name="pic_phone" id="modal_pic_phone" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all" required>
                 </div>
-                <div>
+                <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Delivery Method (Courier) <span class="text-rose-500">*</span></label>
-                    <select name="courier_name" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all" required>
+                    <select name="courier_name" id="modal_courier" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 dark:text-white outline-none transition-all" required>
                         <option value="">- Pilih Kurir -</option>
                         <option value="JNE">JNE</option><option value="J&T">J&T</option><option value="SICEPAT">SiCepat</option><option value="ANTERAJA">AnterAja</option><option value="GOJEK">Gojek/Grab</option>
                     </select>
                 </div>
+            </div>
+            
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-800/50">
+                <button type="button" onclick="closeModal('processInfoModal')" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 transition-colors text-xs">Batal</button>
+                <button type="submit" name="process_hr_info" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-md active:scale-95 flex items-center gap-2">
+                    <i class="ph-bold ph-floppy-disk text-sm"></i> Simpan Data Alamat
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="processResiModal" class="fixed inset-0 z-[999] hidden flex items-center justify-center bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300 modal-box shadow-2xl flex flex-col overflow-hidden">
+        <form method="POST">
+            <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 bg-blue-600 text-white flex justify-between items-center">
+                <h3 class="text-sm font-bold flex items-center gap-2"><i class="ph-bold ph-barcode text-lg"></i> Tahap 2: Input Resi</h3>
+                <button type="button" onclick="closeModal('processResiModal')" class="text-white/70 hover:text-white"><i class="ph-bold ph-x text-lg"></i></button>
+            </div>
+            
+            <div class="p-6">
+                <input type="hidden" name="delivery_id" id="modal_resi_id">
+                
+                <div class="bg-blue-50 text-blue-700 border border-blue-200 rounded-xl p-4 mb-4 text-xs font-medium dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20">
+                    Silakan input nomor resi/tracking pengiriman. Data otomatis akan dipindahkan ke tab <strong>On Going</strong>.
+                </div>
+
                 <div>
                     <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Tracking Number / Resi <span class="text-rose-500">*</span></label>
-                    <input type="text" name="tracking_number" class="w-full px-4 py-2.5 bg-amber-50 dark:bg-slate-900 border border-amber-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 text-amber-700 dark:text-amber-500 outline-none transition-all" required placeholder="Input resi pengiriman...">
+                    <input type="text" name="tracking_number" class="w-full px-4 py-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-sm font-mono font-bold focus:ring-2 focus:ring-blue-500 text-blue-700 dark:text-blue-400 outline-none transition-all shadow-inner" required placeholder="Input resi pengiriman disini...">
                 </div>
             </div>
             
             <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-800/50">
-                <button type="button" onclick="closeModal('processModal')" class="px-6 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 transition-colors text-xs">Batal</button>
-                <button type="submit" name="process_hr_delivery" class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-md active:scale-95 flex items-center gap-2">
-                    <i class="ph-bold ph-check text-sm"></i> Submit & Pindah ke On Going
+                <button type="button" onclick="closeModal('processResiModal')" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 transition-colors text-xs">Batal</button>
+                <button type="submit" name="process_hr_resi" class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md active:scale-95 flex items-center gap-2">
+                    <i class="ph-bold ph-paper-plane-right text-sm"></i> Simpan & Lanjutkan
                 </button>
             </div>
         </form>
@@ -552,14 +612,27 @@ include 'includes/sidebar.php';
         m.classList.remove('hidden');
         setTimeout(() => { m.classList.remove('opacity-0'); b.classList.remove('scale-95', 'opacity-0'); }, 10);
     }
+    
     function closeModal(id) {
         const m = document.getElementById(id); const b = m.querySelector('.modal-box');
         m.classList.add('opacity-0'); b.classList.add('scale-95', 'opacity-0');
         setTimeout(() => { m.classList.add('hidden'); }, 300);
     }
-    function openProcessModal(data) {
-        document.getElementById('modal_del_id').value = data.id;
-        openModal('processModal');
+    
+    // Buka form tahap 1 (Alamat)
+    function openProcessInfoModal(data) {
+        document.getElementById('modal_info_id').value = data.id;
+        document.getElementById('modal_address').value = data.address || '';
+        document.getElementById('modal_pic_name').value = data.receiver_name || '';
+        document.getElementById('modal_pic_phone').value = data.pic_phone || '';
+        document.getElementById('modal_courier').value = data.courier_name || '';
+        openModal('processInfoModal');
+    }
+
+    // Buka form tahap 2 (Resi)
+    function openResiModal(id) {
+        document.getElementById('modal_resi_id').value = id;
+        openModal('processResiModal');
     }
 
     // --- AUTO CHECK TRACKING & UPDATE TO COMPLETED ---
@@ -594,7 +667,7 @@ include 'includes/sidebar.php';
                     .then(res => {
                         if(res.status == 'success') {
                             alert("Sistem mendeteksi paket telah terkirim! Data akan dipindahkan ke tab 'Complete'.");
-                            location.reload(); // Reload halaman untuk update data di tabel
+                            location.reload(); 
                         }
                     });
                 }
