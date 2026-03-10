@@ -173,13 +173,13 @@ include 'includes/sidebar.php';
             </h1>
             <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Sistem manajemen logistik terpadu (IT & HR Collaboration).</p>
         </div>
-        <div class="flex items-center gap-3">
+        <!-- <div class="flex items-center gap-3">
             <a href="delivery_form.php" class="group inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-1 active:scale-95 whitespace-nowrap overflow-hidden relative">
                 <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
                 <i class="ph-bold ph-plus text-lg relative z-10"></i> 
                 <span class="relative z-10">New Request</span>
             </a>
-        </div>
+        </div> -->
     </div>
 
     <div class="inline-flex bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-2xl shadow-inner backdrop-blur-sm overflow-x-auto max-w-full modern-scrollbar">
