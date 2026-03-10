@@ -9,8 +9,8 @@ include '../config/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
-// --- 1. AUTO-UPDATE DATABASE SCHEMA ---
-// Menambahkan kolom baru jika belum ada agar fitur baru berjalan lancar
+// --- 1. AUTO-UPDATE DATABASE SCHEMA (FIXED) ---
+// Mengecek apakah kolom sudah ada sebelum melakukan ALTER TABLE agar tidak error Duplicate
 $new_columns = [
     'client_id' => 'INT NULL',
     'invoice_no' => 'VARCHAR(100) NULL',
@@ -22,8 +22,13 @@ $new_columns = [
     'pic_phone' => 'VARCHAR(50) NULL',
     'address' => 'TEXT NULL'
 ];
+
 foreach($new_columns as $col => $type) {
-    $conn->query("ALTER TABLE deliveries ADD COLUMN $col $type");
+    $check_col = $conn->query("SHOW COLUMNS FROM deliveries LIKE '$col'");
+    if ($check_col && $check_col->num_rows == 0) {
+        // Kolom belum ada, maka tambahkan
+        $conn->query("ALTER TABLE deliveries ADD COLUMN $col $type");
+    }
 }
 
 // --- 2. CEK ROLE & DIVISI ---
