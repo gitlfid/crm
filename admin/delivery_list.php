@@ -618,46 +618,48 @@ include 'includes/sidebar.php';
 
     <div id="content-complete" class="tab-content <?= $active_tab=='complete'?'block':'hidden' ?> transition-opacity duration-300">
         <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-            <div class="overflow-x-auto modern-scrollbar w-full pb-10">
+            <div class="overflow-x-auto modern-scrollbar w-full">
                 <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-50/50 dark:bg-slate-800/30">
+                    <thead class="bg-slate-50/80 dark:bg-slate-800/30">
                         <tr>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider min-w-[200px]">Delivery Summary</th>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider min-w-[250px]">Client & Destination</th>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Item Detail</th>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Delivery Summary</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest min-w-[250px]">Client & Destination</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Item Detail</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50">
                         <?php if($data_complete->num_rows > 0): $data_complete->data_seek(0); while($row = $data_complete->fetch_assoc()): ?>
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
-                            <td class="px-6 py-5 align-top">
-                                <div class="font-mono font-bold text-slate-800 dark:text-slate-200 text-sm mb-1.5"><?= htmlspecialchars($row['tracking_number']) ?></div>
-                                <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-[9px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 mb-2">
-                                    <i class="ph-fill ph-truck text-slate-400"></i> <?= htmlspecialchars($row['courier_name']) ?>
+                            <td class="px-6 py-6 align-middle">
+                                <div class="font-black text-slate-800 dark:text-slate-200 text-sm mb-2.5 uppercase tracking-widest"><?= htmlspecialchars($row['tracking_number']) ?></div>
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 shadow-sm mb-2.5">
+                                    <i class="ph-fill ph-truck text-slate-400 text-xs"></i> <?= htmlspecialchars($row['courier_name']) ?>
                                 </div>
-                                <div class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                                    <i class="ph-fill ph-check-circle"></i> Delivered: <?= date('d M Y', strtotime($row['delivered_date'])) ?>
-                                </div>
-                            </td>
-                            
-                            <td class="px-6 py-5 align-top">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1"><?= htmlspecialchars($row['client_name']) ?></div>
-                                <div class="text-[10px] text-slate-500 font-medium leading-relaxed line-clamp-2 max-w-[300px]" title="<?= htmlspecialchars($row['address']) ?>">
-                                    <i class="ph-fill ph-map-pin mr-1 text-slate-400"></i><?= htmlspecialchars($row['address']) ?>
+                                <div class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                                    <i class="ph-fill ph-check-circle text-sm"></i> Delivered: <?= date('d M Y', strtotime($row['delivered_date'])) ?>
                                 </div>
                             </td>
                             
-                            <td class="px-6 py-5 align-top">
-                                <div class="font-bold text-indigo-600 dark:text-indigo-400 text-sm mb-1">
+                            <td class="px-6 py-6 align-middle">
+                                <div class="font-black text-slate-800 dark:text-slate-200 text-sm mb-2.5 uppercase tracking-wide"><?= htmlspecialchars($row['client_name']) ?></div>
+                                <div class="text-[11px] text-slate-500 font-medium leading-relaxed line-clamp-2 max-w-[300px] flex items-start gap-1.5" title="<?= htmlspecialchars($row['address']) ?>">
+                                    <i class="ph-fill ph-map-pin text-slate-400 mt-0.5 text-sm"></i> <span><?= htmlspecialchars($row['address']) ?></span>
+                                </div>
+                            </td>
+                            
+                            <td class="px-6 py-6 align-middle">
+                                <div class="font-bold text-indigo-600 dark:text-indigo-400 text-sm mb-2.5">
                                     <?= htmlspecialchars($row['item_name']) ?> 
                                 </div>
-                                <div class="inline-flex items-center justify-center bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-md font-black text-[10px]">x<?= $row['qty'] ?></div>
+                                <div class="inline-flex items-center justify-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-0.5 rounded-md font-black text-[10px] shadow-sm">
+                                    x<?= $row['qty'] ?>
+                                </div>
                             </td>
                             
-                            <td class="px-6 py-5 align-middle text-center">
-                                <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-black uppercase tracking-widest shadow-sm w-32">
+                            <td class="px-6 py-6 align-middle text-center">
+                                <span class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-black uppercase tracking-widest shadow-sm">
                                     <i class="ph-bold ph-checks text-sm"></i> Completed
                                 </span>
                             </td>
@@ -665,7 +667,7 @@ include 'includes/sidebar.php';
                         </tr>
                         <?php endwhile; else: ?>
                         <tr>
-                            <td colspan="4" class="px-6 py-16 text-center">
+                            <td colspan="4" class="px-6 py-20 text-center">
                                 <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                                     <div class="w-20 h-20 rounded-3xl bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
                                         <i class="ph-fill ph-archive-box text-4xl text-slate-300 dark:text-slate-600"></i>
