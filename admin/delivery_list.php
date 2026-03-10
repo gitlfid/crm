@@ -434,12 +434,12 @@ include 'includes/sidebar.php';
         <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
             <div class="overflow-x-auto modern-scrollbar w-full">
                 <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-50/50 dark:bg-slate-800/30">
+                    <thead class="bg-slate-50/80 dark:bg-slate-800/30">
                         <tr>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider min-w-[250px]">Submission Details</th>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Package Info</th>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Ref Docs</th>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-indigo-500 uppercase tracking-wider whitespace-nowrap bg-indigo-50/30 dark:bg-indigo-900/10">Action (2 Steps)</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest min-w-[250px]">Submission Details</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Package Info</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Ref Docs</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest whitespace-nowrap w-48">Action (2 Steps)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -450,69 +450,75 @@ include 'includes/sidebar.php';
                         ?>
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
-                            <td class="px-6 py-5 align-top">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1.5"><?= htmlspecialchars($row['client_name']) ?></div>
-                                <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1 mb-3">
-                                    <i class="ph-bold ph-calendar-blank text-slate-400"></i> <?= date('d M Y', strtotime($row['delivery_date'])) ?>
+                            <td class="px-6 py-6 align-middle">
+                                <div class="font-black text-slate-800 dark:text-slate-200 text-sm mb-1.5 uppercase tracking-wide"><?= htmlspecialchars($row['client_name']) ?></div>
+                                <div class="text-[10px] text-slate-500 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                                    <i class="ph-bold ph-calendar-blank text-slate-400"></i> <?= strtoupper(date('d MAR Y', strtotime($row['delivery_date']))) ?>
                                 </div>
                                 
                                 <?php if($is_info_ready): ?>
-                                    <div class="p-3 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-xl border border-emerald-100 dark:border-emerald-500/10 transition-colors">
-                                        <div class="font-bold text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-1.5 mb-1"><i class="ph-fill ph-user-circle"></i> <?= htmlspecialchars($row['receiver_name']) ?> <span class="text-emerald-600/70 font-mono">(<?= htmlspecialchars($row['pic_phone']) ?>)</span></div>
-                                        <div class="text-emerald-600 dark:text-emerald-500/80 text-[10px] leading-snug line-clamp-2 font-medium" title="<?= htmlspecialchars($row['address']) ?>"><i class="ph-fill ph-map-pin mr-1"></i><?= htmlspecialchars($row['address']) ?></div>
+                                    <div class="mt-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700 transition-colors">
+                                        <div class="font-bold text-slate-700 dark:text-slate-300 text-xs flex items-center gap-1.5 mb-1">
+                                            <i class="ph-fill ph-user-circle text-slate-400"></i> 
+                                            <?= htmlspecialchars($row['receiver_name']) ?> 
+                                            <span class="text-slate-500 font-medium text-[10px]">(<?= htmlspecialchars($row['pic_phone']) ?>)</span>
+                                        </div>
+                                        <div class="text-slate-500 text-[10px] leading-snug line-clamp-2" title="<?= htmlspecialchars($row['address']) ?>">
+                                            <i class="ph-fill ph-map-pin mr-1 text-slate-400"></i><?= htmlspecialchars($row['address']) ?>
+                                        </div>
                                     </div>
                                 <?php endif; ?>
                             </td>
                             
-                            <td class="px-6 py-5 align-top">
-                                <div class="font-bold text-indigo-600 dark:text-indigo-400 text-sm mb-1">
+                            <td class="px-6 py-6 align-middle">
+                                <div class="font-bold text-indigo-600 dark:text-indigo-400 text-sm mb-2.5">
                                     <?= htmlspecialchars($row['item_name']) ?> 
                                 </div>
-                                <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase mb-2">
-                                    Qty: <?= $row['qty'] ?>
+                                <div class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest mb-2.5 shadow-sm">
+                                    QTY: <?= $row['qty'] ?>
                                 </div>
                                 <?php if(!empty($row['data_package'])): ?>
-                                    <div class="text-xs text-slate-500 font-medium flex items-center gap-1.5"><i class="ph-fill ph-database text-slate-400"></i> <?= htmlspecialchars($row['data_package']) ?></div>
+                                    <div class="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                                        <i class="ph-fill ph-database text-slate-400 text-sm"></i> <?= htmlspecialchars($row['data_package']) ?>
+                                    </div>
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-6 py-5 align-top text-center">
-                                <div class="flex flex-col gap-1.5 items-center">
-                                    <?php if($row['invoice_no']) echo "<span class='inline-flex px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 shadow-sm'>INV: {$row['invoice_no']}</span>"; ?>
-                                    <?php if($row['po_no']) echo "<span class='inline-flex px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 shadow-sm'>PO: {$row['po_no']}</span>"; ?>
-                                    <?php if($row['do_no']) echo "<span class='inline-flex px-2 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 shadow-sm'>DO: {$row['do_no']}</span>"; ?>
+                            <td class="px-6 py-6 align-middle text-center">
+                                <div class="flex flex-col gap-2 items-center">
+                                    <?php if($row['invoice_no']) echo "<span class='inline-flex px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 shadow-sm w-36 justify-center'>INV: {$row['invoice_no']}</span>"; ?>
+                                    <?php if($row['po_no']) echo "<span class='inline-flex px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 shadow-sm w-36 justify-center'>PO: {$row['po_no']}</span>"; ?>
+                                    <?php if($row['do_no']) echo "<span class='inline-flex px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 shadow-sm w-36 justify-center'>DO: {$row['do_no']}</span>"; ?>
                                     <?php if(!$row['invoice_no'] && !$row['po_no'] && !$row['do_no']) echo '<span class="text-slate-400 italic text-xs font-medium">- No Ref -</span>'; ?>
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-top w-48 bg-indigo-50/10 dark:bg-indigo-900/5">
+                            <td class="px-6 py-6 align-middle bg-slate-50/50 dark:bg-slate-900/30">
                                 <?php if($is_hr): ?>
-                                    <div class="flex flex-col gap-2.5 relative">
-                                        <div class="absolute left-4 top-6 bottom-6 w-0.5 bg-slate-200 dark:bg-slate-700 -z-10"></div>
-                                        
+                                    <div class="flex flex-col gap-3">
                                         <?php $jsonRow = htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>
                                         
-                                        <button onclick='openProcessInfoModal(<?= $jsonRow ?>)' class="w-full <?= $is_info_ready ? 'bg-white border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300' : 'bg-amber-500 hover:bg-amber-600 text-white border-transparent shadow-md shadow-amber-500/20' ?> border font-bold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-start gap-2.5 active:scale-95 relative z-10">
-                                            <div class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 <?= $is_info_ready ? 'bg-emerald-500 text-white' : 'bg-white/20 text-white' ?>">
+                                        <button onclick='openProcessInfoModal(<?= $jsonRow ?>)' class="w-full <?= $is_info_ready ? 'bg-white border-slate-200 text-slate-600 hover:border-amber-400 hover:text-amber-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 shadow-sm' : 'bg-[#EAA13A] hover:bg-[#D98E2A] text-white border-transparent shadow-md shadow-amber-500/20' ?> border font-bold py-2.5 px-4 rounded-xl transition-all text-[11px] uppercase tracking-wide flex items-center justify-start gap-3 active:scale-95">
+                                            <div class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 <?= $is_info_ready ? 'bg-emerald-500 text-white' : 'bg-white/30 text-white' ?>">
                                                 <?= $is_info_ready ? '<i class="ph-bold ph-check"></i>' : '1' ?>
                                             </div>
                                             <?= $is_info_ready ? 'Edit Alamat' : 'Isi Alamat' ?>
                                         </button>
                                         
                                         <?php if($is_info_ready): ?>
-                                            <button onclick="openResiModal(<?= $row['id'] ?>)" class="w-full bg-blue-600 hover:bg-blue-700 text-white border border-transparent font-bold py-2.5 px-4 rounded-xl shadow-md shadow-blue-600/20 transition-all text-xs flex items-center justify-start gap-2.5 active:scale-95 relative z-10">
-                                                <div class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-black text-white shrink-0">2</div>
+                                            <button onclick="openResiModal(<?= $row['id'] ?>)" class="w-full bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-600 border border-slate-200 hover:border-transparent dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-blue-600 font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all text-[11px] uppercase tracking-wide flex items-center justify-start gap-3 active:scale-95 group">
+                                                <div class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 group-hover:bg-white/30 group-hover:text-white flex items-center justify-center text-[10px] font-black shrink-0 transition-colors">2</div>
                                                 Input Resi
                                             </button>
                                         <?php else: ?>
-                                            <button disabled class="w-full bg-slate-100 text-slate-400 dark:bg-slate-800/50 dark:text-slate-600 border border-slate-200 dark:border-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-start gap-2.5 cursor-not-allowed relative z-10">
-                                                <div class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-black shrink-0">2</div>
+                                            <button disabled class="w-full bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-600 border border-slate-100 dark:border-slate-700 font-bold py-2.5 px-4 rounded-xl text-[11px] uppercase tracking-wide flex items-center justify-start gap-3 cursor-not-allowed">
+                                                <div class="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-400 flex items-center justify-center text-[10px] font-black shrink-0">2</div>
                                                 Input Resi
                                             </button>
                                         <?php endif; ?>
                                     </div>
                                 <?php else: ?>
-                                    <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center text-slate-400 font-medium text-xs">
+                                    <div class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center text-slate-400 font-medium text-xs shadow-sm">
                                         <i class="ph-fill ph-lock-key text-lg mb-1 block"></i> Restricted
                                     </div>
                                 <?php endif; ?>
@@ -527,7 +533,7 @@ include 'includes/sidebar.php';
                                         <i class="ph-fill ph-check-circle text-4xl text-emerald-500"></i>
                                     </div>
                                     <h4 class="font-black text-slate-700 dark:text-slate-200 text-base mb-1">Queue Empty</h4>
-                                    <p class="text-sm font-medium">Tidak ada antrean request pengiriman dari IT.</p>
+                                    <p class="text-sm font-medium">Tidak ada antrean request pengiriman dari IT yang perlu diproses.</p>
                                 </div>
                             </td>
                         </tr>
