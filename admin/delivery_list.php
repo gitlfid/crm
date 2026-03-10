@@ -82,11 +82,11 @@ $result = $conn->query($sql);
             <h3 class="mb-1">Delivery Management</h3>
             <p class="text-muted small mb-0">Monitor status pengiriman dan riwayat logistik.</p>
         </div>
-        <!-- <div class="col-md-6 text-end">
+        <div class="col-md-6 text-end">
             <a href="delivery_form.php" class="btn btn-primary shadow-sm btn-sm px-3 py-2">
                 <i class="bi bi-plus-lg me-2"></i> Input Delivery
             </a>
-        </div> -->
+        </div>
     </div>
 </div>
 
