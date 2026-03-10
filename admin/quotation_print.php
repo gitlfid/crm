@@ -205,7 +205,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
             </tr>
             <?php endforeach; ?>
             
-            <?php 
+            <!-- <?php 
                 // Kalkulasi Sub Total, VAT, & Total
                 if ($is_intl) {
                     $vatAmount = 0;
@@ -237,7 +237,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                 <td class="value-cell" contenteditable="true"><?= format_money($totalQuotation, $is_intl) ?></td>
             </tr>
         </tbody>
-    </table>
+    </table> -->
 
     <table class="footer-layout">
         <tr>
