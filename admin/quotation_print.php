@@ -83,12 +83,13 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
         .company-addr { font-size: 10px; color: #333; max-width: 350px; line-height: 1.3; }
         .doc-title { text-align: right; font-size: 24px; font-weight: bold; text-transform: uppercase; vertical-align: bottom; }
 
+        /* PERBAIKAN CSS TABEL INFO (Mencegah border tembus ke dalam) */
         .info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 1px solid #000; }
-        .info-table td { border: 1px solid #000; padding: 8px; vertical-align: top; width: 50%; }
+        .info-box { border: 1px solid #000; padding: 8px; vertical-align: top; width: 50%; }
         
-        .inner-info { width: 100%; font-size: 11px; border-collapse: collapse; }
-        .inner-info td { padding: 2px 0; vertical-align: top; }
-        .lbl { width: 70px; font-weight: bold; }
+        .inner-info { width: 100%; font-size: 11px; border-collapse: collapse; border: none; }
+        .inner-info td { padding: 3px 0; vertical-align: top; border: none; }
+        .lbl { width: 70px; font-weight: bold; white-space: nowrap; }
         .sep { width: 15px; text-align: center; }
 
         .items-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; border: 1px solid #000; }
@@ -136,14 +137,14 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
 
     <table class="info-table">
         <tr>
-            <td>
+            <td class="info-box">
                 <table class="inner-info">
                     <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($quo['company_name']) ?></strong></td></tr>
                     <tr><td class="lbl">Address</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= nl2br(htmlspecialchars($quo['c_address'])) ?></td></tr>
                     <tr><td class="lbl">Attn.</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= htmlspecialchars($quo['pic_name']) ?> <?= !empty($quo['pic_phone']) ? "(".htmlspecialchars($quo['pic_phone']).")" : "" ?></td></tr>
                 </table>
             </td>
-            <td>
+            <td class="info-box">
                 <table class="inner-info">
                     <tr><td class="lbl">Quotation</td><td class="sep">:</td><td><strong><?= $quo['quotation_no'] ?></strong></td></tr>
                     <tr><td class="lbl">Date</td><td class="sep">:</td><td <?= $can_edit_note ?>><?= date('d/m/Y', strtotime($quo['quotation_date'])) ?></td></tr>
