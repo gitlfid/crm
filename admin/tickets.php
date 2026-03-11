@@ -15,32 +15,51 @@ $sql = "SELECT t.*, u.username as assigned_name
         LEFT JOIN users u ON t.assigned_to = u.id 
         WHERE 1=1";
 
-// 2. Filter Logic 
+// Base Filter Logic
+$filter_query = "";
 if (!empty($filter_id)) {
     $safe_id = $conn->real_escape_string($filter_id);
-    $sql .= " AND t.ticket_code LIKE '%$safe_id%'";
+    $filter_query .= " AND t.ticket_code LIKE '%$safe_id%'";
 }
-
-if (!empty($filter_status)) {
-    $safe_status = $conn->real_escape_string($filter_status);
-    $sql .= " AND t.status = '$safe_status'";
-}
-
 if (!empty($filter_company)) {
     $safe_company = $conn->real_escape_string($filter_company);
-    $sql .= " AND t.company LIKE '%$safe_company%'";
+    $filter_query .= " AND t.company LIKE '%$safe_company%'";
 }
 
-// Urutkan
-$sql .= " ORDER BY t.created_at DESC";
+// Tambahkan Filter ke Query Utama
+$sql_main = $sql . $filter_query;
+if (!empty($filter_status)) {
+    $safe_status = $conn->real_escape_string($filter_status);
+    $sql_main .= " AND t.status = '$safe_status'";
+}
 
-$result = $conn->query($sql);
+// Urutkan Query Utama
+$sql_main .= " ORDER BY t.created_at DESC";
+$result = $conn->query($sql_main);
 
-// --- Helper Mapping untuk UI Tailwind (Diperbarui agar lebih kontras & modern) ---
+// --- LOGIKA STATISTIK DINAMIS ---
+// Mengambil statistik tiket berdasarkan filter pencarian (tanpa memfilter status agar kartu ringkasan tetap akurat)
+$sql_stats = "SELECT status, COUNT(*) as count FROM tickets t WHERE 1=1 " . $filter_query . " GROUP BY status";
+$res_stats = $conn->query($sql_stats);
+
+$stats = ['total' => 0, 'open' => 0, 'progress' => 0, 'closed' => 0, 'other' => 0];
+if($res_stats) {
+    while($s = $res_stats->fetch_assoc()) {
+        $st = strtolower($s['status']);
+        $stats['total'] += $s['count'];
+        if (isset($stats[$st])) {
+            $stats[$st] += $s['count'];
+        } else {
+            $stats['other'] += $s['count'];
+        }
+    }
+}
+
+// --- Helper Mapping untuk UI Tailwind ---
 $type_styles = [
-    'support' => 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/20 dark:text-indigo-400',
-    'payment' => 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400',
-    'info'    => 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-400'
+    'support' => 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-500/20 dark:border-indigo-500/30 dark:text-indigo-300',
+    'payment' => 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/20 dark:border-amber-500/30 dark:text-amber-300',
+    'info'    => 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/20 dark:border-sky-500/30 dark:text-sky-300'
 ];
 $type_icons = [
     'support' => 'ph-lifebuoy',
@@ -77,31 +96,60 @@ $status_icons = [
     .animate-spin-slow { animation: spin 3s linear infinite; }
 </style>
 
-<div class="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto space-y-6 animate-fade-in-up">
+<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto space-y-6 animate-fade-in-up">
     
     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-2">
         <div>
             <h1 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400 flex items-center justify-center text-xl shadow-inner">
-                    <i class="ph-bold ph-users-three"></i>
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/30">
+                    <i class="ph-fill ph-headset"></i>
                 </div>
                 External Tickets
             </h1>
             <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Pusat manajemen dukungan pelanggan dan penyelesaian keluhan masuk.</p>
         </div>
-        <nav aria-label="breadcrumb" class="hidden md:block">
-            <ol class="flex items-center gap-2 text-xs font-bold tracking-widest uppercase text-slate-400 bg-white dark:bg-[#24303F] px-4 py-2 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                <li><a href="dashboard.php" class="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1.5"><i class="ph-bold ph-squares-four text-sm"></i> Dashboard</a></li>
-                <li><i class="ph-bold ph-caret-right"></i></li>
-                <li class="text-cyan-600 dark:text-cyan-400 flex items-center gap-1.5"><i class="ph-bold ph-headset text-sm"></i> Tickets</li>
-            </ol>
-        </nav>
+        <div class="flex items-center gap-3">
+            <button onclick="window.location.reload()" class="group inline-flex items-center justify-center w-11 h-11 bg-white dark:bg-[#24303F] border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl shadow-sm transition-all active:scale-95" title="Refresh Data">
+                <i class="ph-bold ph-arrows-clockwise text-xl group-hover:rotate-180 transition-transform duration-500"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-ticket"></i></div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
+                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['total']) ?></h4>
+            </div>
+        </div>
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-envelope-open"></i></div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Open</p>
+                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['open']) ?></h4>
+            </div>
+        </div>
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-hourglass-high"></i></div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Progress</p>
+                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['progress']) ?></h4>
+            </div>
+        </div>
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1">
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400 flex items-center justify-center text-2xl shrink-0"><i class="ph-fill ph-check-circle"></i></div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Closed</p>
+                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['closed']) ?></h4>
+            </div>
+        </div>
     </div>
 
     <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 transition-colors duration-300">
         <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-t-3xl transition-colors" id="filterToggleBtn">
             <h3 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                <i class="ph-bold ph-funnel text-indigo-500 text-lg"></i> Filter & Pencarian
+                <i class="ph-bold ph-funnel text-cyan-500 text-lg"></i> Filter Data & Pencarian
             </h3>
             <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-transform">
                 <i id="filterIcon" class="ph-bold ph-caret-up transition-transform duration-300"></i>
@@ -113,26 +161,26 @@ $status_icons = [
                 <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-5 items-end">
                     
                     <div class="lg:col-span-3">
-                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Nomor Ticket</label>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">No Ticket</label>
                         <div class="relative group">
-                            <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
-                            <input type="text" name="search_id" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner" placeholder="e.g. LFID-..." value="<?= htmlspecialchars($filter_id) ?>">
+                            <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-cyan-500 transition-colors"></i>
+                            <input type="text" name="search_id" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. LFID-..." value="<?= htmlspecialchars($filter_id) ?>">
                         </div>
                     </div>
 
                     <div class="lg:col-span-4">
-                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Nama Perusahaan</label>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Client / Perusahaan</label>
                         <div class="relative group">
-                            <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
-                            <input type="text" name="filter_company" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner" placeholder="Cari nama client/perusahaan..." value="<?= htmlspecialchars($filter_company) ?>">
+                            <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-cyan-500 transition-colors"></i>
+                            <input type="text" name="filter_company" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner" placeholder="Cari nama perusahaan..." value="<?= htmlspecialchars($filter_company) ?>">
                         </div>
                     </div>
 
                     <div class="lg:col-span-3">
-                        <label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Status Tiket</label>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Status Tiket</label>
                         <div class="relative group">
-                            <i class="ph-bold ph-list-dashes absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
-                            <select name="filter_status" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                            <i class="ph-bold ph-list-dashes absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-cyan-500 transition-colors"></i>
+                            <select name="filter_status" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
                                 <option value="">Semua Status</option>
                                 <option value="open" <?= $filter_status == 'open' ? 'selected' : '' ?>>Open</option>
                                 <option value="progress" <?= $filter_status == 'progress' ? 'selected' : '' ?>>In Progress</option>
@@ -145,7 +193,7 @@ $status_icons = [
                     </div>
 
                     <div class="lg:col-span-2 flex gap-3 h-[46px]">
-                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-cyan-600 dark:hover:bg-cyan-700 text-white font-bold rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-cyan-600 dark:hover:bg-cyan-700 text-white font-bold rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-2">
                             <i class="ph-bold ph-funnel"></i> Filter
                         </button>
                         <?php if(!empty($filter_id) || !empty($filter_status) || !empty($filter_company)): ?>
@@ -163,14 +211,14 @@ $status_icons = [
     <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300">
         <div class="overflow-x-auto modern-scrollbar w-full">
             <table class="w-full text-left border-collapse">
-                <thead class="bg-slate-50/50 dark:bg-slate-800/30">
+                <thead class="bg-slate-50/80 dark:bg-slate-800/30">
                     <tr>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Ticket Info</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider min-w-[250px]">Subject & Type</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Client / Company</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Assignment</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-xs font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Action</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Informasi Tiket</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-wider min-w-[250px]">Subject & Tipe</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Klien / Perusahaan</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Ditugaskan Kepada</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -179,13 +227,13 @@ $status_icons = [
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
                             <td class="px-6 py-5 align-middle">
-                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono font-bold text-xs border border-indigo-100 dark:border-indigo-500/20 mb-2">
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-mono font-bold text-[11px] border border-indigo-100 dark:border-indigo-500/20 mb-2">
                                     <i class="ph-bold ph-hash"></i>
                                     <?= htmlspecialchars($row['ticket_code']) ?>
                                 </div>
                                 <div class="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 whitespace-nowrap">
                                     <i class="ph-fill ph-calendar-blank"></i>
-                                    <?= date('d M Y', strtotime($row['created_at'])) ?>
+                                    <?= date('d M Y, H:i', strtotime($row['created_at'])) ?>
                                 </div>
                             </td>
 
@@ -195,17 +243,17 @@ $status_icons = [
                                     $tStyle = isset($type_styles[$t]) ? $type_styles[$t] : $type_styles['info'];
                                     $tIcon  = isset($type_icons[$t]) ? $type_icons[$t] : $type_icons['info'];
                                 ?>
-                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-widest border mb-2 <?= $tStyle ?>">
-                                    <i class="ph-fill <?= $tIcon ?> text-[11px]"></i> <?= htmlspecialchars($row['type']) ?>
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest border mb-2 shadow-sm <?= $tStyle ?>">
+                                    <i class="ph-fill <?= $tIcon ?> text-xs"></i> <?= htmlspecialchars($row['type']) ?>
                                 </span>
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" title="<?= htmlspecialchars($row['subject']) ?>">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm line-clamp-2 leading-snug group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors" title="<?= htmlspecialchars($row['subject']) ?>">
                                     <?= htmlspecialchars($row['subject']) ?>
                                 </div>
                             </td>
 
                             <td class="px-6 py-5 align-middle">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-black text-sm uppercase shrink-0 border border-slate-200 dark:border-slate-600 shadow-sm">
+                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-700 dark:text-slate-200 font-black text-sm uppercase shrink-0 shadow-inner">
                                         <?= strtoupper(substr($row['company'], 0, 1)) ?>
                                     </div>
                                     <div class="font-bold text-slate-700 dark:text-slate-300 text-sm truncate max-w-[180px]" title="<?= htmlspecialchars($row['company']) ?>">
@@ -216,9 +264,9 @@ $status_icons = [
 
                             <td class="px-6 py-5 align-middle">
                                 <?php if($row['assigned_name']): ?>
-                                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 shadow-sm">
-                                        <div class="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-slate-100 ring-2 ring-white dark:ring-slate-700">
-                                            <img src="https://ui-avatars.com/api/?name=<?= urlencode($row['assigned_name']) ?>&background=random&size=64" alt="Avatar" class="w-full h-full object-cover">
+                                    <div class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A222C] shadow-sm">
+                                        <div class="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-slate-100 ring-2 ring-white dark:ring-slate-800">
+                                            <img src="https://ui-avatars.com/api/?name=<?= urlencode($row['assigned_name']) ?>&background=random&color=fff&size=64" alt="Avatar" class="w-full h-full object-cover">
                                         </div>
                                         <span class="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap"><?= htmlspecialchars($row['assigned_name']) ?></span>
                                     </div>
@@ -244,7 +292,7 @@ $status_icons = [
                             </td>
 
                             <td class="px-6 py-5 align-middle text-center">
-                                <a href="view_ticket.php?id=<?= $row['id'] ?>" class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 hover:bg-cyan-600 text-slate-500 hover:text-white dark:bg-slate-800 dark:hover:bg-cyan-600 dark:text-slate-400 dark:hover:text-white transition-all shadow-sm active:scale-95 group/btn" title="Kelola Tiket">
+                                <a href="view_ticket.php?id=<?= $row['id'] ?>" class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-cyan-600 hover:border-cyan-600 text-slate-600 hover:text-white dark:text-slate-300 dark:hover:bg-cyan-600 dark:hover:border-cyan-600 dark:hover:text-white transition-all shadow-sm active:scale-95 group/btn" title="Kelola Tiket">
                                     <i class="ph-bold ph-arrow-right text-lg group-hover/btn:translate-x-0.5 transition-transform"></i>
                                 </a>
                             </td>
@@ -255,13 +303,15 @@ $status_icons = [
                         <tr>
                             <td colspan="6" class="px-6 py-16 text-center">
                                 <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
-                                    <div class="w-20 h-20 rounded-3xl bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
-                                        <i class="ph-fill ph-ticket text-4xl text-slate-300 dark:text-slate-600"></i>
+                                    <div class="w-24 h-24 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
+                                        <i class="ph-fill ph-ticket text-5xl text-slate-300 dark:text-slate-600"></i>
                                     </div>
-                                    <h4 class="font-black text-slate-700 dark:text-slate-200 text-base mb-1">Data Tidak Ditemukan</h4>
-                                    <p class="text-sm font-medium">Data ticket eksternal tidak ditemukan dengan filter saat ini.</p>
+                                    <h4 class="font-black text-slate-700 dark:text-slate-200 text-lg mb-1">Data Tidak Ditemukan</h4>
+                                    <p class="text-sm font-medium">Data tiket eksternal tidak ditemukan dengan filter saat ini.</p>
                                     <?php if(!empty($filter_id) || !empty($filter_status) || !empty($filter_company)): ?>
-                                        <a href="tickets.php" class="mt-4 text-cyan-600 dark:text-cyan-400 font-bold text-sm hover:underline">Reset Filter Pencarian</a>
+                                        <a href="tickets.php" class="mt-5 inline-flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-sm">
+                                            <i class="ph-bold ph-arrows-counter-clockwise"></i> Reset Filter
+                                        </a>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -273,8 +323,8 @@ $status_icons = [
         
         <?php if($result && $result->num_rows > 0): ?>
         <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-center">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest bg-white dark:bg-[#1A222C] px-4 py-1.5 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm">
-                Total Data: <span class="text-cyan-600 dark:text-cyan-400 ml-1"><?= $result->num_rows ?> Tiket</span>
+            <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-white dark:bg-[#1A222C] px-5 py-2 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm">
+                Menampilkan Total <span class="text-cyan-600 dark:text-cyan-400 font-black mx-1"><?= $result->num_rows ?></span> Tiket
             </p>
         </div>
         <?php endif; ?>
