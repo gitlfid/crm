@@ -46,7 +46,7 @@ if (isset($_POST['export_excel'])) {
     $output = fopen('php://output', 'w');
     
     // Header CSV
-    fputcsv($output, array('PO Number', 'Quote Ref', 'Date', 'Client', 'PIC', 'Total Amount', 'Currency', 'Status', 'Sales Person', 'PO File'));
+    fputcsv($output, array('PO Number', 'Quote Ref', 'Date', 'Client', 'PIC', 'Total Amount', 'Currency', 'Status', 'Created By', 'PO File'));
     
     while($row = $resEx->fetch_assoc()) {
         $qId = $row['id'];
@@ -100,6 +100,7 @@ if (isset($_POST['upload_po_doc'])) {
 
     if (isset($_FILES['po_file']) && $_FILES['po_file']['error'] == 0) {
         $ext = strtolower(pathinfo($_FILES['po_file']['name'], PATHINFO_EXTENSION));
+        // Validasi tipe file
         if (in_array($ext, ['jpg', 'jpeg', 'png', 'pdf'])) {
             $fileName = 'PO_' . time() . '_' . $q_id . '.' . $ext;
             if (move_uploaded_file($_FILES['po_file']['tmp_name'], $uploadDir . $fileName)) {
@@ -334,7 +335,7 @@ $res = $conn->query($sql);
                                 </div>
                                 <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A222C] shadow-sm">
                                     <i class="ph-fill ph-user-circle text-slate-400"></i>
-                                    <span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">Sales: <?= htmlspecialchars($row['username'] ?? '') ?></span>
+                                    <span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">Created By: <?= htmlspecialchars($row['username'] ?? '') ?></span>
                                 </div>
                             </td>
 
@@ -372,11 +373,11 @@ $res = $conn->query($sql);
 
                             <td class="px-6 py-5 align-middle text-center whitespace-nowrap relative">
                                 <div class="relative inline-block text-left" data-dropdown>
-                                    <button type="button" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-cyan-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-cyan-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
+                                    <button type="button" onclick="toggleActionMenu(event, <?= $row['id'] ?>)" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-cyan-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-cyan-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
                                         <i class="ph-bold ph-dots-three-vertical text-lg pointer-events-none"></i>
                                     </button>
 
-                                    <div class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
+                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
                                         
                                         <div class="py-1">
                                             <a href="quotation_print.php?id=<?= $row['id'] ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
@@ -587,19 +588,26 @@ $res = $conn->query($sql);
         }
     });
 
-    // --- CUSTOM DROPDOWN MENU LOGIC ---
+    // --- CUSTOM DROPDOWN MENU LOGIC (FIXED) ---
     let currentOpenDropdown = null;
-    function toggleActionMenu(id) {
+    
+    function toggleActionMenu(e, id) {
+        e.stopPropagation(); // Mencegah event ditangkap oleh document.onClick
         const menu = document.getElementById('action-menu-' + id);
+        
+        // Tutup menu lain yang sedang terbuka
         if (currentOpenDropdown && currentOpenDropdown !== menu) {
             currentOpenDropdown.classList.add('hidden');
         }
+        
+        // Toggle menu ini
         menu.classList.toggle('hidden');
         currentOpenDropdown = menu.classList.contains('hidden') ? null : menu;
     }
     
     document.addEventListener('click', (e) => {
-        if (currentOpenDropdown && !e.target.closest('td.relative')) {
+        // Tutup dropdown jika area diluar dropdown di klik
+        if (currentOpenDropdown && !currentOpenDropdown.contains(e.target)) {
             currentOpenDropdown.classList.add('hidden');
             currentOpenDropdown = null;
         }
