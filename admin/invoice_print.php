@@ -228,15 +228,14 @@ function getSpelledOutNumber($number) {
             .print-container { 
                 box-shadow: none !important; 
                 margin: 0 !important; 
-                padding: 10mm 15mm !important; /* Kurangi padding agar area isi lebih luas */
+                padding: 10mm 15mm !important; 
                 width: 100% !important;
                 max-width: 100% !important;
-                height: 100vh !important; /* Paksa 1 halaman */
+                height: 100vh !important; 
                 display: flex;
                 flex-direction: column;
             }
             
-            /* Hindari tabel dan elemen patah ke halaman berikutnya */
             table { page-break-inside: auto; }
             tr    { page-break-inside: avoid; page-break-after: auto; }
             thead { display: table-header-group; }
@@ -252,13 +251,10 @@ function getSpelledOutNumber($number) {
             }
         }
 
-        /* Editable Hover Effects (Interactive Screen Mode) */
         [contenteditable="true"] { transition: all 0.2s; outline: none; }
         [contenteditable="true"]:hover { background-color: #fef08a; box-shadow: 0 0 0 4px #fef08a; border-radius: 2px; cursor: text; }
         [contenteditable="true"]:focus { background-color: #fef08a; box-shadow: 0 0 0 4px #fef08a; border-radius: 2px; cursor: text; border-bottom: 2px dashed #eab308; }
         
-        /* Utility untuk Compact Size */
-        .text-xxs { font-size: 0.65rem; line-height: 1rem; }
     </style>
 </head>
 <body class="py-8 print:py-0 text-[11px]">
@@ -342,7 +338,7 @@ function getSpelledOutNumber($number) {
             </div>
         </div>
 
-        <div class="border border-slate-800 rounded-lg overflow-hidden mb-4 flex-grow relative">
+        <div class="border border-slate-800 rounded-lg overflow-hidden mb-4 shrink-0">
             <table class="w-full text-left text-[10px]">
                 <thead class="bg-slate-800 text-white font-bold uppercase tracking-wider text-[9px]">
                     <tr>
@@ -385,6 +381,10 @@ function getSpelledOutNumber($number) {
                         <td class="py-2 px-3 text-right font-bold text-slate-800 align-top" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_international) ?></td>
                     </tr>
                     <?php endforeach; ?>
+                    
+                    <tr>
+                        <td colspan="6" class="py-3"></td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -407,7 +407,7 @@ function getSpelledOutNumber($number) {
             $currency_text = $is_international ? ($inv['currency'] == 'USD' ? "US Dollars" : $inv['currency']) : "Rupiah";
             $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text;
         ?>
-        <div class="flex justify-end mb-4 shrink-0 avoid-break">
+        <div class="flex justify-end mb-4 shrink-0 avoid-break mt-auto">
             <div class="w-1/2 rounded-xl bg-slate-50 border border-slate-200 p-3">
                 <table class="w-full text-[10px]">
                     <tbody>
@@ -442,7 +442,6 @@ function getSpelledOutNumber($number) {
         <div class="grid grid-cols-12 gap-6 shrink-0 avoid-break">
             
             <div class="col-span-8 flex flex-col gap-3">
-                
                 <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
                     <span class="text-[9px] font-black text-emerald-600 uppercase tracking-widest block mb-0.5">Amount in words:</span>
                     <div class="font-bold text-emerald-800 italic text-[10px] leading-snug" <?= $can_edit_note ?>><?= htmlspecialchars($amountInWords) ?></div>
