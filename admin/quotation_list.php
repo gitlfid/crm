@@ -256,65 +256,65 @@ $status_icons = [
         
         <div id="filterBody" class="p-6 block transition-all duration-300">
             <form method="GET" id="filterForm">
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-5 items-end">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-end">
                     
-                    <div class="xl:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">No Quotation</label>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">No Quotation</label>
                         <div class="relative group">
-                            <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
-                            <input type="text" name="search" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. QUO-..." value="<?= htmlspecialchars($search) ?>">
+                            <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-focus-within:text-indigo-500 transition-colors"></i>
+                            <input type="text" name="search" class="w-full pl-9 pr-3 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. QUO-..." value="<?= htmlspecialchars($search) ?>">
                         </div>
                     </div>
 
-                    <div class="xl:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Klien / Perusahaan</label>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Klien / Perusahaan</label>
                         <div class="relative group">
-                            <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
-                            <select name="client_id" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                            <i class="ph-bold ph-buildings absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-focus-within:text-indigo-500 transition-colors"></i>
+                            <select name="client_id" class="w-full pl-9 pr-8 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
                                 <option value="">Semua Klien</option>
                                 <?php if($clients->num_rows > 0) { $clients->data_seek(0); while($c = $clients->fetch_assoc()): ?>
                                     <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name']) ?></option>
                                 <?php endwhile; } ?>
                             </select>
-                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
                         </div>
                     </div>
 
-                    <div class="xl:col-span-2">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Status</label>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Status</label>
                         <div class="relative group">
-                            <i class="ph-bold ph-list-dashes absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
-                            <select name="status" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
-                                <option value="">Semua</option>
+                            <i class="ph-bold ph-list-dashes absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-focus-within:text-indigo-500 transition-colors"></i>
+                            <select name="status" class="w-full pl-9 pr-8 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                                <option value="">Semua Status</option>
                                 <option value="draft" <?= $f_status=='draft'?'selected':'' ?>>Draft</option>
                                 <option value="sent" <?= $f_status=='sent'?'selected':'' ?>>Sent</option>
                                 <option value="po_received" <?= $f_status=='po_received'?'selected':'' ?>>PO Received</option>
                                 <option value="invoiced" <?= $f_status=='invoiced'?'selected':'' ?>>Invoiced</option>
                                 <option value="cancel" <?= $f_status=='cancel'?'selected':'' ?>>Cancelled</option>
                             </select>
-                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                            <i class="ph-bold ph-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
                         </div>
                     </div>
 
-                    <div class="xl:col-span-2">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Periode Tanggal</label>
+                    <div class="xl:col-span-2 lg:col-span-2 md:col-span-2">
+                        <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Periode Tanggal</label>
                         <div class="flex items-center gap-2">
-                            <input type="date" name="start_date" class="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner" value="<?= $f_start ?>">
+                            <input type="date" name="start_date" class="w-full px-3 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner" value="<?= $f_start ?>">
                             <span class="text-slate-400 font-bold">-</span>
-                            <input type="date" name="end_date" class="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner" value="<?= $f_end ?>">
+                            <input type="date" name="end_date" class="w-full px-3 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner" value="<?= $f_end ?>">
                         </div>
                     </div>
 
-                    <div class="xl:col-span-2 flex gap-2 h-[46px]">
-                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-2">
-                            <i class="ph-bold ph-funnel"></i> Terapkan
+                    <div class="xl:col-span-5 lg:col-span-4 md:col-span-2 flex gap-2 pt-2 xl:pt-0 justify-end w-full">
+                        <button type="submit" class="bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold h-[42px] px-6 rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-2 text-xs">
+                            <i class="ph-bold ph-funnel text-sm"></i> Terapkan
                         </button>
-                        <button type="submit" formmethod="POST" name="export_excel" class="flex-none w-[46px] bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white border border-emerald-200 dark:border-emerald-500/20 transition-all rounded-xl active:scale-95 flex items-center justify-center" title="Export to Excel">
-                            <i class="ph-bold ph-microsoft-excel-logo text-lg"></i>
+                        <button type="submit" formmethod="POST" name="export_excel" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white border border-emerald-200 dark:border-emerald-500/20 transition-all h-[42px] px-4 rounded-xl active:scale-95 flex items-center justify-center" title="Export to Excel">
+                            <i class="ph-bold ph-microsoft-excel-logo text-base"></i>
                         </button>
                         <?php if(!empty($search) || !empty($f_client) || !empty($f_status) || !empty($f_start)): ?>
-                            <a href="quotation_list.php" class="flex-none w-[46px] bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
-                                <i class="ph-bold ph-arrows-counter-clockwise text-lg"></i>
+                            <a href="quotation_list.php" class="bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold h-[42px] px-4 rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
+                                <i class="ph-bold ph-arrows-counter-clockwise text-base"></i>
                             </a>
                         <?php endif; ?>
                     </div>
