@@ -1,5 +1,5 @@
 <?php
-// --- 1. LOAD CONFIG DULUAN ---
+// --- 1. LOAD CONFIG ---
 include '../config/functions.php';
 
 // --- 2. LOGIKA DELETE ---
