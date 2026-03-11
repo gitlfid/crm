@@ -464,20 +464,36 @@ $res = $conn->query($sql);
         </div>
     </div>
 
-    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 transition-colors duration-300 relative min-h-[400px]">
-        <div class="overflow-x-auto modern-scrollbar w-full pb-32"> 
-            <table class="w-full text-left border-collapse table-auto min-w-[1000px]">
-                <thead class="bg-slate-50/80 dark:bg-slate-800/30">
+    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 flex flex-col min-h-[500px] relative">
+        
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Tampilkan</span>
+                <select id="pageSize" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-indigo-500/50 outline-none cursor-pointer">
+                    <option value="10">10 Baris</option>
+                    <option value="50">50 Baris</option>
+                    <option value="100">100 Baris</option>
+                </select>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Data</span>
+            </div>
+            <div class="text-xs font-bold text-slate-500 dark:text-slate-400" id="paginationInfo">
+                Menampilkan 0 dari 0 data
+            </div>
+        </div>
+
+        <div class="overflow-x-auto modern-scrollbar flex-grow pb-24"> 
+            <table class="w-full text-left border-collapse table-fixed min-w-[1100px]">
+                <thead class="bg-slate-50/80 dark:bg-slate-800/50">
                     <tr>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Invoice Info</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-wider min-w-[200px]">Client Details</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] text-right font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Financial Info</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Note</th>
-                        <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap">Action</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[22%]">Invoice Info</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[28%]">Client Details</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-right text-[10px] font-black text-slate-400 uppercase tracking-wider w-[18%]">Financial Info</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[14%]">Status</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[10%]">Note</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[8%]">Action</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50">
+                <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/50">
                     <?php if($res->num_rows > 0): ?>
                         <?php while($row = $res->fetch_assoc()): ?>
                         <?php
@@ -521,7 +537,7 @@ $res = $conn->query($sql);
                             $hasNote = !empty($row['general_notes']);
                             $doCount = intval($row['do_count']);
                         ?>
-                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                        <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
                             <td class="px-6 py-5 align-middle whitespace-nowrap">
                                 <div class="font-mono font-black text-indigo-600 dark:text-indigo-400 text-[13px] mb-1 tracking-wide">
@@ -544,14 +560,14 @@ $res = $conn->query($sql);
                             </td>
 
                             <td class="px-6 py-5 align-middle">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1.5 truncate max-w-[250px] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" title="<?= htmlspecialchars($row['company_name']) ?>">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1.5 leading-snug break-words whitespace-normal pr-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" title="<?= htmlspecialchars($row['company_name']) ?>">
                                     <?= htmlspecialchars($row['company_name']) ?>
                                 </div>
-                                <div class="flex flex-col gap-1">
-                                    <div class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                <div class="flex flex-col gap-1 items-start">
+                                    <div class="text-[10px] text-slate-500 dark:text-slate-400 font-medium break-words whitespace-normal">
                                         Ref: <span class="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"><?= htmlspecialchars($row['quotation_no']) ?></span>
                                     </div>
-                                    <span class="inline-block w-max px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 text-[9px] font-black uppercase tracking-widest mt-0.5">
+                                    <span class="inline-block px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 text-[9px] font-black uppercase tracking-widest mt-0.5">
                                         <?= htmlspecialchars($row['invoice_type']) ?>
                                     </span>
                                 </div>
@@ -612,19 +628,19 @@ $res = $conn->query($sql);
                                         <i class="ph-bold ph-dots-three-vertical text-lg pointer-events-none"></i>
                                     </button>
 
-                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
+                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-[100] overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
                                         
                                         <div class="py-1">
-                                            <a href="invoice_print.php?id=<?= $row['id'] ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-colors">
+                                            <a href="invoice_print.php?id=<?= $row['id'] ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-colors">
                                                 <i class="ph-bold ph-printer text-base text-slate-400 group-hover:text-indigo-500"></i> Print PDF
                                             </a>
                                             
-                                            <button type="button" onclick="openTaxModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['invoice_no']) ?>')" class="w-full text-left group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-400 transition-colors">
+                                            <button type="button" onclick="openTaxModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['invoice_no']) ?>')" class="w-full text-left group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-400 transition-colors">
                                                 <i class="ph-bold ph-receipt text-base text-slate-400 group-hover:text-sky-500"></i> <?= $hasTax ? 'Update Tax' : 'Upload Tax' ?>
                                             </button>
                                             
                                             <?php if($hasTax): ?>
-                                            <a href="../uploads/<?= htmlspecialchars($row['tax_invoice_file']) ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <a href="../uploads/<?= htmlspecialchars($row['tax_invoice_file']) ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-eye text-base text-slate-400"></i> View Tax
                                             </a>
                                             <?php endif; ?>
@@ -632,7 +648,7 @@ $res = $conn->query($sql);
 
                                         <?php if($st == 'paid' || $totalPaid > 0): ?>
                                         <div class="py-1">
-                                            <a href="delivery_order_form.php?from_invoice_id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors">
+                                            <a href="delivery_order_form.php?from_invoice_id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors">
                                                 <i class="ph-bold ph-truck text-base"></i> Create DO
                                             </a>
                                         </div>
@@ -641,20 +657,20 @@ $res = $conn->query($sql);
                                         <?php if($st != 'paid' && $st != 'cancel'): ?>
                                         <div class="py-1">
                                             <?php if($st == 'draft'): ?>
-                                            <a href="invoice_edit.php?id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                            <a href="invoice_edit.php?id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-pencil-simple text-base text-slate-400"></i> Edit Invoice
                                             </a>
-                                            <a href="?action=sent&id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-colors">
+                                            <a href="?action=sent&id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-colors">
                                                 <i class="ph-bold ph-paper-plane-tilt text-base"></i> Mark Sent
                                             </a>
                                             <?php endif; ?>
                                             
-                                            <button type="button" onclick="openPayModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['invoice_no']) ?>', <?= $grandTotal ?>)" class="w-full text-left group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors">
+                                            <button type="button" onclick="openPayModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['invoice_no']) ?>', <?= $grandTotal ?>)" class="w-full text-left group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors">
                                                 <i class="ph-bold ph-wallet text-base"></i> Add Payment / DP
                                             </button>
                                         </div>
                                         <div class="py-1 bg-slate-50/50 dark:bg-slate-800/30">
-                                            <a href="?action=cancel&id=<?= $row['id'] ?>" onclick="return confirm('Batalkan Invoice ini?')" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                            <a href="?action=cancel&id=<?= $row['id'] ?>" onclick="return confirm('Batalkan Invoice ini?')" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
                                                 <i class="ph-bold ph-x-circle text-base"></i> Cancel Invoice
                                             </a>
                                         </div>
@@ -662,7 +678,7 @@ $res = $conn->query($sql);
 
                                         <?php if($user_role == 'admin'): ?>
                                         <div class="py-1 bg-slate-50/50 dark:bg-slate-800/30">
-                                            <a href="?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen? Data tidak dapat dikembalikan.')" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-black text-rose-600 hover:bg-rose-600 hover:text-white dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-colors">
+                                            <a href="?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen? Data tidak dapat dikembalikan.')" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-black text-rose-600 hover:bg-rose-600 hover:text-white dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-colors">
                                                 <i class="ph-bold ph-trash text-base"></i> Delete
                                             </a>
                                         </div>
@@ -674,7 +690,7 @@ $res = $conn->query($sql);
                         </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
-                        <tr>
+                        <tr id="emptyRow">
                             <td colspan="6" class="px-6 py-16 text-center">
                                 <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                                     <div class="w-24 h-24 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
@@ -682,11 +698,6 @@ $res = $conn->query($sql);
                                     </div>
                                     <h4 class="font-black text-slate-700 dark:text-slate-200 text-lg mb-1">Data Tidak Ditemukan</h4>
                                     <p class="text-sm font-medium">Invoice tidak ditemukan dengan filter pencarian saat ini.</p>
-                                    <?php if(!empty($search) || !empty($f_client) || !empty($f_status) || !empty($f_tax) || !empty($f_start_date)): ?>
-                                        <a href="invoice_list.php" class="mt-5 inline-flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-sm">
-                                            <i class="ph-bold ph-arrows-counter-clockwise"></i> Reset Filter
-                                        </a>
-                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
@@ -694,14 +705,23 @@ $res = $conn->query($sql);
                 </tbody>
             </table>
         </div>
-        
-        <?php if($res->num_rows > 0): ?>
-        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-center mt-[-80px] relative z-10">
-            <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-white dark:bg-[#1A222C] px-5 py-2 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm">
-                Menampilkan Total <span class="text-indigo-600 dark:text-indigo-400 font-black mx-1"><?= $res->num_rows ?></span> Invoice
-            </p>
+
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between w-full mt-auto shrink-0 z-20">
+            <div class="flex-1 flex justify-start">
+                <button id="btnPrev" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="ph-bold ph-arrow-left"></i> Previous
+                </button>
+            </div>
+            
+            <div id="pageNumbers" class="flex-1 flex items-center justify-center gap-1.5">
+                </div>
+            
+            <div class="flex-1 flex justify-end">
+                <button id="btnNext" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    Next <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </div>
         </div>
-        <?php endif; ?>
     </div>
 </div>
 
@@ -825,7 +845,88 @@ $res = $conn->query($sql);
     </div>
 </div>
 
+
 <script>
+    // --- PAGINATION LOGIC (Vanilla JS) ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const rows = Array.from(document.querySelectorAll('#tableBody tr.data-row'));
+        const totalRows = rows.length;
+        
+        if(totalRows === 0) return;
+
+        const pageSizeSelect = document.getElementById('pageSize');
+        const paginationInfo = document.getElementById('paginationInfo');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnNext = document.getElementById('btnNext');
+        const pageNumbersContainer = document.getElementById('pageNumbers');
+
+        let currentPage = 1;
+        let rowsPerPage = parseInt(pageSizeSelect.value);
+
+        function renderTable() {
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+
+            rows.forEach((row, index) => {
+                if (index >= start && index < end) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            const currentEnd = end > totalRows ? totalRows : end;
+            paginationInfo.innerHTML = `Menampilkan <span class="text-indigo-600 dark:text-indigo-400 font-black">${start + 1} - ${currentEnd}</span> dari <span class="font-black text-slate-800 dark:text-white">${totalRows}</span> data`;
+
+            updatePaginationButtons();
+        }
+
+        function updatePaginationButtons() {
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+            
+            btnPrev.disabled = currentPage === 1;
+            btnNext.disabled = currentPage === totalPages;
+
+            pageNumbersContainer.innerHTML = '';
+            for (let i = 1; i <= totalPages; i++) {
+                // Limit visible pages for massive lists
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                    const pageBtn = document.createElement('button');
+                    pageBtn.innerText = i;
+                    if (i === currentPage) {
+                        pageBtn.className = "w-8 h-8 rounded-xl text-xs font-black text-white bg-indigo-600 shadow-sm shadow-indigo-500/30 flex items-center justify-center transition-all";
+                    } else {
+                        pageBtn.className = "w-8 h-8 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-all flex items-center justify-center";
+                        pageBtn.onclick = () => { currentPage = i; renderTable(); };
+                    }
+                    pageNumbersContainer.appendChild(pageBtn);
+                } else if (i === currentPage - 2 || i === currentPage + 2) {
+                    const dots = document.createElement('span');
+                    dots.innerText = '...';
+                    dots.className = "w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-black tracking-widest";
+                    pageNumbersContainer.appendChild(dots);
+                }
+            }
+        }
+
+        pageSizeSelect.addEventListener('change', (e) => {
+            rowsPerPage = parseInt(e.target.value);
+            currentPage = 1;
+            renderTable();
+        });
+
+        btnPrev.addEventListener('click', () => {
+            if (currentPage > 1) { currentPage--; renderTable(); }
+        });
+
+        btnNext.addEventListener('click', () => {
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+            if (currentPage < totalPages) { currentPage++; renderTable(); }
+        });
+
+        renderTable();
+    });
+
     // --- FILTER COLLAPSE LOGIC ---
     document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('filterToggleBtn');
@@ -851,7 +952,7 @@ $res = $conn->query($sql);
     let currentOpenDropdown = null;
     
     function toggleActionMenu(e, id) {
-        e.stopPropagation(); // Mencegah klik menyebar dan menutup kembali
+        e.stopPropagation(); 
         const menu = document.getElementById('action-menu-' + id);
         
         if (currentOpenDropdown && currentOpenDropdown !== menu) {
@@ -862,7 +963,6 @@ $res = $conn->query($sql);
         currentOpenDropdown = menu.classList.contains('hidden') ? null : menu;
     }
     
-    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (currentOpenDropdown && !currentOpenDropdown.contains(e.target)) {
             currentOpenDropdown.classList.add('hidden');
@@ -934,7 +1034,7 @@ $res = $conn->query($sql);
                 
                 if(notes.trim() !== "") {
                     btn.classList.remove('bg-slate-100', 'text-slate-400', 'dark:bg-slate-700/50', 'dark:border-slate-600', 'dark:text-slate-500');
-                    btn.classList.add('bg-amber-100', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400', 'border-transparent');
+                    btn.classList.add('bg-amber-100', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400', 'border', 'border-transparent');
                     btn.querySelector('i').classList.replace('ph-bold', 'ph-fill');
                 } else {
                     btn.classList.add('bg-slate-100', 'text-slate-400', 'dark:bg-slate-700/50', 'dark:border-slate-600', 'dark:text-slate-500');
