@@ -176,7 +176,7 @@ $res = $conn->query($sql);
                         <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">No Invoice</label>
                         <div class="relative group">
                             <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-teal-500 transition-colors"></i>
-                            <input type="text" name="search" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. INV-..." value="<?= htmlspecialchars($search ?? '') ?>">
+                            <input type="text" name="search" class="w-full pl-11 pr-4 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. INV-..." value="<?= htmlspecialchars($search ?? '') ?>">
                         </div>
                     </div>
 
@@ -184,7 +184,7 @@ $res = $conn->query($sql);
                         <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Perusahaan Klien</label>
                         <div class="relative group">
                             <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-teal-500 transition-colors"></i>
-                            <select name="client_id" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                            <select name="client_id" class="w-full pl-11 pr-10 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
                                 <option value="">Semua Perusahaan</option>
                                 <?php if($clients->num_rows > 0) { $clients->data_seek(0); while($c = $clients->fetch_assoc()): ?>
                                     <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name']) ?></option>
@@ -194,17 +194,17 @@ $res = $conn->query($sql);
                         </div>
                     </div>
 
-                    <div class="w-full xl:w-auto flex gap-3 h-[46px] shrink-0">
-                        <button type="submit" class="flex-1 xl:flex-none bg-slate-800 hover:bg-slate-900 dark:bg-teal-600 dark:hover:bg-teal-700 text-white font-bold py-2 px-5 rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-teal-500/20 active:scale-95 flex items-center justify-center gap-2">
+                    <div class="w-full xl:w-auto flex gap-3 h-[42px] shrink-0">
+                        <button type="submit" class="flex-1 xl:flex-none bg-slate-800 hover:bg-slate-900 dark:bg-teal-600 dark:hover:bg-teal-700 text-white font-bold px-6 rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-teal-500/20 active:scale-95 flex items-center justify-center gap-2">
                             <i class="ph-bold ph-funnel"></i> Terapkan Filter
                         </button>
                         
-                        <button type="submit" formmethod="POST" name="export_excel" class="flex-1 xl:flex-none bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-bold border border-emerald-200 dark:border-emerald-500/20 py-2 px-5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                        <button type="submit" formmethod="POST" name="export_excel" class="flex-1 xl:flex-none bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white font-bold border border-emerald-200 dark:border-emerald-500/20 px-5 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
                             <i class="ph-bold ph-microsoft-excel-logo text-lg"></i> Export CSV
                         </button>
 
                         <?php if(!empty($search) || !empty($f_client)): ?>
-                            <a href="payment_list.php" class="flex-none bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold py-2 px-4 rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
+                            <a href="payment_list.php" class="flex-none bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold px-4 rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
                                 <i class="ph-bold ph-arrows-counter-clockwise text-lg"></i>
                             </a>
                         <?php endif; ?>
@@ -232,14 +232,14 @@ $res = $conn->query($sql);
         </div>
 
         <div class="overflow-x-auto modern-scrollbar flex-grow pb-24">
-            <table class="w-full text-left border-collapse table-fixed min-w-[1050px]">
+            <table class="w-full text-left border-collapse table-fixed min-w-[1100px]">
                 <thead class="bg-slate-50/80 dark:bg-slate-800/50">
                     <tr>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[20%]">Payment Info</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[30%]">Client & Invoice Ref</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-right text-[10px] font-black text-slate-400 uppercase tracking-wider w-[20%]">Amount & Method</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[20%]">SIM Status & Proof</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[10%]">Action</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[18%]">Payment Date</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[28%]">Client & Invoice Ref</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-right text-[10px] font-black text-slate-400 uppercase tracking-wider w-[20%]">Amount Received</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[22%]">SIM Status & Proof</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Action</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -253,63 +253,72 @@ $res = $conn->query($sql);
                         <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
                             <td class="px-6 py-5 align-middle">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1.5 flex items-center gap-1.5">
-                                    <i class="ph-fill ph-calendar-blank text-teal-500"></i> 
-                                    <?= date('d M Y', strtotime($row['payment_date'])) ?>
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-2 flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-lg bg-teal-50 dark:bg-teal-500/10 text-teal-500 flex items-center justify-center border border-teal-100 dark:border-teal-500/20 shrink-0">
+                                        <i class="ph-bold ph-calendar-blank text-sm"></i>
+                                    </div>
+                                    <span><?= date('d M Y', strtotime($row['payment_date'])) ?></span>
                                 </div>
-                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A222C] shadow-sm">
-                                    <i class="ph-fill ph-user-circle text-slate-400"></i>
-                                    <span class="text-[10px] font-bold text-slate-600 dark:text-slate-300">By: <?= htmlspecialchars($row['admin_name'] ?? 'System') ?></span>
+                                <div class="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                    <i class="ph-fill ph-user-circle text-sm"></i>
+                                    <span>Processed by: <strong class="text-slate-700 dark:text-slate-300"><?= htmlspecialchars($row['admin_name'] ?? 'System') ?></strong></span>
                                 </div>
                             </td>
 
                             <td class="px-6 py-5 align-middle">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 leading-snug break-words whitespace-normal text-sm mb-1.5 pr-2 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors" title="<?= htmlspecialchars($row['company_name'] ?? '') ?>">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-2 leading-snug break-words whitespace-normal pr-4 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors" title="<?= htmlspecialchars($row['company_name'] ?? '') ?>">
                                     <?= htmlspecialchars($row['company_name'] ?? '') ?>
                                 </div>
-                                <div class="font-mono font-black text-teal-600 dark:text-teal-400 tracking-widest text-[11px] bg-teal-50 dark:bg-teal-500/10 px-2 py-0.5 rounded inline-block border border-teal-100 dark:border-teal-500/20">
-                                    <?= htmlspecialchars($row['invoice_no']) ?>
+                                <div class="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                    <span>Inv. Ref:</span>
+                                    <span class="inline-block px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded font-mono font-bold border border-slate-200 dark:border-slate-600 shadow-sm">
+                                        <?= htmlspecialchars($row['invoice_no']) ?>
+                                    </span>
                                 </div>
                             </td>
 
                             <td class="px-6 py-5 align-middle text-right">
-                                <div class="font-black text-slate-800 dark:text-white text-[15px] tracking-wide mb-1">
-                                    <span class="text-[10px] font-bold text-slate-400 mr-1">Rp</span><?= number_format($row['amount'], 0, ',', '.') ?>
+                                <div class="flex flex-col items-end gap-1.5">
+                                    <span class="font-black text-slate-800 dark:text-white text-[15px] tracking-wide">
+                                        <span class="text-[10px] font-bold text-slate-400 mr-1">Rp</span><?= number_format($row['amount'], 0, ',', '.') ?>
+                                    </span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 text-[9px] font-black uppercase tracking-widest bg-slate-50 dark:bg-slate-900 shadow-sm">
+                                        <i class="ph-bold ph-bank mr-1"></i> <?= htmlspecialchars($row['payment_method'] ? $row['payment_method'] : 'Transfer') ?>
+                                    </span>
                                 </div>
-                                <span class="inline-flex px-2 py-0.5 rounded text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 text-[9px] font-black uppercase tracking-widest bg-slate-50 dark:bg-slate-900 shadow-sm">
-                                    <?= htmlspecialchars($row['payment_method'] ? $row['payment_method'] : 'Transfer') ?>
-                                </span>
                             </td>
 
                             <td class="px-6 py-5 align-middle text-center">
                                 <div class="flex flex-col items-center justify-center gap-2">
                                     <?php if($countSim > 0): ?>
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-sky-50 text-sky-600 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                        <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-sky-50 text-sky-600 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20 text-[10px] font-black uppercase tracking-widest shadow-sm w-32">
                                             <i class="ph-fill ph-sim-card text-sm"></i> <?= $countSim ?> ICCID
                                         </span>
                                     <?php else: ?>
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 text-[10px] font-bold uppercase tracking-widest italic shadow-sm">
-                                            <i class="ph-bold ph-minus"></i> No SIM Data
+                                        <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 text-[10px] font-bold uppercase tracking-widest italic shadow-sm w-32">
+                                            <i class="ph-bold ph-minus text-sm"></i> No SIM Data
                                         </span>
                                     <?php endif; ?>
                                     
                                     <?php if($row['proof_file']): ?>
-                                        <a href="../uploads/<?= $row['proof_file'] ?>" target="_blank" class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20">
-                                            <i class="ph-bold ph-image text-xs"></i> View Proof
+                                        <a href="../uploads/<?= $row['proof_file'] ?>" target="_blank" class="inline-flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-200 dark:border-emerald-500/20 shadow-sm w-32">
+                                            <i class="ph-bold ph-image text-sm"></i> View Proof
                                         </a>
                                     <?php else: ?>
-                                        <span class="text-[9px] font-bold text-rose-400 dark:text-rose-500 uppercase tracking-widest italic">Missing Proof</span>
+                                        <span class="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-rose-400 dark:text-rose-500 uppercase tracking-widest italic px-3 py-1 w-32">
+                                            <i class="ph-bold ph-x-circle text-sm"></i> Missing Proof
+                                        </span>
                                     <?php endif; ?>
                                 </div>
                             </td>
 
                             <td class="px-6 py-5 align-middle text-center relative">
                                 <div class="relative inline-block text-left" data-dropdown>
-                                    <button type="button" onclick="toggleActionMenu(event, <?= $row['id'] ?>)" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-teal-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-teal-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
-                                        <i class="ph-bold ph-dots-three-vertical text-lg pointer-events-none"></i>
+                                    <button type="button" onclick="toggleActionMenu(event, <?= $row['id'] ?>)" class="inline-flex justify-center items-center w-9 h-9 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-teal-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-teal-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
+                                        <i class="ph-bold ph-dots-three-vertical text-xl pointer-events-none"></i>
                                     </button>
 
-                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-52 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-[100] overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
+                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-10 top-0 w-52 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
                                         <div class="py-1">
                                             <a href="payment_view.php?id=<?= $row['id'] ?>" class="flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                                 <i class="ph-bold ph-eye text-base text-slate-400 group-hover:text-teal-500"></i> Detail & Upload SIM
@@ -334,6 +343,11 @@ $res = $conn->query($sql);
                                     </div>
                                     <h4 class="font-black text-slate-700 dark:text-slate-200 text-lg mb-1">Data Tidak Ditemukan</h4>
                                     <p class="text-sm font-medium">Riwayat pembayaran tidak ditemukan dengan filter saat ini.</p>
+                                    <?php if(!empty($search) || !empty($f_client)): ?>
+                                        <a href="payment_list.php" class="mt-5 inline-flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-sm">
+                                            <i class="ph-bold ph-arrows-counter-clockwise"></i> Reset Filter
+                                        </a>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
