@@ -274,7 +274,7 @@ $res = $conn->query($sql);
         </div>
     </div>
 
-    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 flex flex-col min-h-[400px]">
+    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 flex flex-col min-h-[500px]">
         
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
             <div class="flex items-center gap-2">
@@ -292,22 +292,22 @@ $res = $conn->query($sql);
         </div>
 
         <div class="overflow-x-auto modern-scrollbar flex-grow pb-24">
-            <table class="w-full text-left border-collapse table-auto min-w-[1000px]">
+            <table class="w-full text-left border-collapse table-fixed min-w-[1050px]">
                 <thead class="bg-slate-50/80 dark:bg-slate-800/50">
                     <tr>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-[20%]">PO Details & Quote Ref</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider min-w-[200px]">Client Information</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-right text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-[15%]">Total Amount</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-[15%]">Document</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-[15%]">Status</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider whitespace-nowrap w-[10%]">Action</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[22%]">PO Details & Quote Ref</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[30%]">Client Information</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-right text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Total Amount</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[13%]">Document</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Status</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[8%]">Action</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/50">
                     <?php if($res->num_rows > 0): ?>
                         <?php while($row = $res->fetch_assoc()): ?>
                         <?php 
-                            // Hitung Total Amount per Baris (Supaya tabel lebih detail)
+                            // Hitung Total Amount per Baris
                             $qId = $row['id'];
                             $calc = $conn->query("SELECT SUM(qty * unit_price) as t FROM quotation_items WHERE quotation_id = $qId")->fetch_assoc();
                             $poTotal = $calc['t'] ?? 0;
@@ -317,11 +317,11 @@ $res = $conn->query($sql);
                         ?>
                         <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
-                            <td class="px-6 py-5 align-middle whitespace-nowrap">
+                            <td class="px-6 py-5 align-middle">
                                 <div class="font-mono font-black text-blue-600 dark:text-blue-400 text-[13px] mb-1 tracking-wide">
                                     <?= htmlspecialchars($row['po_number_client'] ?? 'N/A') ?>
                                 </div>
-                                <div class="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                <div class="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-medium break-words whitespace-normal">
                                     <span>Ref:</span> 
                                     <span class="inline-block px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded font-mono font-bold text-[10px] border border-slate-200 dark:border-slate-600 shadow-sm">
                                         <?= htmlspecialchars($row['quotation_no'] ?? '') ?>
@@ -330,7 +330,7 @@ $res = $conn->query($sql);
                             </td>
 
                             <td class="px-6 py-5 align-middle">
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1.5 leading-snug truncate max-w-[250px]" title="<?= htmlspecialchars($row['company_name'] ?? '') ?>">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-xs mb-2 leading-snug break-words whitespace-normal pr-2">
                                     <?= htmlspecialchars($row['company_name'] ?? '') ?>
                                 </div>
                                 <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A222C] shadow-sm">
@@ -339,7 +339,7 @@ $res = $conn->query($sql);
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-right whitespace-nowrap">
+                            <td class="px-6 py-5 align-middle text-right">
                                 <div class="flex flex-col items-end">
                                     <span class="font-black text-slate-800 dark:text-slate-200 text-sm tracking-wide">
                                         <span class="text-[10px] font-bold text-slate-400 mr-1"><?= $currency ?></span><?= $formattedTotal ?>
@@ -347,7 +347,7 @@ $res = $conn->query($sql);
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center whitespace-nowrap">
+                            <td class="px-6 py-5 align-middle text-center">
                                 <?php if($row['po_file_client']): ?>
                                     <a href="../uploads/<?= $row['po_file_client'] ?>" target="_blank" class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 transition-colors border border-blue-200 dark:border-blue-500/20 font-bold text-[10px] tracking-wide shadow-sm">
                                         <i class="ph-bold ph-file-pdf text-sm"></i> View Doc
@@ -359,25 +359,25 @@ $res = $conn->query($sql);
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center whitespace-nowrap">
+                            <td class="px-6 py-5 align-middle text-center">
                                 <?php if($row['status'] == 'po_received'): ?>
-                                    <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 text-[10px] font-black uppercase tracking-widest w-32 shadow-sm">
+                                    <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 text-[10px] font-black uppercase tracking-widest w-28 shadow-sm">
                                         <i class="ph-fill ph-hourglass-high text-xs"></i> Pending Inv
                                     </span>
                                 <?php else: ?>
-                                    <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-black uppercase tracking-widest w-32 shadow-sm">
+                                    <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-black uppercase tracking-widest w-28 shadow-sm">
                                         <i class="ph-fill ph-check-circle text-xs"></i> Invoiced
                                     </span>
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center whitespace-nowrap relative">
+                            <td class="px-6 py-5 align-middle text-center relative">
                                 <div class="relative inline-block text-left" data-dropdown>
                                     <button type="button" onclick="toggleActionMenu(event, <?= $row['id'] ?>)" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-cyan-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-cyan-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
                                         <i class="ph-bold ph-dots-three-vertical text-lg pointer-events-none"></i>
                                     </button>
 
-                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
+                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-[100] overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
                                         
                                         <div class="py-1">
                                             <a href="quotation_print.php?id=<?= $row['id'] ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
@@ -528,7 +528,7 @@ $res = $conn->query($sql);
             // Generate Page Numbers
             pageNumbersContainer.innerHTML = '';
             for (let i = 1; i <= totalPages; i++) {
-                // Limit visible pages for massive lists (e.g. show 1 2 3 ... 10)
+                // Limit visible pages for massive lists
                 if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
                     const pageBtn = document.createElement('button');
                     pageBtn.innerText = i;
