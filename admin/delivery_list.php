@@ -5,11 +5,12 @@
 // =========================================================================
 ob_start();
 include '../config/database.php';
-// include '../config/functions.php'; // Sesuaikan jika ada
+include '../config/functions.php';
 
 if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
-// --- 1. AUTO-UPDATE DATABASE SCHEMA ---
+// --- 1. AUTO-UPDATE DATABASE SCHEMA (FIXED) ---
+// Mengecek apakah kolom sudah ada sebelum melakukan ALTER TABLE agar tidak error Duplicate
 $new_columns = [
     'client_id' => 'INT NULL',
     'invoice_no' => 'VARCHAR(100) NULL',
@@ -173,13 +174,6 @@ include 'includes/sidebar.php';
             </h1>
             <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Sistem manajemen logistik terpadu (IT & HR Collaboration).</p>
         </div>
-        <!-- <div class="flex items-center gap-3">
-            <a href="delivery_form.php" class="group inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-2.5 px-6 rounded-xl shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-1 active:scale-95 whitespace-nowrap overflow-hidden relative">
-                <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
-                <i class="ph-bold ph-plus text-lg relative z-10"></i> 
-                <span class="relative z-10">New Request</span>
-            </a>
-        </div> -->
     </div>
 
     <div class="inline-flex bg-slate-200/50 dark:bg-slate-800/50 p-1.5 rounded-2xl shadow-inner backdrop-blur-sm overflow-x-auto max-w-full modern-scrollbar">
@@ -616,14 +610,14 @@ include 'includes/sidebar.php';
         </div>
     </div>
 
-    <div id="content-complete" class="tab-content <?= $active_tab=='complete'?'block':'hidden' ?> transition-opacity duration-300">
+    <div id="content-complete" class="tab-content <?= $active_tab=='complete'?'block':'hidden' ?> animate-fade-in-up" style="animation-delay: 0.2s;">
         <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
-            <div class="overflow-x-auto modern-scrollbar w-full">
+            <div class="overflow-x-auto modern-scrollbar w-full pb-10">
                 <table class="w-full text-left border-collapse">
                     <thead class="bg-slate-50/80 dark:bg-slate-800/30">
                         <tr>
                             <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest min-w-[200px]">Delivery Summary</th>
-                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest min-w-[250px]">Client & Destination</th>
+                            <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest min-w-[280px]">Client & Destination</th>
                             <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Item Detail</th>
                             <th class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 text-center text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
                         </tr>
@@ -632,8 +626,8 @@ include 'includes/sidebar.php';
                         <?php if($data_complete->num_rows > 0): $data_complete->data_seek(0); while($row = $data_complete->fetch_assoc()): ?>
                         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
-                            <td class="px-6 py-6 align-middle">
-                                <div class="font-black text-slate-800 dark:text-slate-200 text-sm mb-2.5 uppercase tracking-widest"><?= htmlspecialchars($row['tracking_number']) ?></div>
+                            <td class="px-6 py-6 align-top">
+                                <div class="font-mono font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5 uppercase tracking-widest"><?= htmlspecialchars($row['tracking_number']) ?></div>
                                 <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 shadow-sm mb-2.5">
                                     <i class="ph-fill ph-truck text-slate-400 text-xs"></i> <?= htmlspecialchars($row['courier_name']) ?>
                                 </div>
@@ -642,14 +636,18 @@ include 'includes/sidebar.php';
                                 </div>
                             </td>
                             
-                            <td class="px-6 py-6 align-middle">
-                                <div class="font-black text-slate-800 dark:text-slate-200 text-sm mb-2.5 uppercase tracking-wide"><?= htmlspecialchars($row['client_name']) ?></div>
-                                <div class="text-[11px] text-slate-500 font-medium leading-relaxed line-clamp-2 max-w-[300px] flex items-start gap-1.5" title="<?= htmlspecialchars($row['address']) ?>">
+                            <td class="px-6 py-6 align-top">
+                                <div class="font-black text-slate-800 dark:text-slate-200 text-sm mb-2 uppercase tracking-wide"><?= htmlspecialchars($row['client_name']) ?></div>
+                                <div class="font-bold text-slate-600 dark:text-slate-300 text-xs mb-1 flex items-center gap-1.5">
+                                    <i class="ph-fill ph-user-circle text-slate-400 text-sm"></i> <?= htmlspecialchars($row['receiver_name']) ?> 
+                                    <span class="font-mono text-[10px] text-slate-400 font-medium">(<?= htmlspecialchars($row['pic_phone']) ?>)</span>
+                                </div>
+                                <div class="text-[11px] text-slate-500 font-medium leading-relaxed line-clamp-2 max-w-[320px] flex items-start gap-1.5" title="<?= htmlspecialchars($row['address']) ?>">
                                     <i class="ph-fill ph-map-pin text-slate-400 mt-0.5 text-sm"></i> <span><?= htmlspecialchars($row['address']) ?></span>
                                 </div>
                             </td>
                             
-                            <td class="px-6 py-6 align-middle">
+                            <td class="px-6 py-6 align-top">
                                 <div class="font-bold text-indigo-600 dark:text-indigo-400 text-sm mb-2.5">
                                     <?= htmlspecialchars($row['item_name']) ?> 
                                 </div>
@@ -658,7 +656,7 @@ include 'includes/sidebar.php';
                                 </div>
                             </td>
                             
-                            <td class="px-6 py-6 align-middle text-center">
+                            <td class="px-6 py-6 align-top text-center">
                                 <span class="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 text-[10px] font-black uppercase tracking-widest shadow-sm">
                                     <i class="ph-bold ph-checks text-sm"></i> Completed
                                 </span>
