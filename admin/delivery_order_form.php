@@ -1,8 +1,15 @@
-\<?php
+<?php
 $page_title = "Form Delivery Order";
 include 'includes/header.php';
 include 'includes/sidebar.php';
 include '../config/functions.php';
+
+// --- AUTO-PATCH DATABASE ---
+// Otomatis menambahkan kolom invoice_id ke tabel delivery_orders jika belum ada
+$checkCol = $conn->query("SHOW COLUMNS FROM delivery_orders LIKE 'invoice_id'");
+if ($checkCol && $checkCol->num_rows == 0) {
+    $conn->query("ALTER TABLE delivery_orders ADD COLUMN invoice_id INT NULL AFTER payment_id");
+}
 
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
@@ -14,37 +21,43 @@ $do_number_auto = generateDONumber($conn);
 $do_number = $do_number_auto;
 $do_date = date('Y-m-d');
 $status = 'draft';
-$pic_name = ''; $pic_phone = ''; $payment_id = 0;
+$pic_name = ''; $pic_phone = ''; $payment_id = 0; $current_invoice_id = 0;
 $client_name = ''; $client_address = ''; $ref_info = '';
 $items_list = [];
 
 // KASUS 1: CREATE DARI INVOICE
-if ($from_inv_id > 0) {
+if ($from_inv_id > 0 && $do_id == 0) {
+    $current_invoice_id = $from_inv_id;
+    
+    // Cek jika invoice punya payment (Untuk Invoice Lunas/Sebagian)
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
-    if ($resPay->num_rows > 0) {
+    if ($resPay && $resPay->num_rows > 0) {
         $payRow = $resPay->fetch_assoc();
         $payment_id = $payRow['id'];
-        $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
-                    FROM invoices i JOIN quotations q ON i.quotation_id = q.id JOIN clients c ON q.client_id = c.id
-                    WHERE i.id = $from_inv_id";
-        $info = $conn->query($sqlInfo)->fetch_assoc();
-        if ($info) {
-            $client_name = $info['company_name'];
-            $client_address = $info['address']; 
-            $pic_name = $info['pic_name'];
-            $pic_phone = $info['pic_phone'];
-            $ref_info = "Ref: Invoice #" . $info['invoice_no'];
-        }
-        
-        $sqlItems = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $from_inv_id";
-        $resItems = $conn->query($sqlItems);
+    }
+    
+    // Tarik data client dari invoice (Berlaku untuk Draft maupun Lunas)
+    $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
+                FROM invoices i JOIN quotations q ON i.quotation_id = q.id JOIN clients c ON q.client_id = c.id
+                WHERE i.id = $from_inv_id";
+    $info = $conn->query($sqlInfo)->fetch_assoc();
+    if ($info) {
+        $client_name = $info['company_name'];
+        $client_address = $info['address']; 
+        $pic_name = $info['pic_name'];
+        $pic_phone = $info['pic_phone'];
+        $ref_info = "Ref: Invoice #" . $info['invoice_no'];
+    }
+    
+    // Tarik item
+    $sqlItems = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $from_inv_id";
+    $resItems = $conn->query($sqlItems);
+    if($resItems) {
         while($itm = $resItems->fetch_assoc()) {
             $itm['card_type'] = "Prepaid"; 
             $items_list[] = $itm;
         }
-    } else {
-        echo "<script>alert('Invoice belum dibayar atau tidak valid.'); window.location='invoice_list.php';</script>"; exit;
     }
 }
 
@@ -61,25 +74,27 @@ if ($do_id > 0) {
                 WHERE d.id = $do_id";
                 
     $resData = $conn->query($sqlData);
-    if ($resData->num_rows > 0) {
+    if ($resData && $resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
         
-        // Gunakan nomor dari DB jika edit
         $do_number = $row['do_number']; 
         $do_date = $row['do_date'];
         $status = $row['status'];
         $pic_name = $row['pic_name'];
         $pic_phone = $row['pic_phone'];
         $payment_id = $row['payment_id'] ? $row['payment_id'] : 0;
+        $current_invoice_id = $row['invoice_id'] ? $row['invoice_id'] : ($row['inv_id'] ?? 0);
         
         $client_name = !empty($row['do_client_name']) ? $row['do_client_name'] : $row['company_name'];
         $client_address = !empty($row['do_addr']) ? $row['do_addr'] : $row['client_addr'];
         
-        $ref_info = "Ref: Invoice #" . $row['invoice_no'];
+        if (!empty($row['invoice_no'])) {
+            $ref_info = "Ref: Invoice #" . $row['invoice_no'];
+        }
 
         $sqlItems = "SELECT * FROM delivery_order_items WHERE delivery_order_id = $do_id";
         $resItems = $conn->query($sqlItems);
-        if ($resItems->num_rows > 0) {
+        if ($resItems && $resItems->num_rows > 0) {
             while($itm = $resItems->fetch_assoc()) {
                 $mode = $itm['charge_mode'];
                 if (stripos($mode, 'BBC') !== false || empty($mode)) $mode = 'Prepaid';
@@ -94,10 +109,24 @@ if ($do_id > 0) {
     }
 }
 
+// --- AMBIL DRAFT INVOICES (Hanya Draft & Belum Digunakan di DO lain) ---
+$q_inv = "SELECT id, invoice_no FROM invoices WHERE status = 'draft'";
+$q_inv .= " AND (id NOT IN (SELECT invoice_id FROM delivery_orders WHERE invoice_id IS NOT NULL)";
+if ($current_invoice_id > 0) {
+    // Tetap munculkan ID Invoice ini sendiri jika sedang dalam mode edit DO terkait
+    $q_inv .= " OR id = $current_invoice_id";
+}
+$q_inv .= ") ORDER BY id DESC";
+$draft_invoices = $conn->query($q_inv);
+
+
 // --- PROSES SIMPAN ---
 if (isset($_POST['save_do'])) {
     $p_id_raw = intval($_POST['payment_id']);
     $p_id_sql = ($p_id_raw > 0) ? $p_id_raw : "NULL";
+    
+    $inv_id_raw = intval($_POST['invoice_id']);
+    $inv_id_sql = ($inv_id_raw > 0) ? $inv_id_raw : "NULL";
 
     $d_num = $conn->real_escape_string($_POST['do_number']);
     $d_date = $_POST['do_date'];
@@ -115,12 +144,14 @@ if (isset($_POST['save_do'])) {
                 do_date='$d_date', 
                 status='$d_stat', 
                 payment_id=$p_id_sql, 
+                invoice_id=$inv_id_sql,
                 pic_name='$d_pic', 
                 pic_phone='$d_phone', 
                 address='$d_addr',
                 client_name='$d_client' 
                 WHERE id=$do_id";
         
+        // Fallback jika database belum di-patch dengan sempurna (Backward compatibility)
         if (!$conn->query($sql)) {
              $sql_fb = "UPDATE delivery_orders SET 
                 do_number='$d_num', do_date='$d_date', status='$d_stat', payment_id=$p_id_sql, 
@@ -131,8 +162,8 @@ if (isset($_POST['save_do'])) {
         $curr_do_id = $do_id;
         $conn->query("DELETE FROM delivery_order_items WHERE delivery_order_id=$curr_do_id");
     } else {
-        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address, client_name) 
-                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr', '$d_client')";
+        $sql = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, invoice_id, pic_name, pic_phone, created_by_user_id, address, client_name) 
+                VALUES ('$d_num', '$d_date', '$d_stat', $p_id_sql, $inv_id_sql, '$d_pic', '$d_phone', $user_id, '$d_addr', '$d_client')";
         
         if (!$conn->query($sql)) {
              $sql_fb = "INSERT INTO delivery_orders (do_number, do_date, status, payment_id, pic_name, pic_phone, created_by_user_id, address) 
@@ -183,6 +214,22 @@ if (isset($_POST['save_do'])) {
                             <label class="fw-bold">DO Number</label>
                             <input type="text" name="do_number" class="form-control fw-bold" value="<?= htmlspecialchars($do_number) ?>" required>
                         </div>
+                        
+                        <div class="mb-3">
+                            <label class="fw-bold text-success">Reference Invoice (Draft)</label>
+                            <select name="invoice_id" id="invoice_id" class="form-select border-success" onchange="loadInvoiceData(this.value)">
+                                <option value="">- Tanpa Invoice / Pilih Invoice -</option>
+                                <?php if($draft_invoices && $draft_invoices->num_rows > 0): ?>
+                                    <?php while($invOpt = $draft_invoices->fetch_assoc()): ?>
+                                        <option value="<?= $invOpt['id'] ?>" <?= ($current_invoice_id == $invOpt['id']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($invOpt['invoice_no']) ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                <?php endif; ?>
+                            </select>
+                            <small class="text-muted" style="font-size: 0.75rem;">Hanya menampilkan Invoice Draft yang belum terpakai DO.</small>
+                        </div>
+
                         <div class="mb-3"><label class="fw-bold">Date</label><input type="date" name="do_date" class="form-control" value="<?= $do_date ?>" required></div>
                         
                         <div class="mb-3">
@@ -206,6 +253,7 @@ if (isset($_POST['save_do'])) {
                         </div>
                     </div>
                 </div>
+                
                 <div class="mt-4">
                     <h6 class="fw-bold">Items</h6>
                     <table class="table table-bordered">
@@ -240,8 +288,21 @@ if (isset($_POST['save_do'])) {
         </div>
     </div>
 </div>
+
 <?php include 'includes/footer.php'; ?>
 <script>
 function removeRow(btn) { var row = btn.parentNode.parentNode; if(row.parentNode.rows.length > 1) row.parentNode.removeChild(row); }
 function addRow() { var t=document.getElementById("doItemsBody"); var n=t.rows[0].cloneNode(true); var i=n.getElementsByTagName("input"); for(var x=0;x<i.length;x++){i[x].value="";if(i[x].name=="charge_mode[]")i[x].value="Prepaid";if(i[x].name=="qty[]"){i[x].value="1";i[x].setAttribute("step","any");}} t.appendChild(n); }
+
+function loadInvoiceData(invId) {
+    if (invId) {
+        // Cek agar tidak me-refresh ulang ketika memang sedang load invoice yang sama
+        let searchParams = new URLSearchParams(window.location.search);
+        if (!searchParams.has('edit_id') && searchParams.get('from_invoice_id') != invId) {
+            if (confirm("Ingin memuat data klien dan item barang dari invoice ini?")) {
+                window.location.href = 'delivery_order_form.php?from_invoice_id=' + invId;
+            }
+        }
+    }
+}
 </script>
