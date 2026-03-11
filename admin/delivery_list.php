@@ -163,6 +163,14 @@ include 'includes/sidebar.php';
     .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .modern-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     .dark .modern-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+    
+    /* Global CSS HACK: Menghilangkan panah bawaan browser untuk tag <input list="..."> 
+       agar tidak bentrok dengan icon kustom Tailwind.
+    */
+    input[list]::-webkit-calendar-picker-indicator {
+        display: none !important;
+        opacity: 0 !important;
+    }
 </style>
 
 <div class="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto space-y-6 animate-fade-in-up">
@@ -294,12 +302,12 @@ include 'includes/sidebar.php';
                             </div>
                         </div>
 
-                       <div>
+                        <div>
                             <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-widest">Item / Card Type <span class="text-rose-500">*</span></label>
                             <div class="relative group">
                                 <i class="ph-bold ph-sim-card absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
                                 
-                                <input list="card_options" name="card_type" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner placeholder-slate-400 appearance-none [&::-webkit-calendar-picker-indicator]:hidden cursor-pointer" placeholder="Ketik atau pilih dari list..." required autocomplete="off">
+                                <input list="card_options" name="card_type" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner placeholder-slate-400 cursor-pointer" placeholder="Ketik atau pilih list..." required autocomplete="off">
                                 
                                 <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform group-focus-within:-rotate-180"></i>
                                 
