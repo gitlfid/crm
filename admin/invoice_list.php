@@ -601,18 +601,18 @@ $res = $conn->query($sql);
                             </td>
 
                             <td class="px-4 py-5 align-middle text-center whitespace-nowrap">
-                                <button type="button" onclick="openNoteModal('<?= htmlspecialchars($row['invoice_no']) ?>')" id="btn-note-<?= htmlspecialchars($row['invoice_no']) ?>" class="w-8 h-8 rounded-xl flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 <?= $hasNote ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-200' : 'bg-slate-100 text-slate-400 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 dark:hover:bg-indigo-500/20 dark:hover:text-indigo-400 border border-slate-200' ?>" title="Internal Notes">
+                                <button type="button" onclick="openNoteModal('<?= htmlspecialchars($row['invoice_no']) ?>')" id="btn-note-<?= htmlspecialchars($row['invoice_no']) ?>" class="w-8 h-8 rounded-xl flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 <?= $hasNote ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-200 border border-transparent' : 'bg-slate-100 text-slate-400 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 dark:hover:bg-indigo-500/20 dark:hover:text-indigo-400 border border-slate-200' ?>" title="Internal Notes">
                                     <i class="<?= $hasNote ? 'ph-fill' : 'ph-bold' ?> ph-notepad text-lg"></i>
                                 </button>
                             </td>
 
                             <td class="px-6 py-5 align-middle text-center whitespace-nowrap relative">
                                 <div class="relative inline-block text-left" data-dropdown>
-                                    <button type="button" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-indigo-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
+                                    <button type="button" onclick="toggleActionMenu(event, <?= $row['id'] ?>)" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-indigo-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
                                         <i class="ph-bold ph-dots-three-vertical text-lg pointer-events-none"></i>
                                     </button>
 
-                                    <div class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
+                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-50 overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
                                         
                                         <div class="py-1">
                                             <a href="invoice_print.php?id=<?= $row['id'] ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2 text-[11px] font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-colors">
@@ -722,7 +722,7 @@ $res = $conn->query($sql);
         <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
             <span id="saveStatus" class="text-xs font-bold text-emerald-500 uppercase tracking-widest hidden flex items-center gap-1.5"><i class="ph-fill ph-check-circle text-base"></i> Saved!</span>
             <div class="ml-auto flex gap-3">
-                <button onclick="closeModal('noteModal')" class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors">Batal</button>
+                <button onclick="closeModal('noteModal')" class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-600">Batal</button>
                 <button onclick="saveNote()" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-md shadow-amber-500/30 active:scale-95 flex items-center gap-2">
                     <i class="ph-bold ph-floppy-disk text-lg"></i> Simpan Catatan
                 </button>
@@ -847,19 +847,24 @@ $res = $conn->query($sql);
         }
     });
 
-    // --- CUSTOM DROPDOWN MENU LOGIC ---
+    // --- CUSTOM DROPDOWN MENU LOGIC (Fix Propagation) ---
     let currentOpenDropdown = null;
-    function toggleActionMenu(id) {
+    
+    function toggleActionMenu(e, id) {
+        e.stopPropagation(); // Mencegah klik menyebar dan menutup kembali
         const menu = document.getElementById('action-menu-' + id);
+        
         if (currentOpenDropdown && currentOpenDropdown !== menu) {
             currentOpenDropdown.classList.add('hidden');
         }
+        
         menu.classList.toggle('hidden');
         currentOpenDropdown = menu.classList.contains('hidden') ? null : menu;
     }
     
+    // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
-        if (currentOpenDropdown && !e.target.closest('td.relative')) {
+        if (currentOpenDropdown && !currentOpenDropdown.contains(e.target)) {
             currentOpenDropdown.classList.add('hidden');
             currentOpenDropdown = null;
         }
@@ -929,7 +934,7 @@ $res = $conn->query($sql);
                 
                 if(notes.trim() !== "") {
                     btn.classList.remove('bg-slate-100', 'text-slate-400', 'dark:bg-slate-700/50', 'dark:border-slate-600', 'dark:text-slate-500');
-                    btn.classList.add('bg-amber-100', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400', 'border', 'border-transparent');
+                    btn.classList.add('bg-amber-100', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400', 'border-transparent');
                     btn.querySelector('i').classList.replace('ph-bold', 'ph-fill');
                 } else {
                     btn.classList.add('bg-slate-100', 'text-slate-400', 'dark:bg-slate-700/50', 'dark:border-slate-600', 'dark:text-slate-500');
