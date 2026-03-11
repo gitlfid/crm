@@ -127,6 +127,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // --- 5. FETCH DATA FOR TABS ---
 $clients = $conn->query("SELECT id, company_name FROM clients ORDER BY company_name ASC");
 
+// Ambil Data Unik "Item Name / Card Type" untuk Datalist Dropdown
+$card_types = $conn->query("SELECT DISTINCT item_name FROM deliveries WHERE item_name IS NOT NULL AND item_name != '' ORDER BY item_name ASC");
+
 // Helper to fetch data by status
 function getDeliveriesByStatus($conn, $status) {
     $st = $conn->real_escape_string($status);
@@ -198,7 +201,6 @@ include 'includes/sidebar.php';
 
     <div id="content-dashboard" class="tab-content <?= $active_tab=='dashboard'?'block':'hidden' ?> transition-opacity duration-300">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-            
             <div class="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl shadow-lg shadow-indigo-500/20 p-6 text-white relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300">
                 <div class="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                 <div class="relative z-10 flex items-center justify-between">
@@ -250,7 +252,6 @@ include 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-
         </div>
 
         <div class="bg-white dark:bg-[#24303F] rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm p-10 text-center text-slate-500 dark:text-slate-400">
@@ -292,13 +293,22 @@ include 'includes/sidebar.php';
                                 <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                             </div>
                         </div>
+
                         <div>
                             <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-widest">Item / Card Type <span class="text-rose-500">*</span></label>
                             <div class="relative group">
                                 <i class="ph-bold ph-sim-card absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
-                                <input type="text" name="card_type" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner placeholder-slate-400" placeholder="e.g. M2M Telkomsel" required>
+                                <input list="card_options" name="card_type" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner placeholder-slate-400" placeholder="Ketik atau pilih dari list..." required autocomplete="off">
+                                <datalist id="card_options">
+                                    <?php if($card_types && $card_types->num_rows > 0): ?>
+                                        <?php while($ct = $card_types->fetch_assoc()): ?>
+                                            <option value="<?= htmlspecialchars($ct['item_name']) ?>">
+                                        <?php endwhile; ?>
+                                    <?php endif; ?>
+                                </datalist>
                             </div>
                         </div>
+
                         <div>
                             <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 uppercase tracking-widest">Quantity <span class="text-rose-500">*</span></label>
                             <input type="number" name="qty" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black text-center focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner" required value="1" min="1">
@@ -806,28 +816,17 @@ include 'includes/sidebar.php';
 </div>
 
 <script>
-    // --- TAB SWITCHER (Tailwind Variant) ---
     function switchTab(tabId) {
-        // Update URL tanpa reload
         const url = new URL(window.location); url.searchParams.set('tab', tabId); window.history.pushState({}, '', url);
-        
-        // Sembunyikan semua konten
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-        
-        // Reset style semua tombol tab (inactive state)
         document.querySelectorAll('[id^="btn-tab-"]').forEach(el => {
             el.className = "flex items-center gap-2 py-2.5 px-5 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/50 shrink-0";
         });
-        
-        // Tampilkan konten tujuan
         document.getElementById('content-' + tabId).classList.remove('hidden');
         document.getElementById('content-' + tabId).classList.add('block');
-        
-        // Berikan style aktif pada tombol tujuan
         document.getElementById('btn-tab-' + tabId).className = "flex items-center gap-2 py-2.5 px-5 rounded-xl font-bold text-sm transition-all duration-300 bg-white dark:bg-indigo-600 shadow-sm text-indigo-600 dark:text-white shrink-0";
     }
 
-    // --- MODAL HANDLERS (Tailwind Vanilla JS) ---
     function openModal(id) {
         const m = document.getElementById(id); const b = m.querySelector('.modal-box');
         m.classList.remove('hidden');
@@ -840,7 +839,6 @@ include 'includes/sidebar.php';
         setTimeout(() => { m.classList.add('hidden'); }, 300);
     }
     
-    // Buka form tahap 1 (Alamat)
     function openProcessInfoModal(data) {
         document.getElementById('modal_info_id').value = data.id;
         document.getElementById('modal_address').value = data.address || '';
@@ -850,13 +848,11 @@ include 'includes/sidebar.php';
         openModal('processInfoModal');
     }
 
-    // Buka form tahap 2 (Resi)
     function openResiModal(id) {
         document.getElementById('modal_resi_id').value = id;
         openModal('processResiModal');
     }
 
-    // --- AUTO CHECK TRACKING (AJAX) ---
     function autoCheckTracking(id, resi, kurir) {
         let btn = document.getElementById('btn-track-'+id);
         let origHtml = btn.innerHTML;
@@ -878,7 +874,6 @@ include 'includes/sidebar.php';
                 document.getElementById('trackingResult').innerHTML = data;
                 btn.innerHTML = origHtml; btn.disabled = false;
                 
-                // Cek Kata Kunci Delivery
                 let upperData = data.toUpperCase();
                 if (upperData.includes('DELIVERED') || upperData.includes('BERHASIL DIKIRIM')) {
                     const formData = new FormData();
@@ -905,7 +900,6 @@ include 'includes/sidebar.php';
             });
     }
 
-    // Logika Toggle Form Tambah Manual IT
     document.addEventListener('DOMContentLoaded', () => {
         const btn = document.getElementById('toggleSubmitFormBtn');
         const body = document.getElementById('submitFormBody');
