@@ -274,7 +274,7 @@ $res = $conn->query($sql);
         </div>
     </div>
 
-    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 flex flex-col min-h-[500px]">
+    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 flex flex-col min-h-[500px] relative">
         
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
             <div class="flex items-center gap-2">
@@ -291,7 +291,7 @@ $res = $conn->query($sql);
             </div>
         </div>
 
-        <div class="overflow-x-auto modern-scrollbar flex-grow pb-24">
+        <div class="overflow-x-auto modern-scrollbar flex-grow pb-32">
             <table class="w-full text-left border-collapse table-fixed min-w-[1050px]">
                 <thead class="bg-slate-50/80 dark:bg-slate-800/50">
                     <tr>
@@ -429,18 +429,23 @@ $res = $conn->query($sql);
             </table>
         </div>
 
-        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-between items-center absolute bottom-0 w-full z-10">
-            <button id="btnPrev" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                &larr; Previous
-            </button>
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between w-full mt-auto shrink-0 z-20">
+            <div class="flex-1 flex justify-start">
+                <button id="btnPrev" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="ph-bold ph-arrow-left"></i> Previous
+                </button>
+            </div>
             
-            <div id="pageNumbers" class="flex gap-1">
+            <div id="pageNumbers" class="flex-1 flex items-center justify-center gap-1.5">
                 </div>
             
-            <button id="btnNext" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                Next &rarr;
-            </button>
+            <div class="flex-1 flex justify-end">
+                <button id="btnNext" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    Next <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </div>
         </div>
+
     </div>
 </div>
 
@@ -489,7 +494,7 @@ $res = $conn->query($sql);
         const rows = Array.from(document.querySelectorAll('#tableBody tr.data-row'));
         const totalRows = rows.length;
         
-        if(totalRows === 0) return; // Ignore if no data
+        if(totalRows === 0) return;
 
         const pageSizeSelect = document.getElementById('pageSize');
         const paginationInfo = document.getElementById('paginationInfo');
@@ -512,7 +517,6 @@ $res = $conn->query($sql);
                 }
             });
 
-            // Update Info
             const currentEnd = end > totalRows ? totalRows : end;
             paginationInfo.innerHTML = `Menampilkan <span class="text-cyan-600 dark:text-cyan-400 font-black">${start + 1} - ${currentEnd}</span> dari <span class="font-black text-slate-800 dark:text-white">${totalRows}</span> data`;
 
@@ -525,10 +529,8 @@ $res = $conn->query($sql);
             btnPrev.disabled = currentPage === 1;
             btnNext.disabled = currentPage === totalPages;
 
-            // Generate Page Numbers
             pageNumbersContainer.innerHTML = '';
             for (let i = 1; i <= totalPages; i++) {
-                // Limit visible pages for massive lists
                 if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
                     const pageBtn = document.createElement('button');
                     pageBtn.innerText = i;
@@ -542,7 +544,7 @@ $res = $conn->query($sql);
                 } else if (i === currentPage - 2 || i === currentPage + 2) {
                     const dots = document.createElement('span');
                     dots.innerText = '...';
-                    dots.className = "w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-bold";
+                    dots.className = "w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-black tracking-widest";
                     pageNumbersContainer.appendChild(dots);
                 }
             }
@@ -563,7 +565,6 @@ $res = $conn->query($sql);
             if (currentPage < totalPages) { currentPage++; renderTable(); }
         });
 
-        // Initialize
         renderTable();
     });
 
@@ -588,25 +589,22 @@ $res = $conn->query($sql);
         }
     });
 
-    // --- CUSTOM DROPDOWN MENU LOGIC (FIXED) ---
+    // --- CUSTOM DROPDOWN MENU LOGIC ---
     let currentOpenDropdown = null;
     
     function toggleActionMenu(e, id) {
-        e.stopPropagation(); // Mencegah event ditangkap oleh document.onClick
+        e.stopPropagation();
         const menu = document.getElementById('action-menu-' + id);
         
-        // Tutup menu lain yang sedang terbuka
         if (currentOpenDropdown && currentOpenDropdown !== menu) {
             currentOpenDropdown.classList.add('hidden');
         }
         
-        // Toggle menu ini
         menu.classList.toggle('hidden');
         currentOpenDropdown = menu.classList.contains('hidden') ? null : menu;
     }
     
     document.addEventListener('click', (e) => {
-        // Tutup dropdown jika area diluar dropdown di klik
         if (currentOpenDropdown && !currentOpenDropdown.contains(e.target)) {
             currentOpenDropdown.classList.add('hidden');
             currentOpenDropdown = null;
