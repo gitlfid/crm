@@ -248,9 +248,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
             <div class="w-1/3">
                 <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
             </div>
-            <div class="w-1/3 text-center">
-                <h1 class="text-xl font-black tracking-[0.3em] text-slate-900 uppercase">QUOTATION</h1>
-            </div>
+
             <div class="w-1/3 text-right">
                 <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]">
                     <?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?>
