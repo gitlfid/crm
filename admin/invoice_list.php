@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$user_role = isset($_SESSION['role']) ? $_SESSION['role'] : '';
+$user_role = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : '';
 
 // --- 2. INIT FILTER VARIABLES ---
 $search       = isset($_REQUEST['search']) ? $_REQUEST['search'] : '';
@@ -55,9 +55,9 @@ if(!empty($f_end_date)) {
     $where .= " AND i.invoice_date <= '$safe_end'";
 }
 
-// --- 3. LOGIKA EXPORT EXCEL (ITEM TERPISAH) ---
+// --- 3. LOGIKA EXPORT EXCEL (CSV) ---
 if (isset($_POST['export_excel'])) {
-    if (ob_get_length()) ob_end_clean(); // Bersihkan buffer HTML
+    if (ob_get_length()) ob_end_clean(); 
     
     $sqlEx = "SELECT 
                 i.id, 
@@ -100,7 +100,6 @@ if (isset($_POST['export_excel'])) {
         $invId = $row['id'];
         $quotId = $row['quotation_id'];
 
-        // 1. Ambil Item Detail
         $itemsData = [];
         $sqlItems = "SELECT item_name, description, qty, unit_price FROM invoice_items WHERE invoice_id = $invId";
         $resItems = $conn->query($sqlItems);
@@ -110,19 +109,16 @@ if (isset($_POST['export_excel'])) {
             $resItems = $conn->query($sqlItems);
         }
 
-        // 2. Hitung Total Invoice
         $calcSub = 0;
         while ($itm = $resItems->fetch_assoc()) {
             $itemsData[] = $itm;
             $calcSub += floatval($itm['qty']) * floatval($itm['unit_price']);
         }
         
-        // Logika Pajak
         $is_international = ($row['invoice_type'] == 'International');
         $tax_rate = $is_international ? 0 : 0.11;
         $vat = $calcSub * $tax_rate;
 
-        // Logika Rounding Excel
         if (!$is_international) {
             $calcSub = round($calcSub, 0, PHP_ROUND_HALF_DOWN);
             $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
@@ -132,14 +128,12 @@ if (isset($_POST['export_excel'])) {
         }
         $grandTotal = $calcSub + $vat;
         
-        // Data Umum Baris
         $doNum = !empty($row['do_numbers']) ? $row['do_numbers'] : '-';
         $poClient = !empty($row['po_number_client']) ? $row['po_number_client'] : '-';
         $salesPerson = !empty($row['sales_name']) ? $row['sales_name'] : '-';
         $taxStatus = (!empty($row['tax_invoice_file'])) ? 'Uploaded' : 'Pending';
         $cleanNotes = !empty($row['general_notes']) ? str_replace(array("\r", "\n"), " ", $row['general_notes']) : '-';
 
-        // 3. Tulis Baris CSV
         if (count($itemsData) > 0) {
             foreach ($itemsData as $item) {
                 $desc = $item['item_name'];
@@ -148,32 +142,15 @@ if (isset($_POST['export_excel'])) {
                 }
 
                 fputcsv($output, array(
-                    $row['invoice_date'],
-                    $row['company_name'],
-                    $row['invoice_no'],
-                    $row['invoice_type'],
-                    $poClient,
-                    $row['quotation_no'],
-                    $desc,                  
-                    $item['qty'],           
-                    $item['unit_price'],    
-                    $row['currency'],
-                    $calcSub,    
-                    $vat,        
-                    $grandTotal, 
-                    strtoupper($row['status']),
-                    $salesPerson,
-                    $doNum,
-                    $taxStatus,
-                    $cleanNotes 
+                    $row['invoice_date'], $row['company_name'], $row['invoice_no'], $row['invoice_type'],
+                    $poClient, $row['quotation_no'], $desc, $item['qty'], $item['unit_price'], $row['currency'],
+                    $calcSub, $vat, $grandTotal, strtoupper($row['status']), $salesPerson, $doNum, $taxStatus, $cleanNotes 
                 ));
             }
         } else {
             fputcsv($output, array(
-                $row['invoice_date'], $row['company_name'], $row['invoice_no'], 
-                $row['invoice_type'],
-                $poClient, $row['quotation_no'], 'No Items Found', 0, 0, 
-                $row['currency'], 0, 0, 0, 
+                $row['invoice_date'], $row['company_name'], $row['invoice_no'], $row['invoice_type'],
+                $poClient, $row['quotation_no'], 'No Items Found', 0, 0, $row['currency'], 0, 0, 0, 
                 strtoupper($row['status']), $salesPerson, $doNum, $taxStatus, $cleanNotes
             ));
         }
@@ -198,8 +175,7 @@ if (isset($_POST['confirm_payment'])) {
     $notes = isset($_POST['payment_notes']) ? $conn->real_escape_string($_POST['payment_notes']) : '';
     $user_id = $_SESSION['user_id'];
 
-    // [UPDATE] Validasi dilonggarkan: Mengizinkan DP (kurang dari total), tapi menolak Overpayment
-    if ($amount_input > ($grand_total_system + 100)) { // Tolerance 100 perak
+    if ($amount_input > ($grand_total_system + 100)) { 
         echo "<script>alert('GAGAL: Nominal pembayaran melebihi total tagihan!'); window.location='invoice_list.php';</script>";
         exit;
     }
@@ -219,21 +195,13 @@ if (isset($_POST['confirm_payment'])) {
     }
 
     if ($proof_file) {
-        // [UPDATE] Insert dengan Notes
         $sqlPay = "INSERT INTO payments (invoice_id, payment_date, amount, proof_file, created_by, notes) 
                    VALUES ($inv_id, '$pay_date', $amount_input, '$proof_file', $user_id, '$notes')";
         
         if ($conn->query($sqlPay)) {
-            // Update Status Invoice
-            // Jika Lunas (Total bayar >= Total tagihan), set Paid. Jika kurang, biarkan Partial/Sent (tergantung kebutuhan).
-            // Di sini kita set 'paid' jika sudah lunas/mendekati lunas.
             if ($amount_input >= ($grand_total_system - 100)) {
                 $conn->query("UPDATE invoices SET status='paid' WHERE id=$inv_id");
-            } else {
-                // Opsional: Anda bisa menambah status 'partial' di enum database jika mau
-                // $conn->query("UPDATE invoices SET status='partial' WHERE id=$inv_id");
             }
-            
             echo "<script>alert('Pembayaran berhasil disimpan!'); window.location='payment_list.php';</script>";
         }
     } else {
@@ -245,7 +213,6 @@ if (isset($_POST['confirm_payment'])) {
 if (isset($_POST['upload_tax_invoice'])) {
     $inv_id = intval($_POST['tax_invoice_id']);
     $uploadDir = __DIR__ . '/../uploads/';
-    
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
 
     if (isset($_FILES['tax_file']) && $_FILES['tax_file']['error'] == 0) {
@@ -259,15 +226,9 @@ if (isset($_POST['upload_tax_invoice'])) {
                 } else {
                     echo "<script>alert('Gagal update database.');</script>";
                 }
-            } else {
-                echo "<script>alert('Gagal memindahkan file.');</script>";
-            }
-        } else {
-            echo "<script>alert('Format file tidak didukung. Gunakan PDF/JPG/PNG.');</script>";
-        }
-    } else {
-        echo "<script>alert('Pilih file terlebih dahulu.');</script>";
-    }
+            } else { echo "<script>alert('Gagal memindahkan file.');</script>"; }
+        } else { echo "<script>alert('Format file tidak didukung.');</script>"; }
+    } else { echo "<script>alert('Pilih file terlebih dahulu.');</script>"; }
 }
 
 // --- LOGIKA ACTION: DELETE & STATUS ---
@@ -301,6 +262,24 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     echo "<script>window.location='invoice_list.php';</script>";
 }
 
+// --- QUERY STATISTIK DINAMIS ---
+$sql_stats = "SELECT i.status, COUNT(*) as count 
+              FROM invoices i 
+              JOIN quotations q ON i.quotation_id = q.id 
+              WHERE $where GROUP BY i.status";
+$res_stats = $conn->query($sql_stats);
+
+$stats = ['total' => 0, 'draft' => 0, 'sent' => 0, 'paid' => 0, 'cancel' => 0];
+if ($res_stats) {
+    while($s = $res_stats->fetch_assoc()) {
+        $stats['total'] += $s['count'];
+        $st_key = strtolower($s['status']);
+        if (isset($stats[$st_key])) {
+            $stats[$st_key] += $s['count'];
+        }
+    }
+}
+
 // --- 5. QUERY DATA TAMPILAN UTAMA ---
 $sql = "SELECT i.*, c.company_name, q.quotation_no, q.currency, 
         isp.general_notes, 
@@ -323,314 +302,706 @@ $res = $conn->query($sql);
 ?>
 
 <style>
-    .table-responsive { overflow: visible !important; }
-    .table-compact { font-size: 0.85rem; }
-    .table-compact thead th { font-size: 0.8rem; text-transform: uppercase; background-color: #f8f9fa; color: #6c757d; padding: 10px 12px; }
-    .table-compact tbody td { padding: 8px 12px; vertical-align: middle; }
-    .badge-status { font-size: 0.7rem; padding: 5px 8px; }
-    .btn-note-icon { border: none; background: transparent; padding: 4px; color: #adb5bd; transition: all 0.2s; }
-    .btn-note-icon:hover { color: #0d6efd; transform: scale(1.1); }
-    .btn-note-icon.has-note { color: #ffc107; }
+    .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .modern-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+    .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .modern-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .dark .modern-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
 </style>
 
-<div class="page-heading mb-3">
-    <div class="row align-items-center">
-        <div class="col-12 col-md-6">
-            <h3>Invoice List</h3>
-            <p class="text-subtitle text-muted small mb-0">Daftar tagihan dan status pembayaran.</p>
+<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto space-y-6 animate-fade-in-up">
+    
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-2">
+        <div>
+            <h1 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/30">
+                    <i class="ph-fill ph-receipt"></i>
+                </div>
+                Invoice Management
+            </h1>
+            <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Pantau status tagihan, kelola pembayaran, dan unggah faktur pajak.</p>
         </div>
-        <div class="col-12 col-md-6 text-end">
-            <a href="invoice_form.php" class="btn btn-success btn-sm shadow-sm">
-                <i class="bi bi-plus-lg me-1"></i> Create Manual Invoice
+        <div class="flex items-center gap-3">
+            <button onclick="window.location.href='invoice_list.php'" class="group inline-flex items-center justify-center w-12 h-12 bg-white dark:bg-[#24303F] border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl shadow-sm transition-all active:scale-95" title="Refresh / Reset Filter">
+                <i class="ph-bold ph-arrows-clockwise text-xl group-hover:rotate-180 transition-transform duration-500"></i>
+            </button>
+            <a href="invoice_form.php" class="group inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-emerald-500 hover:from-indigo-500 hover:to-emerald-400 text-white font-bold py-3 px-6 rounded-2xl shadow-lg shadow-indigo-500/30 transition-all transform hover:-translate-y-1 active:scale-95 whitespace-nowrap overflow-hidden relative">
+                <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+                <i class="ph-bold ph-plus text-xl relative z-10"></i> 
+                <span class="relative z-10">Create Manual Invoice</span>
             </a>
         </div>
     </div>
-</div>
 
-<div class="page-content">
-    <div class="card shadow-sm mb-3">
-        <div class="card-body py-3 px-4">
-            <form method="GET">
-                <div class="row g-2 mb-2">
-                    <div class="col-md-4">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
-                            <input type="text" name="search" class="form-control" placeholder="No Invoice..." value="<?= htmlspecialchars($search) ?>">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
+            <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-files"></i></div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Invoices</p>
+                <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['total']) ?></h4>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-check-circle"></i></div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Fully Paid</p>
+                <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['paid']) ?></h4>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
+            <div class="w-14 h-14 rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-paper-plane-tilt"></i></div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Sent to Client</p>
+                <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['sent']) ?></h4>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
+            <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-file-dashed"></i></div>
+            <div>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Draft / Unpaid</p>
+                <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['draft']) ?></h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 transition-colors duration-300">
+        <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-t-3xl transition-colors" id="filterToggleBtn">
+            <h3 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
+                <i class="ph-bold ph-funnel text-indigo-500 text-lg"></i> Filter Data & Export
+            </h3>
+            <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-transform">
+                <i id="filterIcon" class="ph-bold ph-caret-up transition-transform duration-300"></i>
+            </div>
+        </div>
+        
+        <div id="filterBody" class="p-6 block transition-all duration-300">
+            <form method="GET" action="invoice_list.php">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5 mb-5">
+                    
+                    <div class="xl:col-span-2">
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">No Invoice</label>
+                        <div class="relative group">
+                            <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
+                            <input type="text" name="search" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. INV-..." value="<?= htmlspecialchars($search) ?>">
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <select name="client_id" class="form-select form-select-sm">
-                            <option value="">- Semua Perusahaan -</option>
-                            <?php if($clients->num_rows > 0) { $clients->data_seek(0); while($c = $clients->fetch_assoc()): ?>
-                                <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($c['company_name']) ?>
-                                </option>
-                            <?php endwhile; } ?>
-                        </select>
+
+                    <div class="xl:col-span-2">
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Perusahaan / Klien</label>
+                        <div class="relative group">
+                            <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
+                            <select name="client_id" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                                <option value="">Semua Klien</option>
+                                <?php if($clients->num_rows > 0) { $clients->data_seek(0); while($c = $clients->fetch_assoc()): ?>
+                                    <option value="<?= $c['id'] ?>" <?= ($f_client == $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['company_name']) ?></option>
+                                <?php endwhile; } ?>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <select name="status" class="form-select form-select-sm">
-                            <option value="">- Semua Status -</option>
-                            <option value="draft" <?= $f_status=='draft'?'selected':'' ?>>Draft</option>
-                            <option value="sent" <?= $f_status=='sent'?'selected':'' ?>>Sent</option>
-                            <option value="paid" <?= $f_status=='paid'?'selected':'' ?>>Paid</option>
-                            <option value="cancel" <?= $f_status=='cancel'?'selected':'' ?>>Cancelled</option>
-                        </select>
+
+                    <div class="xl:col-span-2">
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Status Pembayaran</label>
+                        <div class="relative group">
+                            <i class="ph-bold ph-wallet absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-indigo-500 transition-colors"></i>
+                            <select name="status" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                                <option value="">Semua Status</option>
+                                <option value="draft" <?= $f_status=='draft'?'selected':'' ?>>Draft</option>
+                                <option value="sent" <?= $f_status=='sent'?'selected':'' ?>>Sent</option>
+                                <option value="paid" <?= $f_status=='paid'?'selected':'' ?>>Paid</option>
+                                <option value="cancel" <?= $f_status=='cancel'?'selected':'' ?>>Cancelled</option>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        </div>
                     </div>
                 </div>
-                <div class="row g-2">
-                    <div class="col-md-2"><input type="date" name="start_date" class="form-control form-control-sm" value="<?= htmlspecialchars($f_start_date) ?>"></div>
-                    <div class="col-md-2"><input type="date" name="end_date" class="form-control form-control-sm" value="<?= htmlspecialchars($f_end_date) ?>"></div>
-                    <div class="col-md-3">
-                        <select name="tax_status" class="form-select form-select-sm">
-                            <option value="">- Filter Faktur Pajak -</option>
-                            <option value="uploaded" <?= $f_tax=='uploaded'?'selected':'' ?>>Uploaded</option>
-                            <option value="pending" <?= $f_tax=='pending'?'selected':'' ?>>Pending</option>
-                        </select>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-12 gap-5 items-end">
+                    
+                    <div class="xl:col-span-3">
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Faktur Pajak</label>
+                        <div class="relative group">
+                            <select name="tax_status" class="w-full pl-4 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                                <option value="">Semua Kondisi</option>
+                                <option value="uploaded" <?= $f_tax=='uploaded'?'selected':'' ?>>Sudah Upload</option>
+                                <option value="pending" <?= $f_tax=='pending'?'selected':'' ?>>Pending / Belum</option>
+                            </select>
+                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                        </div>
                     </div>
-                    <div class="col-md-2"><button type="submit" class="btn btn-primary btn-sm w-100">Apply Filter</button></div>
-                    <div class="col-md-3 text-end">
-                        <button type="submit" formaction="invoice_list.php" formmethod="POST" name="export_excel" class="btn btn-success btn-sm w-100 text-white">
-                            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Excel
+
+                    <div class="xl:col-span-4">
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Periode Tagihan</label>
+                        <div class="flex items-center gap-2">
+                            <input type="date" name="start_date" class="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner" value="<?= htmlspecialchars($f_start_date) ?>">
+                            <span class="text-slate-400 font-bold">-</span>
+                            <input type="date" name="end_date" class="w-full px-3 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/50 outline-none dark:text-white transition-all shadow-inner" value="<?= htmlspecialchars($f_end_date) ?>">
+                        </div>
+                    </div>
+
+                    <div class="xl:col-span-5 flex gap-2 h-[46px]">
+                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-funnel"></i> Terapkan
                         </button>
+                        <button type="submit" formmethod="POST" name="export_excel" class="flex-none w-[46px] bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white border border-emerald-200 dark:border-emerald-500/20 transition-all rounded-xl active:scale-95 flex items-center justify-center" title="Export CSV">
+                            <i class="ph-bold ph-microsoft-excel-logo text-lg"></i>
+                        </button>
+                        <?php if(!empty($search) || !empty($f_client) || !empty($f_status) || !empty($f_tax) || !empty($f_start_date)): ?>
+                            <a href="invoice_list.php" class="flex-none w-[46px] bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
+                                <i class="ph-bold ph-arrows-counter-clockwise text-lg"></i>
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive" style="overflow:visible;">
-                <table class="table table-hover table-compact mb-0 align-middle" id="table1">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4">Invoice No</th>
-                            <th>Date</th>
-                            <th>Client</th>
-                            <th class="text-center">Type</th>
-                            <th class="text-end">Sub Total</th>
-                            <th class="text-end">Adj</th>
-                            <th class="text-end">VAT</th>
-                            <th class="text-end">Grand Total</th>
-                            <th class="text-center">Note</th> 
-                            <th class="text-center">Status</th>
-                            <th class="text-end pe-4">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if($res->num_rows > 0): ?>
-                            <?php while($row = $res->fetch_assoc()): ?>
-                            <?php
-                                $subTotal = floatval($row['sub_total'] ?? 0);
-                                $adjTotal = floatval($row['total_adjustment'] ?? 0);
-                                $totalPaid = floatval($row['total_paid'] ?? 0);
-                                $curr = $row['currency'];
-                                
-                                $is_international = ($row['invoice_type'] == 'International');
-                                $tax_rate = $is_international ? 0 : 0.11;
-                                $vat = $subTotal * $tax_rate;
+    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 flex flex-col min-h-[500px] relative">
+        
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Tampilkan</span>
+                <select id="pageSize" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-indigo-500/50 outline-none cursor-pointer">
+                    <option value="10">10 Baris</option>
+                    <option value="50">50 Baris</option>
+                    <option value="100">100 Baris</option>
+                </select>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Data</span>
+            </div>
+            <div class="text-xs font-bold text-slate-500 dark:text-slate-400" id="paginationInfo">
+                Menampilkan 0 dari 0 data
+            </div>
+        </div>
 
-                                if (!$is_international) {
-                                    $subTotal = round($subTotal, 0, PHP_ROUND_HALF_DOWN);
-                                    $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
-                                } else {
-                                    $subTotal = round($subTotal, 2);
-                                    $vat = round($vat, 2);
-                                }
-                                // Grand Total tidak ditambah adjustment di sini karena adjustment hanya info termin
-                                // Tapi jika adjustment berupa biaya tambahan, harusnya ditambah.
-                                // Sesuai diskusi sebelumnya, Adjustment = DP/Termin, jadi tidak mengubah total tagihan dasar.
-                                $grandTotal = $subTotal + $vat; 
-                                
-                                $remaining = $grandTotal - $totalPaid;
+        <div class="overflow-x-auto modern-scrollbar flex-grow pb-24"> 
+            <table class="w-full text-left border-collapse table-fixed min-w-[1100px]">
+                <thead class="bg-slate-50/80 dark:bg-slate-800/50">
+                    <tr>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[22%]">Invoice Info</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[28%]">Client Details</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-right text-[10px] font-black text-slate-400 uppercase tracking-wider w-[18%]">Financial Info</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[14%]">Status</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[10%]">Note</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[8%]">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/50">
+                    <?php if($res->num_rows > 0): ?>
+                        <?php while($row = $res->fetch_assoc()): ?>
+                        <?php
+                            $subTotal = floatval($row['sub_total'] ?? 0);
+                            $adjTotal = floatval($row['total_adjustment'] ?? 0);
+                            $totalPaid = floatval($row['total_paid'] ?? 0);
+                            $curr = $row['currency'];
+                            
+                            $is_international = ($row['invoice_type'] == 'International');
+                            $tax_rate = $is_international ? 0 : 0.11;
+                            $vat = $subTotal * $tax_rate;
 
-                                $fmt = function($n) use ($is_international) {
-                                    if ($is_international) return number_format($n, 0, '.', ','); 
-                                    return number_format($n, 0, ',', '.');
-                                };
+                            if (!$is_international) {
+                                $subTotal = round($subTotal, 0, PHP_ROUND_HALF_DOWN);
+                                $vat = round($vat, 0, PHP_ROUND_HALF_DOWN);
+                            } else {
+                                $subTotal = round($subTotal, 2);
+                                $vat = round($vat, 2);
+                            }
+                            $grandTotal = $subTotal + $vat; 
+                            $remaining = $grandTotal - $totalPaid;
 
-                                $st = $row['status'];
-                                // Logika Status Tampilan (Bisa Partial)
-                                if ($st != 'cancel' && $totalPaid > 0 && $remaining > 100) {
-                                    $displayStatus = 'PARTIAL';
-                                    $bg = 'warning text-dark';
-                                } else {
-                                    $displayStatus = strtoupper($st);
-                                    $bg = ($st=='paid')?'success':(($st=='cancel')?'danger':(($st=='sent')?'info':'secondary'));
-                                }
+                            $fmt = function($n) use ($is_international) {
+                                if ($is_international) return number_format($n, 2, '.', ','); 
+                                return number_format($n, 0, ',', '.');
+                            };
 
-                                $hasTax = !empty($row['tax_invoice_file']);
-                                $hasNote = !empty($row['general_notes']);
-                                $noteClass = $hasNote ? 'has-note' : '';
-                                $doCount = intval($row['do_count']);
-                            ?>
-                            <tr>
-                                <td class="ps-4 fw-bold text-dark font-monospace">
-                                    <?= $row['invoice_no'] ?>
-                                    <div class="text-muted small fw-normal" style="font-size: 0.7rem;">Ref: <?= $row['quotation_no'] ?></div>
+                            $st = strtolower($row['status']);
+                            if ($st != 'cancel' && $totalPaid > 0 && $remaining > 100) {
+                                $displayStatus = 'PARTIAL';
+                                $bgClass = 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400';
+                            } else {
+                                $displayStatus = strtoupper($st);
+                                if($st == 'paid') $bgClass = 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400';
+                                elseif($st == 'cancel') $bgClass = 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400';
+                                elseif($st == 'sent') $bgClass = 'bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-400';
+                                else $bgClass = 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-300';
+                            }
+
+                            $hasTax = !empty($row['tax_invoice_file']);
+                            $hasNote = !empty($row['general_notes']);
+                            $doCount = intval($row['do_count']);
+                        ?>
+                        <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                            
+                            <td class="px-6 py-5 align-middle whitespace-nowrap">
+                                <div class="font-mono font-black text-indigo-600 dark:text-indigo-400 text-[13px] mb-1 tracking-wide">
+                                    <?= htmlspecialchars($row['invoice_no']) ?>
+                                </div>
+                                <div class="text-[10px] text-slate-500 dark:text-slate-400 mb-2 font-medium flex items-center gap-1.5">
+                                    <i class="ph-fill ph-calendar-blank"></i> <?= date('d M Y', strtotime($row['invoice_date'])) ?>
+                                </div>
+                                <div class="flex items-center gap-1.5">
                                     <?php if($hasTax): ?>
-                                        <span class="badge bg-light text-primary border mt-1" style="font-size: 0.6rem;"><i class="bi bi-check-circle-fill"></i> Tax Invoice</span>
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400 shadow-sm" title="Tax Invoice Uploaded">
+                                            <i class="ph-fill ph-check-circle"></i> Tax
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 shadow-sm" title="No Tax Document">
+                                            <i class="ph-bold ph-minus"></i> No Tax
+                                        </span>
                                     <?php endif; ?>
-                                </td>
-                                <td><?= date('d/m/Y', strtotime($row['invoice_date'])) ?></td>
-                                <td><div class="fw-bold text-truncate" style="max-width: 200px;"><?= htmlspecialchars($row['company_name']) ?></div></td>
-                                <td class="text-center"><span class="badge bg-light text-dark border"><?= $row['invoice_type'] ?></span></td>
-                                <td class="text-end text-muted"><?= $fmt($subTotal) ?></td>
-                                <td class="text-end text-success"><?= $adjTotal != 0 ? $fmt($adjTotal) : '-' ?></td>
-                                <td class="text-end text-muted"><?= $fmt($vat) ?></td>
-                                <td class="text-end fw-bold text-primary">
-                                    <small class="text-muted me-1"><?= $curr ?></small><?= $fmt($grandTotal) ?>
-                                    <?php if($totalPaid > 0): ?>
-                                        <div class="small text-success mt-1" style="font-size:0.7rem;">Paid: <?= $fmt($totalPaid) ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-center">
-                                    <button class="btn-note-icon <?= $noteClass ?>" onclick="openNoteModal('<?= $row['invoice_no'] ?>')" id="btn-note-<?= $row['invoice_no'] ?>"><i class="bi bi-sticky-fill fs-5"></i></button>
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge bg-<?= $bg ?> badge-status rounded-pill"><?= $displayStatus ?></span>
-                                    <?php if($doCount > 0): ?>
-                                        <div class="mt-1"><span class="badge bg-light text-dark border" style="font-size: 0.6rem;"><i class="bi bi-truck me-1"></i> DO Created</span></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end pe-4">
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle py-0" style="font-size:0.8rem;" type="button" data-bs-toggle="dropdown">Act</button>
-                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 small">
-                                            <li><a class="dropdown-item text-primary" href="invoice_print.php?id=<?= $row['id'] ?>" target="_blank"><i class="bi bi-printer me-2"></i> Print PDF</a></li>
-                                            <li><button class="dropdown-item" onclick="openTaxModal(<?= $row['id'] ?>, '<?= $row['invoice_no'] ?>')"><i class="bi bi-file-earmark-arrow-up me-2"></i> <?= $hasTax ? 'Update Tax' : 'Upload Tax' ?></button></li>
-                                            <?php if($hasTax): ?>
-                                            <li><a href="../uploads/<?= $row['tax_invoice_file'] ?>" target="_blank" class="dropdown-item"><i class="bi bi-eye me-2"></i> View Tax</a></li>
-                                            <?php endif; ?>
-                                            
-                                            <?php if($st == 'paid' || $totalPaid > 0): ?>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item fw-bold text-dark" href="delivery_order_form.php?from_invoice_id=<?= $row['id'] ?>"><i class="bi bi-truck me-2 text-warning"></i> Create DO</a></li>
-                                            <?php endif; ?>
+                                </div>
+                            </td>
 
-                                            <?php if($st != 'paid' && $st != 'cancel'): ?>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <?php if($st == 'draft'): ?>
-                                                <li><a class="dropdown-item text-warning" href="invoice_edit.php?id=<?= $row['id'] ?>"><i class="bi bi-pencil me-2"></i> Edit Invoice</a></li>
-                                                <li><a class="dropdown-item text-info" href="?action=sent&id=<?= $row['id'] ?>"><i class="bi bi-send me-2"></i> Mark Sent</a></li>
-                                                <?php endif; ?>
-                                                
-                                                <li><button class="dropdown-item text-success" onclick="openPayModal(<?= $row['id'] ?>, '<?= $row['invoice_no'] ?>', <?= $grandTotal ?>)"><i class="bi bi-check-circle me-2"></i> Add Payment / DP</button></li>
-                                                <li><a class="dropdown-item text-danger" href="?action=cancel&id=<?= $row['id'] ?>" onclick="return confirm('Batalkan Invoice?')"><i class="bi bi-x-circle me-2"></i> Cancel</a></li>
-                                            <?php endif; ?>
-                                            
-                                            <?php if($user_role == 'admin'): ?>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger fw-bold" href="?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen?')"><i class="bi bi-trash-fill me-2"></i> Delete</a></li>
-                                            <?php endif; ?>
-                                        </ul>
+                            <td class="px-6 py-5 align-middle">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1.5 leading-snug break-words whitespace-normal pr-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" title="<?= htmlspecialchars($row['company_name']) ?>">
+                                    <?= htmlspecialchars($row['company_name']) ?>
+                                </div>
+                                <div class="flex flex-col gap-1 items-start">
+                                    <div class="text-[10px] text-slate-500 dark:text-slate-400 font-medium break-words whitespace-normal">
+                                        Ref: <span class="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"><?= htmlspecialchars($row['quotation_no']) ?></span>
                                     </div>
-                                </td>
-                            </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr><td colspan="11" class="text-center py-5 text-muted small">Tidak ada data invoice.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                                    <span class="inline-block px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 text-[9px] font-black uppercase tracking-widest mt-0.5">
+                                        <?= htmlspecialchars($row['invoice_type']) ?>
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td class="px-6 py-4 align-middle text-right whitespace-nowrap">
+                                <div class="flex flex-col items-end gap-1">
+                                    <div class="text-[10px] flex justify-between w-full max-w-[140px] ml-auto font-medium">
+                                        <span class="text-slate-500 dark:text-slate-400">Subtotal:</span>
+                                        <span class="text-slate-700 dark:text-slate-300"><span class="text-[9px] mr-0.5 opacity-70"><?= $curr ?></span><?= $fmt($subTotal) ?></span>
+                                    </div>
+                                    <div class="text-[10px] flex justify-between w-full max-w-[140px] ml-auto font-medium">
+                                        <span class="text-slate-500 dark:text-slate-400">VAT (11%):</span>
+                                        <span class="text-slate-700 dark:text-slate-300"><span class="text-[9px] mr-0.5 opacity-70"><?= $curr ?></span><?= $fmt($vat) ?></span>
+                                    </div>
+                                    <?php if($adjTotal != 0): ?>
+                                    <div class="text-[10px] flex justify-between w-full max-w-[140px] ml-auto font-bold text-emerald-600 dark:text-emerald-400">
+                                        <span>DP/Adj:</span>
+                                        <span><span class="text-[9px] mr-0.5 opacity-70"><?= $curr ?></span><?= $fmt($adjTotal) ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <div class="text-[13px] font-black text-indigo-600 dark:text-indigo-400 mt-1.5 pt-1.5 border-t border-slate-200 dark:border-slate-700 flex justify-between w-full max-w-[140px] ml-auto items-end">
+                                        <span class="text-[9px] uppercase tracking-widest text-slate-400 mb-0.5">Total</span>
+                                        <span><span class="text-[10px] font-bold opacity-70 mr-0.5"><?= $curr ?></span><?= $fmt($grandTotal) ?></span>
+                                    </div>
+                                    
+                                    <?php if($totalPaid > 0): ?>
+                                    <div class="text-[10px] font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-500/20 mt-1">
+                                        PAID: <?= $curr ?> <?= $fmt($totalPaid) ?>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+
+                            <td class="px-6 py-5 align-middle text-center whitespace-nowrap">
+                                <div class="flex flex-col items-center gap-1.5">
+                                    <span class="inline-flex items-center justify-center px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest w-20 shadow-sm <?= $bgClass ?>">
+                                        <?= $displayStatus ?>
+                                    </span>
+                                    <?php if($doCount > 0): ?>
+                                        <span class="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-1.5 py-0.5 rounded shadow-sm">
+                                            <i class="ph-bold ph-truck text-[10px]"></i> DO Created
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+
+                            <td class="px-4 py-5 align-middle text-center whitespace-nowrap">
+                                <button type="button" onclick="openNoteModal('<?= htmlspecialchars($row['invoice_no']) ?>')" id="btn-note-<?= htmlspecialchars($row['invoice_no']) ?>" class="w-8 h-8 rounded-xl flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 <?= $hasNote ? 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-200 border border-transparent' : 'bg-slate-100 text-slate-400 dark:bg-slate-700/50 dark:border-slate-600 dark:text-slate-500 hover:bg-indigo-100 hover:text-indigo-600 dark:hover:bg-indigo-500/20 dark:hover:text-indigo-400 border border-slate-200' ?>" title="Internal Notes">
+                                    <i class="<?= $hasNote ? 'ph-fill' : 'ph-bold' ?> ph-notepad text-lg"></i>
+                                </button>
+                            </td>
+
+                            <td class="px-6 py-5 align-middle text-center whitespace-nowrap relative">
+                                <div class="relative inline-block text-left" data-dropdown>
+                                    <button type="button" onclick="toggleActionMenu(event, <?= $row['id'] ?>)" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-indigo-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
+                                        <i class="ph-bold ph-dots-three-vertical text-lg pointer-events-none"></i>
+                                    </button>
+
+                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-48 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-[100] overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
+                                        
+                                        <div class="py-1">
+                                            <a href="invoice_print.php?id=<?= $row['id'] ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-colors">
+                                                <i class="ph-bold ph-printer text-base text-slate-400 group-hover:text-indigo-500"></i> Print PDF
+                                            </a>
+                                            
+                                            <button type="button" onclick="openTaxModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['invoice_no']) ?>')" class="w-full text-left group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-400 transition-colors">
+                                                <i class="ph-bold ph-receipt text-base text-slate-400 group-hover:text-sky-500"></i> <?= $hasTax ? 'Update Tax' : 'Upload Tax' ?>
+                                            </button>
+                                            
+                                            <?php if($hasTax): ?>
+                                            <a href="../uploads/<?= htmlspecialchars($row['tax_invoice_file']) ?>" target="_blank" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                <i class="ph-bold ph-eye text-base text-slate-400"></i> View Tax
+                                            </a>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <?php if($st == 'paid' || $totalPaid > 0): ?>
+                                        <div class="py-1">
+                                            <a href="delivery_order_form.php?from_invoice_id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors">
+                                                <i class="ph-bold ph-truck text-base"></i> Create DO
+                                            </a>
+                                        </div>
+                                        <?php endif; ?>
+
+                                        <?php if($st != 'paid' && $st != 'cancel'): ?>
+                                        <div class="py-1">
+                                            <?php if($st == 'draft'): ?>
+                                            <a href="invoice_edit.php?id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                                <i class="ph-bold ph-pencil-simple text-base text-slate-400"></i> Edit Invoice
+                                            </a>
+                                            <a href="?action=sent&id=<?= $row['id'] ?>" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-colors">
+                                                <i class="ph-bold ph-paper-plane-tilt text-base"></i> Mark Sent
+                                            </a>
+                                            <?php endif; ?>
+                                            
+                                            <button type="button" onclick="openPayModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['invoice_no']) ?>', <?= $grandTotal ?>)" class="w-full text-left group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors">
+                                                <i class="ph-bold ph-wallet text-base"></i> Add Payment / DP
+                                            </button>
+                                        </div>
+                                        <div class="py-1 bg-slate-50/50 dark:bg-slate-800/30">
+                                            <a href="?action=cancel&id=<?= $row['id'] ?>" onclick="return confirm('Batalkan Invoice ini?')" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                                                <i class="ph-bold ph-x-circle text-base"></i> Cancel Invoice
+                                            </a>
+                                        </div>
+                                        <?php endif; ?>
+
+                                        <?php if($user_role == 'admin'): ?>
+                                        <div class="py-1 bg-slate-50/50 dark:bg-slate-800/30">
+                                            <a href="?action=delete&id=<?= $row['id'] ?>" onclick="return confirm('Hapus permanen? Data tidak dapat dikembalikan.')" class="group flex items-center gap-2.5 px-4 py-2.5 text-xs font-black text-rose-600 hover:bg-rose-600 hover:text-white dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-colors">
+                                                <i class="ph-bold ph-trash text-base"></i> Delete
+                                            </a>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </td>
+
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr id="emptyRow">
+                            <td colspan="6" class="px-6 py-16 text-center">
+                                <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
+                                    <div class="w-24 h-24 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
+                                        <i class="ph-fill ph-receipt text-5xl text-slate-300 dark:text-slate-600"></i>
+                                    </div>
+                                    <h4 class="font-black text-slate-700 dark:text-slate-200 text-lg mb-1">Data Tidak Ditemukan</h4>
+                                    <p class="text-sm font-medium">Invoice tidak ditemukan dengan filter pencarian saat ini.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between w-full mt-auto shrink-0 z-20">
+            <div class="flex-1 flex justify-start">
+                <button id="btnPrev" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="ph-bold ph-arrow-left"></i> Previous
+                </button>
             </div>
-            <?php if($res->num_rows > 20): ?>
-                <div class="card-footer bg-white border-top text-center py-2 text-muted small">Menampilkan hasil pencarian</div>
-            <?php endif; ?>
+            
+            <div id="pageNumbers" class="flex-1 flex items-center justify-center gap-1.5">
+                </div>
+            
+            <div class="flex-1 flex justify-end">
+                <button id="btnNext" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                    Next <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="noteModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-light py-2"><h6 class="modal-title fw-bold">Catatan Invoice</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" id="noteInvoiceNo">
-                <input type="text" id="noteTitle" class="form-control form-control-sm bg-light fw-bold mb-2" readonly>
-                <textarea id="generalNotes" class="form-control" rows="8" placeholder="Tulis catatan internal di sini..."></textarea>
-            </div>
-            <div class="modal-footer bg-light py-2">
-                <span id="saveStatus" class="me-auto small text-success fw-bold" style="display:none;">Tersimpan!</span>
-                <button type="button" class="btn btn-primary btn-sm px-4" onclick="saveNote()">Simpan</button>
+<div id="noteModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('noteModal')"></div>
+    <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-lg transform scale-95 opacity-0 transition-all duration-300 modal-box flex flex-col overflow-hidden">
+        <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+            <h3 class="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2"><i class="ph-fill ph-notepad text-amber-500 text-xl"></i> Internal Notes</h3>
+            <button onclick="closeModal('noteModal')" class="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-200/50 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-700 dark:text-slate-400 dark:hover:bg-rose-500/20 dark:hover:text-rose-400 transition-colors">
+                <i class="ph-bold ph-x text-lg"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <input type="hidden" id="noteInvoiceNo">
+            <input type="text" id="noteTitle" class="w-full mb-4 px-4 py-2.5 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold font-mono outline-none cursor-not-allowed text-center shadow-inner" readonly>
+            <textarea id="generalNotes" class="w-full px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/50 transition-all resize-none shadow-sm" rows="6" placeholder="Tulis catatan internal, riwayat interaksi klien, atau log dokumen di sini..."></textarea>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
+            <span id="saveStatus" class="text-xs font-bold text-emerald-500 uppercase tracking-widest hidden flex items-center gap-1.5"><i class="ph-fill ph-check-circle text-base"></i> Saved!</span>
+            <div class="ml-auto flex gap-3">
+                <button onclick="closeModal('noteModal')" class="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-600">Batal</button>
+                <button onclick="saveNote()" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-md shadow-amber-500/30 active:scale-95 flex items-center gap-2">
+                    <i class="ph-bold ph-floppy-disk text-lg"></i> Simpan Catatan
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="payModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form method="POST" enctype="multipart/form-data" class="modal-content" onsubmit="return validatePayment()">
-            <div class="modal-header bg-success text-white py-2">
-                <h6 class="modal-title"><i class="bi bi-wallet2 me-2"></i> Pembayaran / DP</h6>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+<div id="payModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('payModal')"></div>
+    <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 modal-box flex flex-col overflow-hidden">
+        <form method="POST" enctype="multipart/form-data" onsubmit="return validatePayment()">
+            <div class="px-6 py-5 border-b border-emerald-500/20 bg-emerald-500 flex justify-between items-center text-white">
+                <h3 class="text-base font-black flex items-center gap-2"><i class="ph-bold ph-wallet text-xl"></i> Input Pembayaran</h3>
+                <button type="button" onclick="closeModal('payModal')" class="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/40 transition-colors">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
             </div>
-            <div class="modal-body">
+            
+            <div class="p-6 overflow-y-auto max-h-[80vh] modern-scrollbar">
                 <input type="hidden" name="invoice_id" id="modal_inv_id">
                 <input type="hidden" name="grand_total_system" id="modal_grand_total">
                 
-                <div class="alert alert-light-success border-success text-center py-2 mb-3">
-                    <strong id="modal_inv_no" class="d-block"></strong>
-                    <small>Total Tagihan: <strong class="text-success">Rp <span id="display_total"></span></strong></small>
+                <div class="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl p-4 text-center mb-6 shadow-sm">
+                    <p id="modal_inv_no" class="text-sm font-bold text-emerald-800 dark:text-emerald-400 font-mono mb-1 tracking-widest"></p>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">Total Tagihan Sistem</p>
+                    <p class="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">Rp <span id="display_total"></span></p>
                 </div>
                 
-                <div class="mb-2">
-                    <label class="form-label small fw-bold">Tanggal Bayar</label>
-                    <input type="date" name="payment_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required>
-                </div>
-                
-                <div class="mb-2">
-                    <label class="form-label small fw-bold">Nominal Pembayaran (Bisa DP/Partial)</label>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text">Rp</span>
-                        <input type="number" name="amount" id="input_amount" class="form-control" required>
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">Tanggal Bayar <span class="text-rose-500">*</span></label>
+                        <div class="relative">
+                            <i class="ph-bold ph-calendar absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                            <input type="date" name="payment_date" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/50 outline-none dark:text-white transition-all shadow-inner" value="<?= date('Y-m-d') ?>" required>
+                        </div>
                     </div>
-                    <div id="err_msg" class="text-danger small mt-1 fw-bold" style="display:none;">Nominal tidak boleh melebihi tagihan!</div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">Nominal (DP / Lunas) <span class="text-rose-500">*</span></label>
+                        <div class="relative group">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 group-focus-within:text-emerald-500 transition-colors">Rp</span>
+                            <input type="number" name="amount" id="input_amount" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-lg font-black text-emerald-600 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all shadow-inner placeholder-slate-400" required placeholder="0">
+                        </div>
+                        <p id="err_msg" class="text-[10px] font-bold text-rose-500 mt-2 hidden flex items-center gap-1"><i class="ph-fill ph-warning-circle text-sm"></i> Peringatan: Nominal melebih total tagihan!</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">Catatan (Opsional)</label>
+                        <textarea name="payment_notes" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none transition-all shadow-inner placeholder-slate-400" rows="2" placeholder="e.g. Termin 1 (50%), Pelunasan..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">Bukti Transfer <span class="text-rose-500">*</span></label>
+                        <input type="file" name="proof_file" class="w-full block text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-widest file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 dark:file:bg-emerald-500/10 dark:file:text-emerald-400 dark:hover:file:bg-emerald-500/20 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 transition-all" accept=".jpg,.jpeg,.png,.pdf" required>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex bg-slate-50/50 dark:bg-slate-800/50 justify-end gap-3 shrink-0">
+                <button type="button" onclick="closeModal('payModal')" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-sm shadow-sm">Batal</button>
+                <button type="submit" name="confirm_payment" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 transition-colors shadow-md shadow-emerald-500/30 flex items-center justify-center gap-2 active:scale-95">
+                    <i class="ph-bold ph-floppy-disk text-lg"></i> Simpan Pembayaran
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="taxModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('taxModal')"></div>
+    <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 modal-box flex flex-col overflow-hidden">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="px-6 py-5 border-b border-sky-500/20 bg-sky-500 flex justify-between items-center text-white">
+                <h3 class="text-base font-black flex items-center gap-2"><i class="ph-bold ph-file-arrow-up text-xl"></i> Upload Faktur Pajak</h3>
+                <button type="button" onclick="closeModal('taxModal')" class="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/40 transition-colors">
+                    <i class="ph-bold ph-x text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="p-6 space-y-5">
+                <input type="hidden" name="tax_invoice_id" id="tax_invoice_id">
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">No Invoice</label>
+                    <input type="text" id="tax_inv_no" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold font-mono text-slate-600 dark:text-slate-400 outline-none cursor-not-allowed shadow-inner" readonly>
                 </div>
                 
-                <div class="mb-2">
-                    <label class="form-label small fw-bold">Catatan (Optional)</label>
-                    <textarea name="payment_notes" class="form-control form-control-sm" rows="2" placeholder="Contoh: DP 50%, Termin 1, Pelunasan"></textarea>
-                </div>
-
-                <div class="mb-2">
-                    <label class="form-label small fw-bold">Bukti Transfer</label>
-                    <input type="file" name="proof_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">File Faktur Pajak <span class="text-rose-500">*</span></label>
+                    <input type="file" name="tax_file" class="w-full block text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:uppercase file:tracking-widest file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-500/10 dark:file:text-sky-400 dark:hover:file:bg-sky-500/20 cursor-pointer border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-900 transition-all" accept=".jpg,.jpeg,.png,.pdf" required>
+                    <p class="text-[10px] font-medium text-slate-400 mt-2 italic flex items-center gap-1"><i class="ph-fill ph-info"></i> Format didukung: PDF, JPG, PNG.</p>
                 </div>
             </div>
-            <div class="modal-footer py-2">
-                <button type="submit" name="confirm_payment" class="btn btn-success btn-sm w-100">Simpan Pembayaran</button>
+            
+            <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex bg-slate-50/50 dark:bg-slate-800/50 justify-end gap-3 shrink-0">
+                <button type="button" onclick="closeModal('taxModal')" class="px-5 py-2.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors text-sm shadow-sm">Batal</button>
+                <button type="submit" name="upload_tax_invoice" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-sky-500 hover:bg-sky-600 transition-colors shadow-md shadow-sky-500/30 flex items-center justify-center gap-2 active:scale-95">
+                    <i class="ph-bold ph-upload-simple text-lg"></i> Upload Dokumen
+                </button>
             </div>
         </form>
     </div>
 </div>
 
-<div class="modal fade" id="taxModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form method="POST" enctype="multipart/form-data" class="modal-content">
-            <div class="modal-header bg-warning text-dark py-2"><h6 class="modal-title">Upload Faktur Pajak</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <input type="hidden" name="tax_invoice_id" id="tax_invoice_id">
-                <input type="text" id="tax_inv_no" class="form-control form-control-sm bg-light mb-2" readonly>
-                <input type="file" name="tax_file" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
-            </div>
-            <div class="modal-footer py-2"><button type="submit" name="upload_tax_invoice" class="btn btn-warning btn-sm w-100">Upload</button></div>
-        </form>
-    </div>
-</div>
-
-<?php include 'includes/footer.php'; ?>
 
 <script>
+    // --- PAGINATION LOGIC (Vanilla JS) ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const rows = Array.from(document.querySelectorAll('#tableBody tr.data-row'));
+        const totalRows = rows.length;
+        
+        if(totalRows === 0) return;
+
+        const pageSizeSelect = document.getElementById('pageSize');
+        const paginationInfo = document.getElementById('paginationInfo');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnNext = document.getElementById('btnNext');
+        const pageNumbersContainer = document.getElementById('pageNumbers');
+
+        let currentPage = 1;
+        let rowsPerPage = parseInt(pageSizeSelect.value);
+
+        function renderTable() {
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+
+            rows.forEach((row, index) => {
+                if (index >= start && index < end) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            const currentEnd = end > totalRows ? totalRows : end;
+            paginationInfo.innerHTML = `Menampilkan <span class="text-indigo-600 dark:text-indigo-400 font-black">${start + 1} - ${currentEnd}</span> dari <span class="font-black text-slate-800 dark:text-white">${totalRows}</span> data`;
+
+            updatePaginationButtons();
+        }
+
+        function updatePaginationButtons() {
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+            
+            btnPrev.disabled = currentPage === 1;
+            btnNext.disabled = currentPage === totalPages;
+
+            pageNumbersContainer.innerHTML = '';
+            for (let i = 1; i <= totalPages; i++) {
+                // Limit visible pages for massive lists
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                    const pageBtn = document.createElement('button');
+                    pageBtn.innerText = i;
+                    if (i === currentPage) {
+                        pageBtn.className = "w-8 h-8 rounded-xl text-xs font-black text-white bg-indigo-600 shadow-sm shadow-indigo-500/30 flex items-center justify-center transition-all";
+                    } else {
+                        pageBtn.className = "w-8 h-8 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-all flex items-center justify-center";
+                        pageBtn.onclick = () => { currentPage = i; renderTable(); };
+                    }
+                    pageNumbersContainer.appendChild(pageBtn);
+                } else if (i === currentPage - 2 || i === currentPage + 2) {
+                    const dots = document.createElement('span');
+                    dots.innerText = '...';
+                    dots.className = "w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-black tracking-widest";
+                    pageNumbersContainer.appendChild(dots);
+                }
+            }
+        }
+
+        pageSizeSelect.addEventListener('change', (e) => {
+            rowsPerPage = parseInt(e.target.value);
+            currentPage = 1;
+            renderTable();
+        });
+
+        btnPrev.addEventListener('click', () => {
+            if (currentPage > 1) { currentPage--; renderTable(); }
+        });
+
+        btnNext.addEventListener('click', () => {
+            const totalPages = Math.ceil(totalRows / rowsPerPage);
+            if (currentPage < totalPages) { currentPage++; renderTable(); }
+        });
+
+        renderTable();
+    });
+
+    // --- FILTER COLLAPSE LOGIC ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('filterToggleBtn');
+        const body = document.getElementById('filterBody');
+        const icon = document.getElementById('filterIcon');
+
+        if(btn && body && icon) {
+            btn.addEventListener('click', () => {
+                if (body.classList.contains('hidden')) {
+                    body.classList.remove('hidden');
+                    setTimeout(() => body.style.opacity = '1', 10); 
+                    icon.classList.replace('ph-caret-down', 'ph-caret-up');
+                } else {
+                    body.classList.add('hidden');
+                    body.style.opacity = '0';
+                    icon.classList.replace('ph-caret-up', 'ph-caret-down');
+                }
+            });
+        }
+    });
+
+    // --- CUSTOM DROPDOWN MENU LOGIC (Fix Propagation) ---
+    let currentOpenDropdown = null;
+    
+    function toggleActionMenu(e, id) {
+        e.stopPropagation(); 
+        const menu = document.getElementById('action-menu-' + id);
+        
+        if (currentOpenDropdown && currentOpenDropdown !== menu) {
+            currentOpenDropdown.classList.add('hidden');
+        }
+        
+        menu.classList.toggle('hidden');
+        currentOpenDropdown = menu.classList.contains('hidden') ? null : menu;
+    }
+    
+    document.addEventListener('click', (e) => {
+        if (currentOpenDropdown && !currentOpenDropdown.contains(e.target)) {
+            currentOpenDropdown.classList.add('hidden');
+            currentOpenDropdown = null;
+        }
+    });
+
+    // --- CUSTOM MODAL HANDLERS ---
+    function openModal(id) {
+        const modal = document.getElementById(id);
+        const box = modal.querySelector('.modal-box');
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            box.classList.remove('scale-95', 'opacity-0');
+        }, 10);
+    }
+
+    function closeModal(id) {
+        const modal = document.getElementById(id);
+        const box = modal.querySelector('.modal-box');
+        modal.classList.add('opacity-0');
+        box.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+
+    // --- AJAX & FORM LOGIC ---
     let systemTotal = 0;
 
     function openNoteModal(invoiceNo) {
         document.getElementById('noteInvoiceNo').value = invoiceNo;
         document.getElementById('noteTitle').value = invoiceNo;
-        document.getElementById('generalNotes').value = "Loading...";
-        document.getElementById('saveStatus').style.display = 'none';
+        document.getElementById('generalNotes').value = "Memuat catatan...";
+        document.getElementById('saveStatus').classList.add('hidden');
         
+        openModal('noteModal');
+
         const formData = new FormData();
         formData.append('action', 'load');
         formData.append('invoice_no', invoiceNo);
@@ -638,7 +1009,8 @@ $res = $conn->query($sql);
         .then(res => res.json())
         .then(res => {
             document.getElementById('generalNotes').value = (res.status === 'success' && res.data) ? (res.data.general_notes || '') : '';
-            new bootstrap.Modal(document.getElementById('noteModal')).show();
+        }).catch(err => {
+            document.getElementById('generalNotes').value = "";
         });
     }
 
@@ -646,16 +1018,37 @@ $res = $conn->query($sql);
         const inv = document.getElementById('noteInvoiceNo').value;
         const notes = document.getElementById('generalNotes').value;
         const btn = document.getElementById('btn-note-' + inv);
-        const formData = new FormData();
-        formData.append('action', 'save'); formData.append('invoice_no', inv); formData.append('notes', notes); formData.append('calc_data', '[]'); 
         
-        fetch('ajax_scratchpad.php', { method: 'POST', body: formData }).then(res => res.json()).then(res => {
+        const formData = new FormData();
+        formData.append('action', 'save'); 
+        formData.append('invoice_no', inv); 
+        formData.append('notes', notes); 
+        formData.append('calc_data', '[]'); 
+        
+        fetch('ajax_scratchpad.php', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(res => {
             if(res.status === 'success') {
                 const s = document.getElementById('saveStatus');
-                s.style.display = 'inline-block';
-                setTimeout(() => { s.style.display = 'none'; bootstrap.Modal.getInstance(document.getElementById('noteModal')).hide(); }, 1000);
-                if(notes.trim() !== "") btn.classList.add('has-note'); else btn.classList.remove('has-note');
-            } else alert('Gagal simpan: ' + res.message);
+                s.classList.remove('hidden');
+                
+                if(notes.trim() !== "") {
+                    btn.classList.remove('bg-slate-100', 'text-slate-400', 'dark:bg-slate-700/50', 'dark:border-slate-600', 'dark:text-slate-500');
+                    btn.classList.add('bg-amber-100', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400', 'border', 'border-transparent');
+                    btn.querySelector('i').classList.replace('ph-bold', 'ph-fill');
+                } else {
+                    btn.classList.add('bg-slate-100', 'text-slate-400', 'dark:bg-slate-700/50', 'dark:border-slate-600', 'dark:text-slate-500');
+                    btn.classList.remove('bg-amber-100', 'text-amber-600', 'dark:bg-amber-500/20', 'dark:text-amber-400', 'border-transparent');
+                    btn.querySelector('i').classList.replace('ph-fill', 'ph-bold');
+                }
+
+                setTimeout(() => { 
+                    s.classList.add('hidden'); 
+                    closeModal('noteModal'); 
+                }, 1000);
+            } else {
+                alert('Gagal menyimpan catatan: ' + res.message);
+            }
         });
     }
 
@@ -666,23 +1059,24 @@ $res = $conn->query($sql);
         document.getElementById('modal_grand_total').value = total;
         document.getElementById('display_total').innerText = new Intl.NumberFormat('id-ID').format(total);
         document.getElementById('input_amount').value = ""; 
-        document.getElementById('err_msg').style.display = 'none';
-        new bootstrap.Modal(document.getElementById('payModal')).show();
+        document.getElementById('err_msg').classList.add('hidden');
+        openModal('payModal');
+    }
+
+    function validatePayment() {
+        let inputVal = parseFloat(document.getElementById('input_amount').value);
+        if (isNaN(inputVal) || inputVal > (systemTotal + 100)) { 
+            document.getElementById('err_msg').classList.remove('hidden');
+            return false;
+        }
+        return true;
     }
 
     function openTaxModal(id, no) {
         document.getElementById('tax_invoice_id').value = id;
         document.getElementById('tax_inv_no').value = no;
-        new bootstrap.Modal(document.getElementById('taxModal')).show();
-    }
-
-    function validatePayment() {
-        let inputVal = parseFloat(document.getElementById('input_amount').value);
-        // Validasi: Nominal tidak boleh melebihi total tagihan (tapi boleh kurang/DP)
-        if (isNaN(inputVal) || inputVal > (systemTotal + 100)) { 
-            document.getElementById('err_msg').style.display = 'block';
-            return false;
-        }
-        return true;
+        openModal('taxModal');
     }
 </script>
+
+<?php include 'includes/footer.php'; ?>

@@ -56,6 +56,7 @@ function format_money($num, $is_intl) {
     } else {
         return number_format((float)$num, 0, ',', '.');
     }
+    return $string;
 }
 
 // 6. DEFAULT REMARKS
