@@ -256,13 +256,17 @@ function getSpelledOutNumber($number) {
             <div class="w-1/3">
                 <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
             </div>
-            <div class="w-1/3 text-center">
-                <h1 class="text-xl font-black tracking-[0.3em] text-slate-900 uppercase">INVOICE</h1>
-            </div>
+
             <div class="w-1/3 text-right">
                 <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]" <?= $can_edit_note ?>>
                     <?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?>
                 </div>
+            </div>
+        </div>
+
+        <div class="w-full flex justify-center mb-6 shrink-0">
+            <div class="border border-slate-200 rounded-xl py-2.5 px-10 text-center shadow-sm">
+                <h1 class="text-xl font-bold tracking-[0.3em] text-slate-800 uppercase m-0">QUOTATION</h1>
             </div>
         </div>
 
