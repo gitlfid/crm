@@ -22,7 +22,17 @@ $itemsData = [];
 $resQ = $conn->query("SELECT item_name, qty, unit_price, card_type, description FROM quotation_items WHERE quotation_id = $id");
 while($row = $resQ->fetch_assoc()) { $itemsData[] = $row; }
 
-// 3. AMBIL SETTINGS APLIKASI (Logo, Alamat Perusahaan)
+// 3. AMBIL ADJUSTMENTS (Data Tambahan: DP, Potongan, dll - Disamakan dengan Invoice)
+$adjData = [];
+$checkTable = $conn->query("SHOW TABLES LIKE 'quotation_adjustments'");
+if ($checkTable && $checkTable->num_rows > 0) {
+    $resAdj = $conn->query("SELECT * FROM quotation_adjustments WHERE quotation_id = $id");
+    if ($resAdj) {
+        while($row = $resAdj->fetch_assoc()) { $adjData[] = $row; }
+    }
+}
+
+// 4. AMBIL SETTINGS APLIKASI (Logo, Alamat Perusahaan)
 $sets = [];
 $res = $conn->query("SELECT * FROM settings");
 if ($res) {
@@ -30,7 +40,7 @@ if ($res) {
 }
 
 // ========================================================================
-// 4. LOGIKA PERMISSION EDIT NOTE (HANYA ADMIN & DIVISI FINANCE)
+// 5. LOGIKA PERMISSION EDIT NOTE (HANYA ADMIN & DIVISI FINANCE)
 // ========================================================================
 $user_id_session = $_SESSION['user_id'];
 $user_role_session = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 'standard';
@@ -48,7 +58,7 @@ if ($cek_div && $cek_div->num_rows > 0) {
 $can_edit_note = ($user_role_session === 'admin' || $is_finance) ? 'contenteditable="true"' : '';
 
 
-// 5. SETTING CURRENCY & FORMATTING
+// 6. SETTING CURRENCY & FORMATTING
 $is_intl = ($quo['currency'] !== 'IDR');
 $tax_rate = $is_intl ? 0 : 0.11;
 
@@ -60,7 +70,95 @@ function format_money($num, $is_intl) {
     }
 }
 
-// 6. DEFAULT REMARKS
+// FUNGSI KONVERSI ANGKA KE HURUF (TERBILANG BAHASA INGGRIS)
+function getSpelledOutNumber($number) {
+    $number = str_replace(',', '', $number);
+    $hyphen      = '-';
+    $conjunction = ' ';
+    $separator   = ' ';
+    $negative    = 'Negative ';
+    $dictionary  = array(
+        0                   => 'Zero',
+        1                   => 'One',
+        2                   => 'Two',
+        3                   => 'Three',
+        4                   => 'Four',
+        5                   => 'Five',
+        6                   => 'Six',
+        7                   => 'Seven',
+        8                   => 'Eight',
+        9                   => 'Nine',
+        10                  => 'Ten',
+        11                  => 'Eleven',
+        12                  => 'Twelve',
+        13                  => 'Thirteen',
+        14                  => 'Fourteen',
+        15                  => 'Fifteen',
+        16                  => 'Sixteen',
+        17                  => 'Seventeen',
+        18                  => 'Eighteen',
+        19                  => 'Nineteen',
+        20                  => 'Twenty',
+        30                  => 'Thirty',
+        40                  => 'Forty',
+        50                  => 'Fifty',
+        60                  => 'Sixty',
+        70                  => 'Seventy',
+        80                  => 'Eighty',
+        90                  => 'Ninety',
+        100                 => 'Hundred',
+        1000                => 'Thousand',
+        1000000             => 'Million',
+        1000000000          => 'Billion',
+        1000000000000       => 'Trillion'
+    );
+
+    if (!is_numeric($number)) return false;
+    if ($number < 0) return $negative . getSpelledOutNumber(abs($number));
+    
+    $string = $fraction = null;
+    if (strpos($number, '.') !== false) {
+        list($number, $fraction) = explode('.', $number);
+    }
+
+    switch (true) {
+        case $number < 21:
+            $string = $dictionary[(int)$number];
+            break;
+        case $number < 100:
+            $tens   = ((int) ($number / 10)) * 10;
+            $units  = $number % 10;
+            $string = $dictionary[$tens];
+            if ($units) $string .= $hyphen . $dictionary[$units];
+            break;
+        case $number < 1000:
+            $hundreds  = floor($number / 100);
+            $remainder = $number % 100;
+            $string = $dictionary[$hundreds] . ' ' . $dictionary[100];
+            if ($remainder) $string .= $conjunction . getSpelledOutNumber($remainder);
+            break;
+        default:
+            $baseUnit = pow(1000, floor(log($number, 1000)));
+            $numBaseUnits = (int) ($number / $baseUnit);
+            $remainder = fmod($number, $baseUnit);
+            $string = getSpelledOutNumber($numBaseUnits) . ' ' . $dictionary[$baseUnit];
+            if ($remainder) {
+                $string .= $remainder < 100 ? $conjunction : $separator;
+                $string .= getSpelledOutNumber($remainder);
+            }
+            break;
+    }
+
+    if (null !== $fraction && is_numeric($fraction)) {
+        $fraction = substr($fraction, 0, 2);
+        if((int)$fraction > 0) {
+            $string .= ' and ' . getSpelledOutNumber((int)$fraction) . ' Cents';
+        }
+    }
+    return $string;
+}
+
+// 7. DEFAULT REMARKS
 $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the number quotation if open the PO\n- Please send the NPWP Company if open the PO";
 ?>
 
@@ -82,7 +180,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
             -webkit-print-color-adjust: exact; 
             print-color-adjust: exact; 
             background-color: #f1f5f9; 
-            color: #1e293b; /* slate-800 */
+            color: #1e293b; 
         }
         
         /* Set Print to fit 1 page */
@@ -151,7 +249,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                 <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
             </div>
             <div class="w-1/3 text-center">
-                <h1 class="text-3xl font-black tracking-tight text-slate-900 uppercase">Quotation</h1>
+                <h1 class="text-xl font-black tracking-[0.3em] text-slate-900 uppercase">QUOTATION</h1>
             </div>
             <div class="w-1/3 text-right">
                 <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]">
@@ -209,16 +307,16 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
             </div>
         </div>
 
-        <div class="border border-slate-800 rounded-lg overflow-hidden mb-4 shrink-0">
+        <div class="border border-slate-800 rounded-lg overflow-hidden mb-3 shrink-0">
             <table class="w-full text-left text-[10px]">
                 <thead class="bg-slate-800 text-white font-bold uppercase tracking-wider text-[9px]">
                     <tr>
-                        <th class="py-2 px-3 text-center w-[5%]">No</th>
-                        <th class="py-2 px-3 w-[40%]">Description / Item</th>
-                        <th class="py-2 px-3 text-center w-[8%]">Qty</th>
-                        <th class="py-2 px-3 text-center w-[15%]">Charge Mode</th>
-                        <th class="py-2 px-3 text-right w-[15%]">Unit Price</th>
-                        <th class="py-2 px-3 text-right w-[17%]">Line Total</th>
+                        <th class="py-2.5 px-3 text-center w-[5%]">No</th>
+                        <th class="py-2.5 px-3 w-[40%]">Description / Item</th>
+                        <th class="py-2.5 px-3 text-center w-[8%]">Qty</th>
+                        <th class="py-2.5 px-3 text-center w-[15%]">Charge Mode</th>
+                        <th class="py-2.5 px-3 text-right w-[15%]">Unit Price</th>
+                        <th class="py-2.5 px-3 text-right w-[17%]">Line Total</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 bg-white">
@@ -232,27 +330,27 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                         $lineTotal = $qty * $price;
                         $grandTotal += $lineTotal;
                     ?>
-                    <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-2 px-3 text-center font-medium text-slate-500 align-top"><?= $no++ ?></td>
-                        <td class="py-2 px-3 align-top">
+                    <tr class="hover:bg-slate-50 transition-colors h-10">
+                        <td class="py-2.5 px-3 text-center font-medium text-slate-500 align-middle"><?= $no++ ?></td>
+                        <td class="py-2.5 px-3 align-middle">
                             <div class="font-bold text-slate-800" <?= $can_edit_note ?>><?= htmlspecialchars($item['item_name']) ?></div>
                             <?php if(!empty($item['description']) && $item['description'] != 'Exclude Tax'): ?>
                                 <div class="text-[9px] text-slate-500 mt-0.5 leading-snug" <?= $can_edit_note ?>><?= nl2br(htmlspecialchars($item['description'])) ?></div>
                             <?php endif; ?>
                         </td>
-                        <td class="py-2 px-3 text-center font-bold text-slate-800 align-top" <?= $can_edit_note ?>><?= $qty ?></td> 
-                        <td class="py-2 px-3 text-center align-top">
+                        <td class="py-2.5 px-3 text-center font-bold text-slate-800 align-middle" <?= $can_edit_note ?>><?= $qty ?></td> 
+                        <td class="py-2.5 px-3 text-center align-middle">
                             <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border border-slate-200" <?= $can_edit_note ?>>
                                 <?= htmlspecialchars($item['card_type']) ?>
                             </span>
                         </td>
-                        <td class="py-2 px-3 text-right font-medium text-slate-700 align-top" <?= $can_edit_note ?>><?= format_money($price, $is_intl) ?></td>
-                        <td class="py-2 px-3 text-right font-bold text-slate-800 align-top" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_intl) ?></td>
+                        <td class="py-2.5 px-3 text-right font-medium text-slate-700 align-middle" <?= $can_edit_note ?>><?= format_money($price, $is_intl) ?></td>
+                        <td class="py-2.5 px-3 text-right font-bold text-slate-800 align-middle" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_intl) ?></td>
                     </tr>
                     <?php endforeach; ?>
                     
                     <tr>
-                        <td colspan="6" class="py-3"></td>
+                        <td colspan="6" class="py-1"></td>
                     </tr>
                 </tbody>
             </table>
@@ -266,37 +364,66 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                 $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
                 $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
             }
+            
             $totalQuotation = $grandTotal + $vatAmount;
+            
+            // Loop Adjustment (jika ada)
+            foreach($adjData as $adj) {
+                $totalQuotation += floatval($adj['amount']);
+            }
+
+            $currency_text = $is_intl ? ($quo['currency'] == 'USD' ? "US Dollars" : $quo['currency']) : "Rupiah";
+            $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalQuotation))) . " " . $currency_text;
         ?>
-        <div class="flex justify-end mb-4 shrink-0 avoid-break mt-auto">
-            <div class="w-1/2 rounded-xl bg-slate-50 border border-slate-200 p-3">
+
+        <div class="flex justify-end w-full mb-6 shrink-0 avoid-break">
+            <div class="w-[45%] rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
                 <table class="w-full text-[10px]">
                     <tbody>
-                        <tr>
-                            <td class="py-1 text-slate-500 font-bold uppercase tracking-widest text-[9px]">Sub Total</td>
-                            <td class="py-1 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_intl) ?></td>
+                        <tr id="row-subtotal">
+                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left">
+                                <?php if($can_edit_note != ''): ?>
+                                    <span contenteditable="false" class="no-print inline-block bg-rose-500 text-white rounded px-1.5 py-0.5 text-[8px] mr-1.5 cursor-pointer hover:bg-rose-600 transition-colors" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
+                                <?php endif; ?>
+                                <span <?= $can_edit_note ?>>Sub Total</span>
+                            </td>
+                            <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_intl) ?></td>
                         </tr>
+                        
                         <?php if(!$is_intl): ?>
                         <tr>
-                            <td class="py-1 text-slate-500 font-bold uppercase tracking-widest text-[9px] border-b border-slate-200 pb-2">VAT (11%)</td>
-                            <td class="py-1 text-right font-bold text-slate-800 border-b border-slate-200 pb-2" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_intl) ?></td>
+                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left">VAT (11%)</td>
+                            <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_intl) ?></td>
                         </tr>
                         <?php endif; ?>
+
+                        <?php foreach($adjData as $adj): ?>
                         <tr>
-                            <td class="py-2 pt-2 text-indigo-600 font-black uppercase tracking-widest text-[11px]">Total (<?= $quo['currency'] ?>)</td>
-                            <td class="py-2 pt-2 text-right font-black text-indigo-600 text-sm" <?= $can_edit_note ?>><?= format_money($totalQuotation, $is_intl) ?></td>
+                            <td class="py-1.5 text-rose-500 font-bold uppercase tracking-widest text-[9px] text-left" <?= $can_edit_note ?>><?= htmlspecialchars($adj['label']) ?></td>
+                            <td class="py-1.5 text-right font-bold text-rose-600" <?= $can_edit_note ?>><?= format_money($adj['amount'], $is_intl) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+
+                        <tr class="border-t border-slate-200">
+                            <td class="py-2 pt-3 text-indigo-600 font-black uppercase tracking-widest text-[11px] text-left">Total (<?= $quo['currency'] ?>)</td>
+                            <td class="py-2 pt-3 text-right font-black text-indigo-600 text-sm" <?= $can_edit_note ?>><?= format_money($totalQuotation, $is_intl) ?></td>
                         </tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="grid grid-cols-12 gap-6 shrink-0 avoid-break">
+        <div class="grid grid-cols-12 gap-6 w-full mt-auto shrink-0 avoid-break">
             
-            <div class="col-span-8">
-                <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 h-full">
-                    <h4 class="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><i class="ph-fill ph-info text-sm"></i> Remarks & Notes</h4>
-                    <div class="text-[9px] text-slate-700 leading-relaxed whitespace-pre-wrap font-medium" <?= $can_edit_note ?>><?= htmlspecialchars($remarks) ?></div>
+            <div class="col-span-8 flex flex-col gap-3">
+                <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
+                    <span class="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-0.5">Amount in words:</span>
+                    <div class="font-bold text-indigo-800 italic text-[10px] leading-snug" <?= $can_edit_note ?>><?= htmlspecialchars($amountInWords) ?></div>
+                </div>
+
+                <div>
+                    <strong class="text-[9px] uppercase tracking-widest text-slate-500 block mb-0.5">Remarks & Notes:</strong>
+                    <div class="text-[9px] text-slate-700 leading-relaxed whitespace-pre-wrap font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-200" <?= $can_edit_note ?>><?= htmlspecialchars($remarks) ?></div>
                 </div>
             </div>
 
@@ -332,7 +459,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                     <?php endif; ?>
                 </div>
                 
-                <div class="inline-block border-b-2 border-slate-800 pb-1 px-4 mb-0.5 font-bold text-[11px]" <?= $can_edit_note ?>>
+                <div class="inline-block border-b border-slate-800 pb-1 px-4 mb-0.5 font-bold text-[11px]" <?= $can_edit_note ?>>
                     <?= htmlspecialchars($signerName) ?>
                 </div>
                 <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Authorized Signature</p>
