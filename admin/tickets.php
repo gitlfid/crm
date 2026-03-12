@@ -117,28 +117,28 @@ $status_icons = [
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-ticket"></i></div>
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-ticket"></i></div>
             <div>
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
                 <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['total']) ?></h4>
             </div>
         </div>
         <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-envelope-open"></i></div>
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-envelope-open"></i></div>
             <div>
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Open</p>
                 <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['open']) ?></h4>
             </div>
         </div>
         <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-hourglass-high"></i></div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-hourglass-high"></i></div>
             <div>
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Progress</p>
                 <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['progress']) ?></h4>
             </div>
         </div>
         <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-check-circle"></i></div>
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400 flex items-center justify-center text-2xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-check-circle"></i></div>
             <div>
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Closed</p>
                 <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['closed']) ?></h4>
@@ -158,29 +158,29 @@ $status_icons = [
         
         <div id="filterBody" class="p-6 block transition-all duration-300">
             <form method="GET" action="">
-                <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-5 items-end">
+                <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-4 items-end">
                     
                     <div class="lg:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">No Ticket</label>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">No Ticket</label>
                         <div class="relative group">
                             <i class="ph-bold ph-hash absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-cyan-500 transition-colors"></i>
-                            <input type="text" name="search_id" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. LFID-..." value="<?= htmlspecialchars($filter_id) ?>">
+                            <input type="text" name="search_id" class="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner uppercase" placeholder="e.g. LFID-..." value="<?= htmlspecialchars($filter_id) ?>">
                         </div>
                     </div>
 
                     <div class="lg:col-span-4">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Client / Perusahaan</label>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Client / Perusahaan</label>
                         <div class="relative group">
                             <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-cyan-500 transition-colors"></i>
-                            <input type="text" name="filter_company" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner" placeholder="Cari nama perusahaan..." value="<?= htmlspecialchars($filter_company) ?>">
+                            <input type="text" name="filter_company" class="w-full pl-11 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner" placeholder="Cari nama perusahaan..." value="<?= htmlspecialchars($filter_company) ?>">
                         </div>
                     </div>
 
                     <div class="lg:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Status Tiket</label>
+                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Status Tiket</label>
                         <div class="relative group">
                             <i class="ph-bold ph-list-dashes absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-cyan-500 transition-colors"></i>
-                            <select name="filter_status" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                            <select name="filter_status" class="w-full pl-11 pr-10 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
                                 <option value="">Semua Status</option>
                                 <option value="open" <?= $filter_status == 'open' ? 'selected' : '' ?>>Open</option>
                                 <option value="progress" <?= $filter_status == 'progress' ? 'selected' : '' ?>>In Progress</option>
@@ -192,12 +192,12 @@ $status_icons = [
                         </div>
                     </div>
 
-                    <div class="lg:col-span-2 flex gap-3 h-[46px]">
-                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-cyan-600 dark:hover:bg-cyan-700 text-white font-bold rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-2">
-                            <i class="ph-bold ph-funnel"></i> Filter
+                    <div class="lg:col-span-2 flex gap-2 h-[42px]">
+                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-cyan-600 dark:hover:bg-cyan-700 text-white font-bold rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-cyan-500/20 active:scale-95 flex items-center justify-center gap-1.5 text-sm">
+                            <i class="ph-bold ph-funnel text-base"></i> Filter
                         </button>
                         <?php if(!empty($filter_id) || !empty($filter_status) || !empty($filter_company)): ?>
-                            <a href="tickets.php" class="flex-none w-[46px] bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
+                            <a href="tickets.php" class="flex-none w-[42px] bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
                                 <i class="ph-bold ph-arrows-counter-clockwise text-lg"></i>
                             </a>
                         <?php endif; ?>
@@ -213,7 +213,7 @@ $status_icons = [
         <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50 dark:bg-slate-800/30">
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Tampilkan</span>
-                <select id="pageSize" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer">
+                <select id="pageSize" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg px-2 py-1 focus:ring-2 focus:ring-cyan-500/50 outline-none cursor-pointer">
                     <option value="10">10 Baris</option>
                     <option value="25">25 Baris</option>
                     <option value="50">50 Baris</option>
@@ -229,15 +229,15 @@ $status_icons = [
         </div>
 
         <div class="overflow-x-auto modern-scrollbar flex-grow pb-20">
-            <table class="w-full text-left border-collapse table-fixed min-w-[1100px]">
+            <table class="w-full text-left border-collapse table-fixed min-w-[1000px]">
                 <thead class="bg-white dark:bg-[#24303F] border-b border-slate-200 dark:border-slate-700">
                     <tr>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[16%]">Informasi Tiket</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[30%]">Subject & Tipe</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[22%]">Klien / Perusahaan</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[15%]">Ditugaskan Ke</th>
-                        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[10%]">Status</th>
-                        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[7%]">Aksi</th>
+                        <th class="px-5 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[16%]">Informasi Tiket</th>
+                        <th class="px-5 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[28%]">Subject & Tipe</th>
+                        <th class="px-5 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[22%]">Klien / Perusahaan</th>
+                        <th class="px-5 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[16%]">Ditugaskan Ke</th>
+                        <th class="px-5 py-3.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[10%]">Status</th>
+                        <th class="px-5 py-3.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[8%]">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -245,77 +245,75 @@ $status_icons = [
                         <?php while($row = $result->fetch_assoc()): ?>
                         <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
-                            <td class="px-6 py-5 align-middle search-target">
-                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-mono font-bold text-[11px] border border-indigo-100 dark:border-indigo-500/20 mb-2 shadow-sm">
+                            <td class="px-5 py-3 align-middle search-target">
+                                <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-mono font-bold text-[10px] border border-indigo-100 dark:border-indigo-500/20 mb-1.5 shadow-sm">
                                     <i class="ph-bold ph-hash"></i>
                                     <?= htmlspecialchars($row['ticket_code']) ?>
                                 </div>
-                                <div class="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
+                                <div class="text-[9px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 whitespace-nowrap">
                                     <i class="ph-fill ph-calendar-blank text-slate-400"></i>
                                     <?= date('d M Y, H:i', strtotime($row['created_at'])) ?>
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle search-target">
+                            <td class="px-5 py-3 align-middle search-target pr-4">
                                 <?php 
                                     $t = strtolower($row['type']);
                                     $tStyle = isset($type_styles[$t]) ? $type_styles[$t] : $type_styles['info'];
                                     $tIcon  = isset($type_icons[$t]) ? $type_icons[$t] : $type_icons['info'];
                                 ?>
-                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border mb-2 shadow-sm <?= $tStyle ?>">
-                                    <i class="ph-fill <?= $tIcon ?> text-xs"></i> <?= htmlspecialchars($row['type']) ?>
+                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border mb-1.5 shadow-sm <?= $tStyle ?>">
+                                    <i class="ph-fill <?= $tIcon ?>"></i> <?= htmlspecialchars($row['type']) ?>
                                 </span>
-                                <div class="font-bold text-slate-800 dark:text-slate-200 text-sm line-clamp-2 leading-snug group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors" title="<?= htmlspecialchars($row['subject']) ?>">
+                                <div class="font-bold text-slate-800 dark:text-slate-200 text-xs line-clamp-2 leading-snug group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors" title="<?= htmlspecialchars($row['subject']) ?>">
                                     <?= htmlspecialchars($row['subject']) ?>
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle search-target">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-700 dark:text-slate-200 font-black text-sm uppercase shrink-0 shadow-inner border border-white dark:border-slate-600/50">
+                            <td class="px-5 py-3 align-middle search-target pr-2">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-700 dark:text-slate-200 font-black text-xs uppercase shrink-0 shadow-inner border border-white dark:border-slate-600/50">
                                         <?= strtoupper(substr($row['company'], 0, 1)) ?>
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="font-bold text-slate-800 dark:text-slate-200 text-sm truncate" title="<?= htmlspecialchars($row['company']) ?>">
+                                        <p class="font-bold text-slate-800 dark:text-slate-200 text-xs truncate" title="<?= htmlspecialchars($row['company']) ?>">
                                             <?= htmlspecialchars($row['company']) ?>
                                         </p>
-                                        <p class="text-[10px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5"><?= htmlspecialchars($row['name']) ?></p>
+                                        <p class="text-[9px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5"><?= htmlspecialchars($row['name']) ?></p>
                                     </div>
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle search-target">
+                            <td class="px-5 py-3 align-middle search-target">
                                 <?php if($row['assigned_name']): ?>
-                                    <div class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A222C] shadow-sm">
-                                        <div class="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-slate-100 ring-2 ring-white dark:ring-slate-800">
+                                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A222C] shadow-sm">
+                                        <div class="w-5 h-5 rounded-full overflow-hidden shrink-0 bg-slate-100 ring-1 ring-slate-200 dark:ring-slate-700">
                                             <img src="https://ui-avatars.com/api/?name=<?= urlencode($row['assigned_name']) ?>&background=random&color=fff&size=64" alt="Avatar" class="w-full h-full object-cover">
                                         </div>
-                                        <span class="text-[11px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap"><?= htmlspecialchars($row['assigned_name']) ?></span>
+                                        <span class="text-[10px] font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap"><?= htmlspecialchars($row['assigned_name']) ?></span>
                                     </div>
                                 <?php else: ?>
-                                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500">
-                                        <div class="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                                            <i class="ph-bold ph-user-minus text-xs"></i>
-                                        </div>
-                                        <span class="text-[9px] font-black uppercase tracking-widest">Unassigned</span>
+                                    <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500">
+                                        <i class="ph-bold ph-user-minus text-[10px]"></i>
+                                        <span class="text-[9px] font-bold uppercase tracking-widest">Unassigned</span>
                                     </div>
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center search-target">
+                            <td class="px-5 py-3 align-middle text-center search-target">
                                 <?php 
                                     $st = strtolower($row['status']);
                                     $sStyle = isset($status_styles[$st]) ? $status_styles[$st] : $status_styles['closed'];
                                     $sIcon  = isset($status_icons[$st]) ? $status_icons[$st] : $status_icons['closed'];
                                 ?>
-                                <span class="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[9px] font-black uppercase tracking-widest w-28 shadow-sm <?= $sStyle ?>">
-                                    <i class="ph-bold <?= $sIcon ?> text-sm"></i> <?= htmlspecialchars($st) ?>
+                                <span class="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-md border text-[9px] font-bold uppercase tracking-widest w-24 shadow-sm <?= $sStyle ?>">
+                                    <i class="ph-bold <?= $sIcon ?> text-xs"></i> <?= htmlspecialchars($st) ?>
                                 </span>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center">
-                                <a href="view_ticket.php?id=<?= $row['id'] ?>" class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-cyan-600 hover:border-cyan-600 text-slate-500 hover:text-white dark:text-slate-400 dark:hover:bg-cyan-600 dark:hover:border-cyan-600 dark:hover:text-white transition-all shadow-sm active:scale-95 group/btn" title="Kelola Tiket">
-                                    <i class="ph-bold ph-arrow-right text-lg group-hover/btn:translate-x-0.5 transition-transform"></i>
+                            <td class="px-5 py-3 align-middle text-center">
+                                <a href="view_ticket.php?id=<?= $row['id'] ?>" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-cyan-600 hover:border-cyan-600 text-slate-500 hover:text-white dark:text-slate-300 dark:hover:bg-cyan-600 dark:hover:border-cyan-600 dark:hover:text-white transition-all shadow-sm active:scale-95 group/btn" title="Kelola Tiket">
+                                    <i class="ph-bold ph-arrow-right text-base group-hover/btn:translate-x-0.5 transition-transform"></i>
                                 </a>
                             </td>
 
@@ -325,11 +323,16 @@ $status_icons = [
                         <tr id="emptyRow">
                             <td colspan="6" class="px-6 py-16 text-center">
                                 <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
-                                    <div class="w-24 h-24 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
-                                        <i class="ph-fill ph-ticket text-5xl text-slate-300 dark:text-slate-600"></i>
+                                    <div class="w-20 h-20 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
+                                        <i class="ph-fill ph-ticket text-4xl text-slate-300 dark:text-slate-600"></i>
                                     </div>
-                                    <h4 class="font-black text-slate-700 dark:text-slate-200 text-lg mb-1">Data Tidak Ditemukan</h4>
+                                    <h4 class="font-black text-slate-700 dark:text-slate-200 text-base mb-1">Data Tidak Ditemukan</h4>
                                     <p class="text-sm font-medium">Data tiket eksternal tidak ditemukan dengan filter saat ini.</p>
+                                    <?php if(!empty($filter_id) || !empty($filter_status) || !empty($filter_company)): ?>
+                                        <a href="tickets.php" class="mt-4 inline-flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-sm">
+                                            <i class="ph-bold ph-arrows-counter-clockwise"></i> Reset Filter
+                                        </a>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
