@@ -258,6 +258,10 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
             </div>
         </div>
 
+            <div class="w-1/3 text-center">
+                <h1 class="text-xl font-black tracking-[0.3em] text-slate-900 uppercase">QUOTATION</h1>
+            </div>
+
         <div class="grid grid-cols-2 gap-4 mb-5 shrink-0">
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <h3 class="text-[9px] font-black uppercase tracking-widest text-indigo-600 mb-2 flex items-center gap-1.5"><i class="ph-fill ph-buildings text-sm"></i> Prepared For</h3>
