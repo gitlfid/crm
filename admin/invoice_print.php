@@ -240,7 +240,7 @@ function getSpelledOutNumber($number) {
         .no-sign-box { height: 100px; line-height:100px; color:#ccc; border:1px dashed #ccc; margin:10px auto; width:150px; font-size: 10px; }
 
         @media print {
-            .no-print { display: none; }
+            .no-print { display: none !important; }
             [contenteditable="true"]:hover { background: none; outline: none; }
         }
     </style>
@@ -343,18 +343,18 @@ function getSpelledOutNumber($number) {
                 
                 $totalInvoice = $grandTotal + $vatAmount;
                 
-                // MENGUBAH TOTAL INVOICE MENJADI TERBILANG
+                // MENGUBAH TOTAL INVOICE MENJADI TERBILANG (TANPA KATA "ONLY" DAN TANPA PAGAR)
                 $currency_text = $is_international ? ($inv['currency'] == 'USD' ? "US Dollars" : $inv['currency']) : "Rupiah";
                 $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text;
             ?>
             
             <tr class="summary-row" id="row-subtotal">
                 <td colspan="4" class="border-none"></td>
-                <td class="label-cell" <?= $can_edit_note ?>>
+                <td class="label-cell">
                     <?php if($can_edit_note != ''): ?>
-                        <span class="no-print" style="color:red; cursor:pointer; float:left; margin-right:5px; font-size:10px;" onclick="document.getElementById('row-subtotal').style.display='none'" title="Hapus Baris Sub Total">✖</span>
+                        <span contenteditable="false" class="no-print" style="display:inline-block; background-color:#dc3545; color:#fff; border-radius:3px; padding:2px 5px; font-size:10px; margin-right:8px; cursor:pointer;" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
                     <?php endif; ?>
-                    Sub Total
+                    <span <?= $can_edit_note ?>>Sub Total</span>
                 </td>
                 <td class="value-cell" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_international) ?></td>
             </tr>
