@@ -213,10 +213,9 @@ function getSpelledOutNumber($number) {
             -webkit-print-color-adjust: exact; 
             print-color-adjust: exact; 
             background-color: #f1f5f9; 
-            color: #1e293b; /* slate-800 */
+            color: #1e293b; 
         }
         
-        /* Set Print to fit 1 page */
         @page { 
             size: A4 portrait; 
             margin: 0; 
@@ -280,7 +279,7 @@ function getSpelledOutNumber($number) {
                 <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
             </div>
             <div class="w-1/3 text-center">
-                <h1 class="text-2xl font-black tracking-widest text-slate-900 uppercase">INVOICE</h1>
+                <h1 class="text-xl font-black tracking-widest text-slate-900 uppercase">INVOICE</h1>
             </div>
             <div class="w-1/3 text-right">
                 <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]">
@@ -407,107 +406,115 @@ function getSpelledOutNumber($number) {
             $currency_text = $is_international ? ($inv['currency'] == 'USD' ? "US Dollars" : $inv['currency']) : "Rupiah";
             $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text;
         ?>
-        <div class="flex justify-end mb-6 shrink-0 avoid-break">
-            <div class="w-1/2 rounded-xl bg-slate-50 border border-slate-200 p-3">
-                <table class="w-full text-[10px]">
-                    <tbody>
-                        <tr>
-                            <td class="py-1 text-slate-500 font-bold uppercase tracking-widest text-[9px]">Sub Total</td>
-                            <td class="py-1 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_international) ?></td>
-                        </tr>
-                        
-                        <?php if(!$is_international): ?>
-                        <tr>
-                            <td class="py-1 text-slate-500 font-bold uppercase tracking-widest text-[9px] border-b border-slate-200 pb-2">VAT (11%)</td>
-                            <td class="py-1 text-right font-bold text-slate-800 border-b border-slate-200 pb-2" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_international) ?></td>
-                        </tr>
-                        <?php endif; ?>
 
-                        <?php foreach($adjData as $adj): ?>
-                        <tr>
-                            <td class="py-1 text-rose-500 font-bold uppercase tracking-widest text-[9px]" <?= $can_edit_note ?>><?= htmlspecialchars($adj['label']) ?></td>
-                            <td class="py-1 text-right font-bold text-rose-600" <?= $can_edit_note ?>><?= format_money($adj['amount'], $is_international) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-
-                        <tr>
-                            <td class="py-2 pt-2 text-emerald-600 font-black uppercase tracking-widest text-[11px] <?= empty($adjData) && $is_international ? 'border-t border-slate-200' : '' ?>">Total (<?= $inv['currency'] ?>)</td>
-                            <td class="py-2 pt-2 text-right font-black text-emerald-600 text-sm <?= empty($adjData) && $is_international ? 'border-t border-slate-200' : '' ?>" <?= $can_edit_note ?>><?= format_money($totalInvoice, $is_international) ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-12 gap-6 shrink-0 avoid-break mt-auto">
+        <div class="mt-auto flex flex-col gap-4 shrink-0 avoid-break">
             
-            <div class="col-span-8 flex flex-col gap-3">
-                <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
-                    <span class="text-[9px] font-black text-emerald-600 uppercase tracking-widest block mb-0.5">Amount in words:</span>
-                    <div class="font-bold text-emerald-800 italic text-[10px] leading-snug" <?= $can_edit_note ?>><?= htmlspecialchars($amountInWords) ?></div>
-                </div>
+            <div class="flex justify-end w-full">
+                <div class="w-1/2 rounded-xl bg-slate-50 border border-slate-200 p-3">
+                    <table class="w-full text-[10px]">
+                        <tbody>
+                            <tr id="row-subtotal">
+                                <td class="py-1 text-slate-500 font-bold uppercase tracking-widest text-[9px]">
+                                    <?php if($can_edit_note != ''): ?>
+                                        <span contenteditable="false" class="no-print inline-block bg-rose-500 text-white rounded px-1.5 py-0.5 text-[8px] mr-1.5 cursor-pointer hover:bg-rose-600 transition-colors" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
+                                    <?php endif; ?>
+                                    <span <?= $can_edit_note ?>>Sub Total</span>
+                                </td>
+                                <td class="py-1 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_international) ?></td>
+                            </tr>
+                            
+                            <?php if(!$is_international): ?>
+                            <tr>
+                                <td class="py-1 text-slate-500 font-bold uppercase tracking-widest text-[9px] border-b border-slate-200 pb-2">VAT (11%)</td>
+                                <td class="py-1 text-right font-bold text-slate-800 border-b border-slate-200 pb-2" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_international) ?></td>
+                            </tr>
+                            <?php endif; ?>
 
-                <div>
-                    <strong class="text-[9px] uppercase tracking-widest text-slate-500 block mb-0.5">Note:</strong>
-                    <div class="text-[9px] text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200" <?= $can_edit_note ?>>
-                        <?php if($is_international): ?>
-                            <?= htmlspecialchars($special_note_usd) ?>
-                        <?php else: ?>
-                            <?= nl2br(htmlspecialchars($final_note)) ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
+                            <?php foreach($adjData as $adj): ?>
+                            <tr>
+                                <td class="py-1 text-rose-500 font-bold uppercase tracking-widest text-[9px]" <?= $can_edit_note ?>><?= htmlspecialchars($adj['label']) ?></td>
+                                <td class="py-1 text-right font-bold text-rose-600" <?= $can_edit_note ?>><?= format_money($adj['amount'], $is_international) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
 
-                <div>
-                    <strong class="text-[9px] uppercase tracking-widest text-slate-800 block border-b border-slate-800 pb-1 mb-1.5 w-max"><?= htmlspecialchars($payment_title) ?></strong>
-                    <table class="w-full text-[9px] text-slate-700" <?= $can_edit_note ?>>
-                        <?php foreach($payment_details as $label => $value): ?>
-                        <tr>
-                            <td class="py-0.5 font-bold w-24 align-top text-slate-600"><?= htmlspecialchars($label) ?></td>
-                            <td class="py-0.5 w-3 align-top text-center">:</td>
-                            <td class="py-0.5 align-top font-medium"><?= htmlspecialchars($value) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
+                            <tr>
+                                <td class="py-2 pt-2 text-emerald-600 font-black uppercase tracking-widest text-[11px] <?= empty($adjData) && $is_international ? 'border-t border-slate-200' : '' ?>">Total (<?= $inv['currency'] ?>)</td>
+                                <td class="py-2 pt-2 text-right font-black text-emerald-600 text-sm <?= empty($adjData) && $is_international ? 'border-t border-slate-200' : '' ?>" <?= $can_edit_note ?>><?= format_money($totalInvoice, $is_international) ?></td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
 
-            <div class="col-span-4 text-center flex flex-col justify-end pt-2">
-                <p class="text-[10px] font-bold text-slate-800 mb-1">PT. Linksfield Networks Indonesia</p>
-                
-                <?php 
-                    $signPath = ''; $signerName = 'Niawati'; $baseDir = dirname(__DIR__);
-                    $sqlNia = "SELECT id, username, signature_file FROM users WHERE username LIKE '%Niawati%' OR email LIKE '%nia@%' LIMIT 1";
-                    $resNia = $conn->query($sqlNia);
-                    $nia = $resNia->fetch_assoc();
-                    if ($nia) {
-                        $signerName = $nia['username']; $niaId = $nia['id'];
-                        if (!empty($nia['signature_file']) && file_exists($baseDir . '/uploads/signatures/' . $nia['signature_file'])) {
-                            $signPath = '../uploads/signatures/' . $nia['signature_file'];
-                        } elseif (count(glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png')) > 0) {
-                            $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png');
-                            $signPath = '../uploads/signatures/' . basename($files[0]);
-                        }
-                    }
-                    if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
-                        $signPath = '../assets/images/signature.png';
-                    }
-                ?>
-                
-                <div class="h-20 flex items-center justify-center my-1 relative">
-                    <?php if (!empty($signPath)): ?>
-                        <img src="<?= $signPath ?>" class="max-h-full max-w-[160px] object-contain relative z-10 mix-blend-multiply">
-                    <?php else: ?>
-                        <div class="w-full h-16 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[9px] font-bold text-slate-400 bg-slate-50">
-                            (Signature Missing)
+            <div class="grid grid-cols-12 gap-6 w-full">
+                <div class="col-span-8 flex flex-col gap-3">
+                    <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
+                        <span class="text-[9px] font-black text-emerald-600 uppercase tracking-widest block mb-0.5">Amount in words:</span>
+                        <div class="font-bold text-emerald-800 italic text-[10px] leading-snug" <?= $can_edit_note ?>><?= htmlspecialchars($amountInWords) ?></div>
+                    </div>
+
+                    <div>
+                        <strong class="text-[9px] uppercase tracking-widest text-slate-500 block mb-0.5">Note:</strong>
+                        <div class="text-[9px] text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200" <?= $can_edit_note ?>>
+                            <?php if($is_international): ?>
+                                <?= htmlspecialchars($special_note_usd) ?>
+                            <?php else: ?>
+                                <?= nl2br(htmlspecialchars($final_note)) ?>
+                            <?php endif; ?>
                         </div>
-                    <?php endif; ?>
+                    </div>
+
+                    <div>
+                        <strong class="text-[9px] uppercase tracking-widest text-slate-800 block border-b border-slate-800 pb-1 mb-1.5 w-max"><?= htmlspecialchars($payment_title) ?></strong>
+                        <table class="w-full text-[9px] text-slate-700" <?= $can_edit_note ?>>
+                            <?php foreach($payment_details as $label => $value): ?>
+                            <tr>
+                                <td class="py-0.5 font-bold w-24 align-top text-slate-600"><?= htmlspecialchars($label) ?></td>
+                                <td class="py-0.5 w-3 align-top text-center">:</td>
+                                <td class="py-0.5 align-top font-medium"><?= htmlspecialchars($value) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </table>
+                    </div>
                 </div>
-                
-                <div class="inline-block border-b border-slate-800 pb-1 px-4 mb-0.5 font-bold text-[11px]" <?= $can_edit_note ?>>
-                    <?= htmlspecialchars($signerName) ?>
+
+                <div class="col-span-4 text-center flex flex-col justify-end pt-2">
+                    <p class="text-[10px] font-bold text-slate-800 mb-1">PT. Linksfield Networks Indonesia</p>
+                    
+                    <?php 
+                        $signPath = ''; $signerName = 'Niawati'; $baseDir = dirname(__DIR__);
+                        $sqlNia = "SELECT id, username, signature_file FROM users WHERE username LIKE '%Niawati%' OR email LIKE '%nia@%' LIMIT 1";
+                        $resNia = $conn->query($sqlNia);
+                        $nia = $resNia->fetch_assoc();
+                        if ($nia) {
+                            $signerName = $nia['username']; $niaId = $nia['id'];
+                            if (!empty($nia['signature_file']) && file_exists($baseDir . '/uploads/signatures/' . $nia['signature_file'])) {
+                                $signPath = '../uploads/signatures/' . $nia['signature_file'];
+                            } elseif (count(glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png')) > 0) {
+                                $files = glob($baseDir . '/uploads/signatures/SIG_*_' . $niaId . '_*.png');
+                                $signPath = '../uploads/signatures/' . basename($files[0]);
+                            }
+                        }
+                        if (empty($signPath) && file_exists($baseDir . '/assets/images/signature.png')) {
+                            $signPath = '../assets/images/signature.png';
+                        }
+                    ?>
+                    
+                    <div class="h-20 flex items-center justify-center my-1 relative">
+                        <?php if (!empty($signPath)): ?>
+                            <img src="<?= $signPath ?>" class="max-h-full max-w-[160px] object-contain relative z-10 mix-blend-multiply">
+                        <?php else: ?>
+                            <div class="w-full h-16 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[9px] font-bold text-slate-400 bg-slate-50">
+                                (Signature Missing)
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="inline-block border-b border-slate-800 pb-1 px-4 mb-0.5 font-bold text-[11px]" <?= $can_edit_note ?>>
+                        <?= htmlspecialchars($signerName) ?>
+                    </div>
+                    <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Authorized Signature</p>
                 </div>
-                <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Authorized Signature</p>
             </div>
             
         </div>
