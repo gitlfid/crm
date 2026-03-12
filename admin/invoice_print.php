@@ -289,7 +289,7 @@ function getSpelledOutNumber($number) {
 
         <div class="w-full flex justify-center mb-6 shrink-0">
             <div class="border border-slate-200 rounded-xl py-2.5 px-10 text-center shadow-sm">
-                <h1 class="text-xl font-bold tracking-[0.3em] text-slate-800 uppercase m-0">QUOTATION</h1>
+                <h1 class="text-xl font-bold tracking-[0.3em] text-slate-800 uppercase m-0">INVOICE</h1>
             </div>
         </div>
 
