@@ -475,9 +475,9 @@ function getSpelledOutNumber($number) {
                     }
                 ?>
                 
-                <div class="h-32 flex items-center justify-center my-2 relative w-full">
+                <div class="h-36 flex items-center justify-center mt-2 mb-4 relative w-full">
                     <?php if (!empty($signPath)): ?>
-                        <img src="<?= $signPath ?>" class="max-h-full w-auto max-w-[220px] object-contain relative z-10 mix-blend-multiply">
+                        <img src="<?= $signPath ?>" class="h-full w-auto max-w-[280px] object-contain relative z-10 mix-blend-multiply transform scale-[1.4] origin-center">
                     <?php else: ?>
                         <div class="w-full h-20 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[10px] font-bold text-slate-400 bg-slate-50">
                             (Signature Missing)
