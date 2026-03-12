@@ -10,6 +10,13 @@ if ($checkCol && $checkCol->num_rows == 0) {
     $conn->query("ALTER TABLE delivery_orders ADD COLUMN invoice_id INT NULL AFTER payment_id");
 }
 
+// --- AUTO-PATCH DATABASE ---
+// Otomatis menambahkan kolom invoice_id ke tabel delivery_orders jika belum ada
+$checkCol = $conn->query("SHOW COLUMNS FROM delivery_orders LIKE 'invoice_id'");
+if ($checkCol && $checkCol->num_rows == 0) {
+    $conn->query("ALTER TABLE delivery_orders ADD COLUMN invoice_id INT NULL AFTER payment_id");
+}
+
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
@@ -29,6 +36,7 @@ $items_list = [];
 if ($from_inv_id > 0 && $do_id == 0) {
     $current_invoice_id = $from_inv_id;
     
+    // Cek jika invoice punya payment (Untuk Invoice Lunas/Sebagian)
     $sqlPay = "SELECT id FROM payments WHERE invoice_id = $from_inv_id ORDER BY id DESC LIMIT 1";
     $resPay = $conn->query($sqlPay);
     if ($resPay && $resPay->num_rows > 0) {
@@ -36,6 +44,7 @@ if ($from_inv_id > 0 && $do_id == 0) {
         $payment_id = $payRow['id'];
     }
     
+    // Tarik data client dari invoice (Berlaku untuk Draft maupun Lunas)
     $sqlInfo = "SELECT c.company_name, c.address, c.pic_name, c.pic_phone, i.invoice_no 
                 FROM invoices i JOIN quotations q ON i.quotation_id = q.id JOIN clients c ON q.client_id = c.id
                 WHERE i.id = $from_inv_id";
@@ -48,6 +57,7 @@ if ($from_inv_id > 0 && $do_id == 0) {
         $ref_info = "Ref: Invoice #" . $info['invoice_no'];
     }
     
+    // Tarik item
     $sqlItems = "SELECT item_name, qty, description FROM invoice_items WHERE invoice_id = $from_inv_id";
     $resItems = $conn->query($sqlItems);
     if($resItems) {
@@ -106,14 +116,16 @@ if ($do_id > 0) {
     }
 }
 
-// --- AMBIL DRAFT INVOICES ---
+// --- AMBIL DRAFT INVOICES (Hanya Draft & Belum Digunakan di DO lain) ---
 $q_inv = "SELECT id, invoice_no FROM invoices WHERE status = 'draft'";
 $q_inv .= " AND (id NOT IN (SELECT invoice_id FROM delivery_orders WHERE invoice_id IS NOT NULL)";
 if ($current_invoice_id > 0) {
+    // Tetap munculkan ID Invoice ini sendiri jika sedang dalam mode edit DO terkait
     $q_inv .= " OR id = $current_invoice_id";
 }
 $q_inv .= ") ORDER BY id DESC";
 $draft_invoices = $conn->query($q_inv);
+
 
 // --- PROSES SIMPAN ---
 if (isset($_POST['save_do'])) {
@@ -146,6 +158,7 @@ if (isset($_POST['save_do'])) {
                 client_name='$d_client' 
                 WHERE id=$do_id";
         
+        // Fallback jika database belum di-patch dengan sempurna (Backward compatibility)
         if (!$conn->query($sql)) {
              $sql_fb = "UPDATE delivery_orders SET 
                 do_number='$d_num', do_date='$d_date', status='$d_stat', payment_id=$p_id_sql, 
@@ -241,13 +254,10 @@ if (isset($_POST['save_do'])) {
                             <i class="ph-bold ph-hash absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
                             <input type="text" name="do_number" value="<?= htmlspecialchars($do_number) ?>" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black text-amber-600 dark:text-amber-400 focus:ring-2 focus:ring-amber-500/50 outline-none transition-all shadow-inner uppercase tracking-wider" required>
                         </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Reference Invoice (Draft)</label>
-                        <div class="relative group">
-                            <i class="ph-bold ph-receipt absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 text-lg"></i>
-                            <select name="invoice_id" id="invoice_id" onchange="loadInvoiceData(this.value)" class="w-full pl-11 pr-10 py-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl text-sm font-bold text-emerald-700 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500/50 appearance-none outline-none transition-all cursor-pointer shadow-inner">
+                        
+                        <div class="mb-3">
+                            <label class="fw-bold text-success">Reference Invoice (Draft)</label>
+                            <select name="invoice_id" id="invoice_id" class="form-select border-success" onchange="loadInvoiceData(this.value)">
                                 <option value="">- Tanpa Invoice / Pilih Invoice -</option>
                                 <?php if($draft_invoices && $draft_invoices->num_rows > 0): ?>
                                     <?php while($invOpt = $draft_invoices->fetch_assoc()): ?>
@@ -257,7 +267,14 @@ if (isset($_POST['save_do'])) {
                                     <?php endwhile; ?>
                                 <?php endif; ?>
                             </select>
-                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none"></i>
+                            <small class="text-muted" style="font-size: 0.75rem;">Hanya menampilkan Invoice Draft yang belum terpakai DO.</small>
+                        </div>
+
+                        <div class="mb-3"><label class="fw-bold">Date</label><input type="date" name="do_date" class="form-control" value="<?= $do_date ?>" required></div>
+                        
+                        <div class="mb-3">
+                            <label class="fw-bold">Client</label>
+                            <input type="text" name="client_name" class="form-control" value="<?= htmlspecialchars($client_name) ?>" required>
                         </div>
                         <p class="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1.5 font-medium"><i class="ph-fill ph-info"></i> Memilih invoice akan mengisi otomatis data Client dan Item.</p>
                     </div>
@@ -282,44 +299,36 @@ if (isset($_POST['save_do'])) {
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="bg-white dark:bg-[#24303F] p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
-                <h3 class="text-sm font-black text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-3 mb-5 flex items-center gap-2">
-                    <i class="ph-fill ph-map-pin text-sky-500 text-lg"></i> Destination & Receiver
-                </h3>
                 
-                <div class="space-y-5">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Client / Company <span class="text-rose-500">*</span></label>
-                        <div class="relative group">
-                            <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                            <input type="text" name="client_name" value="<?= htmlspecialchars($client_name) ?>" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-sky-500/50 dark:text-white outline-none transition-all shadow-inner" placeholder="Nama Perusahaan Tujuan" required>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Delivery Address <span class="text-rose-500">*</span></label>
-                        <textarea name="address" rows="3" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-sky-500/50 dark:text-white outline-none transition-all shadow-inner resize-none" placeholder="Alamat lengkap pengiriman..." required><?= htmlspecialchars($client_address) ?></textarea>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Receiver (PIC) <span class="text-rose-500">*</span></label>
-                            <div class="relative group">
-                                <i class="ph-bold ph-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                                <input type="text" name="pic_name" value="<?= htmlspecialchars($pic_name) ?>" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-sky-500/50 dark:text-white outline-none transition-all shadow-inner" placeholder="Nama Penerima" required>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">PIC Phone</label>
-                            <div class="relative group">
-                                <i class="ph-bold ph-phone absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                                <input type="text" name="pic_phone" value="<?= htmlspecialchars($pic_phone) ?>" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-sky-500/50 dark:text-white outline-none transition-all shadow-inner" placeholder="0812...">
-                            </div>
-                        </div>
-                    </div>
+                <div class="mt-4">
+                    <h6 class="fw-bold">Items</h6>
+                    <table class="table table-bordered">
+                        <thead class="bg-light"><tr><th>Item</th><th>Unit</th><th>Charge Mode</th><th>Desc</th><th>Act</th></tr></thead>
+                        <tbody id="doItemsBody">
+                            <?php if (!empty($items_list)): foreach ($items_list as $item): ?>
+                                <tr>
+                                    <td><input type="text" name="item_name[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['item_name']) ?>"></td>
+                                    <td><input type="number" step="any" name="qty[]" class="form-control form-control-sm text-center" value="<?= floatval($item['qty']) ?>"></td>
+                                    <td><input type="text" name="charge_mode[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['card_type']) ?>"></td>
+                                    <td><input type="text" name="description[]" class="form-control form-control-sm" value="<?= htmlspecialchars($item['description']) ?>"></td>
+                                    <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
+                                </tr>
+                            <?php endforeach; else: ?>
+                                <tr>
+                                    <td><input type="text" name="item_name[]" class="form-control form-control-sm"></td>
+                                    <td><input type="number" step="any" name="qty[]" class="form-control form-control-sm text-center" value="1"></td>
+                                    <td><input type="text" name="charge_mode[]" class="form-control form-control-sm" value="Prepaid"></td>
+                                    <td><input type="text" name="description[]" class="form-control form-control-sm"></td>
+                                    <td class="text-center"><button type="button" class="btn btn-danger btn-sm" onclick="removeRow(this)">X</button></td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ Add Row</button>
+                </div>
+                <div class="text-end border-top pt-3 mt-3">
+                    <a href="delivery_order_list.php" class="btn btn-light border">Cancel</a>
+                    <button type="submit" name="save_do" class="btn btn-primary fw-bold">Save Delivery Order</button>
                 </div>
             </div>
         </div>
@@ -404,46 +413,20 @@ if (isset($_POST['save_do'])) {
     </form>
 </div>
 
-<script>
-    // Logika hapus baris item
-    function removeRow(btn) { 
-        var row = btn.parentNode.parentNode; 
-        if(row.parentNode.rows.length > 1) {
-            row.parentNode.removeChild(row); 
-        } else {
-            alert('Minimal harus ada 1 item!');
-        }
-    }
-
-    // Logika tambah baris item
-    function addRow() { 
-        var tbody = document.getElementById("doItemsBody"); 
-        var newRow = tbody.rows[0].cloneNode(true); 
-        var inputs = newRow.getElementsByTagName("input"); 
-        
-        for(var i=0; i<inputs.length; i++) {
-            if(inputs[i].name === "item_name[]" || inputs[i].name === "description[]") {
-                inputs[i].value = "";
-            } else if(inputs[i].name === "charge_mode[]") {
-                inputs[i].value = "Prepaid";
-            } else if(inputs[i].name === "qty[]") {
-                inputs[i].value = "1";
-            }
-        } 
-        tbody.appendChild(newRow); 
-    }
-
-    // Logika Fetch Invoice Data (Auto-Reload Page)
-    function loadInvoiceData(invId) {
-        if (invId) {
-            let searchParams = new URLSearchParams(window.location.search);
-            if (!searchParams.has('edit_id') && searchParams.get('from_invoice_id') != invId) {
-                if (confirm("Ingin memuat otomatis data klien dan daftar barang dari invoice ini?")) {
-                    window.location.href = 'delivery_order_form.php?from_invoice_id=' + invId;
-                }
-            }
-        }
-    }
-</script>
-
 <?php include 'includes/footer.php'; ?>
+<script>
+function removeRow(btn) { var row = btn.parentNode.parentNode; if(row.parentNode.rows.length > 1) row.parentNode.removeChild(row); }
+function addRow() { var t=document.getElementById("doItemsBody"); var n=t.rows[0].cloneNode(true); var i=n.getElementsByTagName("input"); for(var x=0;x<i.length;x++){i[x].value="";if(i[x].name=="charge_mode[]")i[x].value="Prepaid";if(i[x].name=="qty[]"){i[x].value="1";i[x].setAttribute("step","any");}} t.appendChild(n); }
+
+function loadInvoiceData(invId) {
+    if (invId) {
+        // Cek agar tidak me-refresh ulang ketika memang sedang load invoice yang sama
+        let searchParams = new URLSearchParams(window.location.search);
+        if (!searchParams.has('edit_id') && searchParams.get('from_invoice_id') != invId) {
+            if (confirm("Ingin memuat data klien dan item barang dari invoice ini?")) {
+                window.location.href = 'delivery_order_form.php?from_invoice_id=' + invId;
+            }
+        }
+    }
+}
+</script>

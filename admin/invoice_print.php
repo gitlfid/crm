@@ -54,6 +54,23 @@ if($res) {
 $can_edit_note = 'contenteditable="true" spellcheck="false"';
 
 
+// 5. CEK PERMISSION UNTUK EDIT NOTE & TOTAL (Hanya Admin & Divisi Finance)
+$user_id_session = $_SESSION['user_id'];
+$user_role_session = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 'standard';
+$is_finance = false;
+
+$cek_div = $conn->query("SELECT d.name FROM users u LEFT JOIN divisions d ON u.division_id = d.id WHERE u.id = $user_id_session");
+if ($cek_div && $cek_div->num_rows > 0) {
+    $row_div = $cek_div->fetch_assoc();
+    if (!empty($row_div['name']) && stripos($row_div['name'], 'finance') !== false) {
+        $is_finance = true;
+    }
+}
+
+// Berikan hak 'contenteditable' jika user adalah Admin atau divisi Finance
+$can_edit_note = ($user_role_session === 'admin' || $is_finance) ? 'contenteditable="true"' : '';
+
+
 // --- LOGIKA TIPE INVOICE (DOMESTIC / INTERNATIONAL) ---
 $inv_type = isset($inv['invoice_type']) ? $inv['invoice_type'] : 'Domestic'; 
 $is_international = ($inv_type == 'International');
@@ -61,7 +78,7 @@ $is_international = ($inv_type == 'International');
 // A. SETTING PAJAK
 $tax_rate = $is_international ? 0 : 0.11;
 
-// B. SETTING PAYMENT DETAILS & NOTE
+// B. SETTING PAYMENT DETAILS & NOTE (Format Array agar bisa dirender ke tabel sejajar)
 if ($is_international) {
     $payment_title = "Payment Method (USD)";
     $special_note_usd = "Please note that the payer is responsible for any bank charges incurred in preparing bank transfers.";
@@ -104,10 +121,39 @@ function getSpelledOutNumber($number) {
     $separator   = ' ';
     $negative    = 'Negative ';
     $dictionary  = array(
-        0=>'Zero', 1=>'One', 2=>'Two', 3=>'Three', 4=>'Four', 5=>'Five', 6=>'Six', 7=>'Seven', 8=>'Eight', 9=>'Nine',
-        10=>'Ten', 11=>'Eleven', 12=>'Twelve', 13=>'Thirteen', 14=>'Fourteen', 15=>'Fifteen', 16=>'Sixteen', 17=>'Seventeen', 18=>'Eighteen', 19=>'Nineteen',
-        20=>'Twenty', 30=>'Thirty', 40=>'Forty', 50=>'Fifty', 60=>'Sixty', 70=>'Seventy', 80=>'Eighty', 90=>'Ninety',
-        100=>'Hundred', 1000=>'Thousand', 1000000=>'Million', 1000000000=>'Billion', 1000000000000=>'Trillion'
+        0                   => 'Zero',
+        1                   => 'One',
+        2                   => 'Two',
+        3                   => 'Three',
+        4                   => 'Four',
+        5                   => 'Five',
+        6                   => 'Six',
+        7                   => 'Seven',
+        8                   => 'Eight',
+        9                   => 'Nine',
+        10                  => 'Ten',
+        11                  => 'Eleven',
+        12                  => 'Twelve',
+        13                  => 'Thirteen',
+        14                  => 'Fourteen',
+        15                  => 'Fifteen',
+        16                  => 'Sixteen',
+        17                  => 'Seventeen',
+        18                  => 'Eighteen',
+        19                  => 'Nineteen',
+        20                  => 'Twenty',
+        30                  => 'Thirty',
+        40                  => 'Forty',
+        50                  => 'Fifty',
+        60                  => 'Sixty',
+        70                  => 'Seventy',
+        80                  => 'Eighty',
+        90                  => 'Ninety',
+        100                 => 'Hundred',
+        1000                => 'Thousand',
+        1000000             => 'Million',
+        1000000000          => 'Billion',
+        1000000000000       => 'Trillion'
     );
 
     if (!is_numeric($number)) return false;
@@ -184,33 +230,8 @@ function getSpelledOutNumber($number) {
         }
         
         @media print {
-            body { background-color: #ffffff; }
             .no-print { display: none !important; }
-            .print-container { 
-                box-shadow: none !important; 
-                margin: 0 !important; 
-                padding: 10mm 15mm !important; 
-                width: 100% !important;
-                max-width: 100% !important;
-                height: 100vh !important; 
-                display: flex;
-                flex-direction: column;
-            }
-            
-            table { page-break-inside: auto; }
-            tr    { page-break-inside: avoid; page-break-after: auto; }
-            thead { display: table-header-group; }
-            tfoot { display: table-footer-group; }
-            
-            .avoid-break { page-break-inside: avoid; }
-            
-            /* Sembunyikan efek edit saat di-print */
-            [contenteditable="true"] { 
-                background: transparent !important; 
-                box-shadow: none !important; 
-                outline: none !important; 
-                border: none !important; 
-            }
+            [contenteditable="true"]:hover { background: none; outline: none; }
         }
 
         /* Styling Fitur Edit Manual */
@@ -250,71 +271,36 @@ function getSpelledOutNumber($number) {
         </button>
     </div>
 
-    <div class="print-container bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto p-10 shadow-2xl rounded flex flex-col">
-        
-        <div class="flex justify-between items-center border-b-[3px] border-slate-800 pb-4 mb-5 shrink-0">
-            <div class="w-1/3">
-                <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
-            </div>
+    <table class="header-table">
+        <tr>
+            <td>
+                <img src="../uploads/<?= $sets['company_logo'] ?>" class="logo" onerror="this.style.display='none'">
+                <div class="company-addr"><?= nl2br(htmlspecialchars($sets['company_address_full'])) ?></div>
+            </td>
+            <td align="right" valign="top"><div class="doc-title">INVOICE</div></td>
+        </tr>
+    </table>
 
-            <div class="w-1/3 text-right">
-                <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]" <?= $can_edit_note ?>>
-                    <?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?>
-                </div>
-            </div>
-        </div>
-
-        <div class="w-full flex justify-center mb-6 shrink-0">
-            <div class="border border-slate-200 rounded-xl py-2.5 px-10 text-center shadow-sm">
-                <h1 class="text-xl font-bold tracking-[0.3em] text-slate-800 uppercase m-0">INVOICE</h1>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4 mb-5 shrink-0">
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <h3 class="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-2 flex items-center gap-1.5"><i class="ph-fill ph-buildings text-sm"></i> Billed To</h3>
-                <div class="font-black text-slate-800 text-xs mb-1" <?= $can_edit_note ?>><?= htmlspecialchars($inv['company_name']) ?></div>
-                <div class="text-[10px] text-slate-600 leading-snug mb-2" <?= $can_edit_note ?>><?= nl2br(htmlspecialchars($inv['c_address'])) ?></div>
-                
-                <div class="border-t border-slate-200 pt-2">
-                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Attention:</p>
-                    <p class="text-[10px] font-bold text-slate-800 leading-tight" <?= $can_edit_note ?>><?= htmlspecialchars($inv['pic_name']) ?></p>
-                    <p class="text-[10px] text-slate-500 font-medium" <?= $can_edit_note ?>><?= htmlspecialchars($inv['pic_phone']) ?></p>
-                </div>
-            </div>
-
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <h3 class="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-2 flex items-center gap-1.5"><i class="ph-fill ph-receipt text-sm"></i> Invoice Details</h3>
-                
-                <table class="w-full text-[10px]">
-                    <tbody>
-                        <tr>
-                            <td class="py-0.5 text-slate-500 font-medium w-24">Invoice No</td>
-                            <td class="py-0.5 font-bold text-slate-800 font-mono" <?= $can_edit_note ?>>#<?= $inv['invoice_no'] ?></td>
-                        </tr>
-                        <tr>
-                            <td class="py-0.5 text-slate-500 font-medium">Invoice Date</td>
-                            <td class="py-0.5 font-bold text-slate-800" <?= $can_edit_note ?>><?= date('F d, Y', strtotime($inv['invoice_date'])) ?></td>
-                        </tr>
-                        <tr>
-                            <td class="py-0.5 text-slate-500 font-medium">Due Date</td>
-                            <td class="py-0.5 font-bold text-rose-600" <?= $can_edit_note ?>><?= date('F d, Y', strtotime($inv['due_date'])) ?></td>
-                        </tr>
-                        <tr>
-                            <td class="py-0.5 text-slate-500 font-medium">PO. Reference</td>
-                            <td class="py-0.5 font-bold text-slate-800" <?= $can_edit_note ?>><?= htmlspecialchars($inv['po_number_client'] ?? '-') ?></td>
-                        </tr>
-                        <tr>
-                            <td class="py-0.5 text-slate-500 font-medium pb-1.5">Currency</td>
-                            <td class="py-0.5 font-bold text-slate-800 border-b border-slate-200 pb-1.5">
-                                <span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-black tracking-widest" <?= $can_edit_note ?>><?= $inv['currency'] ?></span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="py-0.5 text-slate-500 font-medium pt-1.5">Sales Person</td>
-                            <td class="py-0.5 font-bold text-slate-800 pt-1.5" <?= $can_edit_note ?>><?= htmlspecialchars($inv['sales_name']) ?></td>
-                        </tr>
-                    </tbody>
+    <table class="info-wrapper">
+        <tr>
+            <td class="info-box border-right">
+                <table class="inner-table">
+                    <tr><td class="lbl">To</td><td class="sep">:</td><td><strong><?= htmlspecialchars($inv['company_name']) ?></strong></td></tr>
+                    <tr><td class="lbl">Address</td><td class="sep">:</td><td><?= nl2br(htmlspecialchars($inv['c_address'])) ?></td></tr>
+                    <tr><td class="lbl">Attention</td><td class="sep">:</td><td><?= htmlspecialchars($inv['pic_name']) ?> <br> <?= htmlspecialchars($inv['pic_phone']) ?></td></tr>
+                </table>
+            </td>
+            <td class="info-box">
+                <table class="inner-table">
+                    <tr><td class="lbl">Invoice Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['invoice_date'])) ?></td></tr>
+                    <tr><td class="lbl">Due Date</td><td class="sep">:</td><td><?= date('d/m/Y', strtotime($inv['due_date'])) ?></td></tr>
+                    <tr><td class="lbl">Invoice No</td><td class="sep">:</td><td><strong><?= $inv['invoice_no'] ?></strong></td></tr>
+                    <tr><td class="lbl">PO. Reference</td><td class="sep">:</td><td><?= $inv['po_number_client'] ?></td></tr>
+                    <tr><td class="lbl">Currency</td><td class="sep">:</td><td><?= $inv['currency'] ?></td></tr>
+                    <tr><td colspan="3" style="height:5px"></td></tr>
+                    <tr><td class="lbl">Contact Person</td><td class="sep">:</td><td><?= $inv['sales_name'] ?></td></tr>
+                    <tr><td class="lbl">Email</td><td class="sep">:</td><td><?= $inv['sales_email'] ?></td></tr>
+                    <tr><td class="lbl">Phone</td><td class="sep">:</td><td><?= $inv['sales_phone'] ?></td></tr>
                 </table>
             </div>
         </div>
@@ -381,66 +367,94 @@ function getSpelledOutNumber($number) {
             
             $totalInvoice = $grandTotal + $vatAmount;
             
-            foreach($adjData as $adj) {
-                $totalInvoice += floatval($adj['amount']);
-            }
+            <?php 
+                // Kalkulasi Dasar (Subtotal + VAT saja)
+                if ($is_international) {
+                    $vatAmount = 0;
+                    $grandTotal = round($grandTotal, 2); 
+                } else {
+                    $grandTotal = round($grandTotal, 0, PHP_ROUND_HALF_DOWN); 
+                    $vatAmount = round($grandTotal * $tax_rate, 0, PHP_ROUND_HALF_DOWN); 
+                }
+                
+                $totalInvoice = $grandTotal + $vatAmount;
+                
+                // MENGUBAH TOTAL INVOICE MENJADI TERBILANG (TANPA KATA "ONLY" DAN TANPA PAGAR)
+                $currency_text = $is_international ? ($inv['currency'] == 'USD' ? "US Dollars" : $inv['currency']) : "Rupiah";
+                $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text;
+            ?>
             
-            $currency_text = $is_international ? ($inv['currency'] == 'USD' ? "US Dollars" : $inv['currency']) : "Rupiah";
-            $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text;
-        ?>
-
-        <div class="flex justify-end w-full mb-6 shrink-0 avoid-break">
-            <div class="w-[45%] rounded-xl bg-white border border-slate-200 p-4 shadow-sm">
-                <table class="w-full text-[10px]">
-                    <tbody>
-                        <tr id="row-subtotal">
-                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left">
-                                <span contenteditable="false" class="no-print inline-block bg-rose-500 text-white rounded px-1.5 py-0.5 text-[8px] mr-1.5 cursor-pointer hover:bg-rose-600 transition-colors" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
-                                <span <?= $can_edit_note ?>>Sub Total</span>
-                            </td>
-                            <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_international) ?></td>
-                        </tr>
-                        
-                        <?php if(!$is_international): ?>
-                        <tr>
-                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left" <?= $can_edit_note ?>>VAT (11%)</td>
-                            <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_international) ?></td>
-                        </tr>
-                        <?php endif; ?>
-
-                        <?php foreach($adjData as $adj): ?>
-                        <tr>
-                            <td class="py-1.5 text-rose-500 font-bold uppercase tracking-widest text-[9px] text-left" <?= $can_edit_note ?>><?= htmlspecialchars($adj['label']) ?></td>
-                            <td class="py-1.5 text-right font-bold text-rose-600" <?= $can_edit_note ?>><?= format_money($adj['amount'], $is_international) ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-
-                        <tr class="border-t border-slate-200">
-                            <td class="py-2 pt-3 text-emerald-600 font-black uppercase tracking-widest text-[11px] text-left" <?= $can_edit_note ?>>Total (<?= $inv['currency'] ?>)</td>
-                            <td class="py-2 pt-3 text-right font-black text-emerald-600 text-sm" <?= $can_edit_note ?>><?= format_money($totalInvoice, $is_international) ?></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-12 gap-6 w-full mt-auto shrink-0 avoid-break">
+            <tr class="summary-row" id="row-subtotal">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell">
+                    <?php if($can_edit_note != ''): ?>
+                        <span contenteditable="false" class="no-print" style="display:inline-block; background-color:#dc3545; color:#fff; border-radius:3px; padding:2px 5px; font-size:10px; margin-right:8px; cursor:pointer;" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
+                    <?php endif; ?>
+                    <span <?= $can_edit_note ?>>Sub Total</span>
+                </td>
+                <td class="value-cell" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_international) ?></td>
+            </tr>
             
-            <div class="col-span-8 flex flex-col gap-3">
-                <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
-                    <span class="text-[9px] font-black text-emerald-600 uppercase tracking-widest block mb-0.5">Amount in words:</span>
-                    <div class="font-bold text-emerald-800 italic text-[10px] leading-snug" <?= $can_edit_note ?>><?= htmlspecialchars($amountInWords) ?></div>
+            <?php if(!$is_international): ?>
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell">VAT (11%)</td>
+                <td class="value-cell" contenteditable="true"><?= format_money($vatAmount, $is_international) ?></td>
+            </tr>
+            <?php endif; ?>
+
+            <?php foreach($adjData as $adj): ?>
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell text-muted" contenteditable="true"><?= htmlspecialchars($adj['label']) ?></td>
+                <td class="value-cell text-muted" contenteditable="true"><?= format_money($adj['amount'], $is_international) ?></td>
+            </tr>
+            <?php endforeach; ?>
+
+            <tr class="summary-row">
+                <td colspan="4" class="border-none"></td>
+                <td class="label-cell" <?= $can_edit_note ?>>Total</td>
+                <td class="value-cell" contenteditable="true"><?= format_money($totalInvoice, $is_international) ?></td>
+            </tr>
+
+        </tbody>
+    </table>
+
+    <table class="footer-layout">
+        <tr>
+            <td class="footer-left">
+                
+                <div style="font-size: 11px; margin-bottom: 15px;">
+                    <span style="font-weight: bold;">Amount in words :</span><br>
+                    <div <?= $can_edit_note ?> style="font-style: italic; margin-top: 3px; line-height: 1.4; max-width: 90%;">
+                        <?= htmlspecialchars($amountInWords) ?>
+                    </div>
                 </div>
 
-                <div>
-                    <strong class="text-[9px] uppercase tracking-widest text-slate-500 block mb-0.5" <?= $can_edit_note ?>>Note:</strong>
-                    <div class="text-[9px] text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200" <?= $can_edit_note ?>>
-                        <?php if($is_international): ?>
-                            <?= htmlspecialchars($special_note_usd) ?>
-                        <?php else: ?>
+                <div style="font-style: italic; font-size: 10px; margin-bottom: 20px;">
+                    <strong>Note :</strong><br>
+                    <?php if($is_international): ?>
+                        <div <?= $can_edit_note ?> style="margin-bottom:5px; color:#000;">
+                            <?= $special_note_usd ?>
+                        </div>
+                    <?php else: ?>
+                        <div <?= $can_edit_note ?> style="margin-bottom:5px; color:#000;">
                             <?= nl2br(htmlspecialchars($final_note)) ?>
-                        <?php endif; ?>
-                    </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div style="font-size: 11px;">
+                    <span style="font-weight: bold; margin-bottom: 2px; display: block;"><?= $payment_title ?></span>
+                    <table style="width: 100%; font-size: 11px; line-height: 1.4; border-collapse: collapse;" <?= $can_edit_note ?>>
+                        <?php foreach($payment_details as $label => $value): ?>
+                        <tr>
+                            <td style="width: 90px; vertical-align: top; padding-bottom: 2px;"><?= htmlspecialchars($label) ?></td>
+                            <td style="width: 15px; vertical-align: top; text-align: center; padding-bottom: 2px;">:</td>
+                            <td style="vertical-align: top; padding-bottom: 2px;"><?= htmlspecialchars($value) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </table>
                 </div>
 
                 <div>

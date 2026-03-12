@@ -198,6 +198,7 @@ while($row = $res_rep->fetch_assoc()) { $replies[] = $row; }
 
 // Helper Functions
 function formatText($text) { 
+    // Bersihkan literal \r\n di dalam reply message (jika ada)
     $text = str_replace(array('\r\n', '\n', '\r'), '<br>', $text);
     return nl2br($text); 
 } 
@@ -260,10 +261,16 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                         <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 text-white flex items-center justify-center text-2xl font-black shadow-md shrink-0">
                             <?= strtoupper(substr($ticket['name'],0,1)) ?>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h4 class="font-black text-slate-800 dark:text-white text-base truncate mb-0.5"><?= htmlspecialchars($ticket['name']) ?></h4>
-                            <p class="text-xs font-bold text-slate-500 dark:text-slate-400 truncate mb-1.5"><?= htmlspecialchars($ticket['company']) ?></p>
-                            <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><i class="ph-fill ph-envelope-simple text-slate-400"></i> <?= htmlspecialchars($ticket['email']) ?></p>
+                        
+                        <h6 class="text-uppercase text-muted small fw-bold ls-1">Deskripsi Masalah</h6>
+                        
+                        <div class="mb-3 text-dark" style="word-break: break-word;">
+                            <?php 
+                                $desc_clean = htmlspecialchars($ticket['description']);
+                                // Ubah literal string \r\n menjadi HTML break agar nomor ICCID turun ke bawah
+                                $desc_clean = str_replace(array('\r\n', '\n', '\r'), '<br>', $desc_clean);
+                                echo nl2br($desc_clean);
+                            ?>
                         </div>
                     </div>
 
@@ -308,7 +315,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                                             <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest"><?= date('d M H:i', strtotime($reply['created_at'])) ?></span>
                                         </div>
                                         
-                                        <div class="p-4 sm:p-5 shadow-sm text-sm font-medium leading-relaxed break-words <?= $isAdmin ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-sm' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl rounded-tl-sm' ?>">
+                                        <div class="chat-message" style="word-break: break-word;">
                                             <?= formatText($reply['message']) ?>
                                             
                                             <?php if(!empty($reply['attachment'])): ?>
