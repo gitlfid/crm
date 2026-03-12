@@ -173,7 +173,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
         body { 
             font-family: 'Inter', sans-serif; 
@@ -257,45 +257,45 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
 
         <div class="w-full flex justify-center mb-6 shrink-0">
             <div class="border border-slate-200 rounded-xl py-2.5 px-10 text-center shadow-sm">
-                <h1 class="text-xl font-black tracking-[0.3em] text-slate-900 uppercase m-0">QUOTATION</h1>
+                <h1 class="text-xl font-bold tracking-[0.3em] text-slate-800 uppercase m-0">QUOTATION</h1>
             </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4 mb-5 shrink-0">
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <h3 class="text-[9px] font-black uppercase tracking-widest text-indigo-600 mb-2 flex items-center gap-1.5"><i class="ph-fill ph-buildings text-sm"></i> Prepared For</h3>
-                <div class="font-black text-slate-800 text-xs mb-1" <?= $can_edit_note ?>><?= htmlspecialchars($quo['company_name']) ?></div>
+                <h3 class="text-[9px] font-bold uppercase tracking-widest text-indigo-600 mb-2 flex items-center gap-1.5"><i class="ph-fill ph-buildings text-sm"></i> Prepared For</h3>
+                <div class="font-bold text-slate-800 text-xs mb-1" <?= $can_edit_note ?>><?= htmlspecialchars($quo['company_name']) ?></div>
                 <div class="text-[10px] text-slate-600 leading-snug mb-2" <?= $can_edit_note ?>><?= nl2br(htmlspecialchars($quo['c_address'])) ?></div>
                 
                 <div class="border-t border-slate-200 pt-2">
-                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Attention:</p>
-                    <p class="text-[10px] font-bold text-slate-800 leading-tight" <?= $can_edit_note ?>><?= htmlspecialchars($quo['pic_name']) ?></p>
+                    <p class="text-[9px] font-semibold text-slate-400 uppercase tracking-widest mb-0.5">Attention:</p>
+                    <p class="text-[10px] font-semibold text-slate-800 leading-tight" <?= $can_edit_note ?>><?= htmlspecialchars($quo['pic_name']) ?></p>
                     <p class="text-[10px] text-slate-500 font-medium" <?= $can_edit_note ?>><?= htmlspecialchars($quo['pic_phone']) ?></p>
                 </div>
             </div>
 
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <h3 class="text-[9px] font-black uppercase tracking-widest text-indigo-600 mb-2 flex items-center gap-1.5"><i class="ph-fill ph-file-text text-sm"></i> Document Details</h3>
+                <h3 class="text-[9px] font-bold uppercase tracking-widest text-indigo-600 mb-2 flex items-center gap-1.5"><i class="ph-fill ph-file-text text-sm"></i> Document Details</h3>
                 
                 <table class="w-full text-[10px]">
                     <tbody>
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium w-24">Quote No</td>
-                            <td class="py-0.5 font-bold text-slate-800 font-mono">#<?= $quo['quotation_no'] ?></td>
+                            <td class="py-0.5 font-semibold text-slate-800 font-mono">#<?= $quo['quotation_no'] ?></td>
                         </tr>
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium">Date</td>
-                            <td class="py-0.5 font-bold text-slate-800" <?= $can_edit_note ?>><?= date('F d, Y', strtotime($quo['quotation_date'])) ?></td>
+                            <td class="py-0.5 font-semibold text-slate-800" <?= $can_edit_note ?>><?= date('F d, Y', strtotime($quo['quotation_date'])) ?></td>
                         </tr>
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium pb-1.5">Currency</td>
-                            <td class="py-0.5 font-bold text-slate-800 border-b border-slate-200 pb-1.5">
-                                <span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-black tracking-widest"><?= $quo['currency'] ?></span>
+                            <td class="py-0.5 font-semibold text-slate-800 border-b border-slate-200 pb-1.5">
+                                <span class="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-widest"><?= $quo['currency'] ?></span>
                             </td>
                         </tr>
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium pt-1.5">Contact Person</td>
-                            <td class="py-0.5 font-bold text-slate-800 pt-1.5" <?= $can_edit_note ?>><?= htmlspecialchars($quo['sales_name']) ?></td>
+                            <td class="py-0.5 font-semibold text-slate-800 pt-1.5" <?= $can_edit_note ?>><?= htmlspecialchars($quo['sales_name']) ?></td>
                         </tr>
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium">Email</td>
@@ -312,7 +312,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
 
         <div class="border border-slate-800 rounded-lg overflow-hidden mb-3 shrink-0">
             <table class="w-full text-left text-[10px]">
-                <thead class="bg-slate-800 text-white font-bold uppercase tracking-wider text-[9px]">
+                <thead class="bg-slate-800 text-white font-semibold uppercase tracking-wider text-[9px]">
                     <tr>
                         <th class="py-2.5 px-3 text-center w-[5%]">No</th>
                         <th class="py-2.5 px-3 w-[40%]">Description / Item</th>
@@ -336,19 +336,19 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                     <tr class="hover:bg-slate-50 transition-colors h-10">
                         <td class="py-2.5 px-3 text-center font-medium text-slate-500 align-middle"><?= $no++ ?></td>
                         <td class="py-2.5 px-3 align-middle">
-                            <div class="font-bold text-slate-800" <?= $can_edit_note ?>><?= htmlspecialchars($item['item_name']) ?></div>
+                            <div class="font-semibold text-slate-800" <?= $can_edit_note ?>><?= htmlspecialchars($item['item_name']) ?></div>
                             <?php if(!empty($item['description']) && $item['description'] != 'Exclude Tax'): ?>
                                 <div class="text-[9px] text-slate-500 mt-0.5 leading-snug" <?= $can_edit_note ?>><?= nl2br(htmlspecialchars($item['description'])) ?></div>
                             <?php endif; ?>
                         </td>
-                        <td class="py-2.5 px-3 text-center font-bold text-slate-800 align-middle" <?= $can_edit_note ?>><?= $qty ?></td> 
+                        <td class="py-2.5 px-3 text-center font-semibold text-slate-800 align-middle" <?= $can_edit_note ?>><?= $qty ?></td> 
                         <td class="py-2.5 px-3 text-center align-middle">
-                            <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border border-slate-200" <?= $can_edit_note ?>>
+                            <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-semibold uppercase tracking-widest border border-slate-200" <?= $can_edit_note ?>>
                                 <?= htmlspecialchars($item['card_type']) ?>
                             </span>
                         </td>
                         <td class="py-2.5 px-3 text-right font-medium text-slate-700 align-middle" <?= $can_edit_note ?>><?= format_money($price, $is_intl) ?></td>
-                        <td class="py-2.5 px-3 text-right font-bold text-slate-800 align-middle" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_intl) ?></td>
+                        <td class="py-2.5 px-3 text-right font-semibold text-slate-800 align-middle" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_intl) ?></td>
                     </tr>
                     <?php endforeach; ?>
                     
@@ -384,32 +384,32 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                 <table class="w-full text-[10px]">
                     <tbody>
                         <tr id="row-subtotal">
-                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left">
+                            <td class="py-1.5 text-slate-500 font-semibold uppercase tracking-widest text-[9px] text-left">
                                 <?php if($can_edit_note != ''): ?>
                                     <span contenteditable="false" class="no-print inline-block bg-rose-500 text-white rounded px-1.5 py-0.5 text-[8px] mr-1.5 cursor-pointer hover:bg-rose-600 transition-colors" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
                                 <?php endif; ?>
                                 <span <?= $can_edit_note ?>>Sub Total</span>
                             </td>
-                            <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_intl) ?></td>
+                            <td class="py-1.5 text-right font-semibold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_intl) ?></td>
                         </tr>
                         
                         <?php if(!$is_intl): ?>
                         <tr>
-                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left">VAT (11%)</td>
-                            <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_intl) ?></td>
+                            <td class="py-1.5 text-slate-500 font-semibold uppercase tracking-widest text-[9px] text-left">VAT (11%)</td>
+                            <td class="py-1.5 text-right font-semibold text-slate-800" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_intl) ?></td>
                         </tr>
                         <?php endif; ?>
 
                         <?php foreach($adjData as $adj): ?>
                         <tr>
-                            <td class="py-1.5 text-rose-500 font-bold uppercase tracking-widest text-[9px] text-left" <?= $can_edit_note ?>><?= htmlspecialchars($adj['label']) ?></td>
-                            <td class="py-1.5 text-right font-bold text-rose-600" <?= $can_edit_note ?>><?= format_money($adj['amount'], $is_intl) ?></td>
+                            <td class="py-1.5 text-rose-500 font-semibold uppercase tracking-widest text-[9px] text-left" <?= $can_edit_note ?>><?= htmlspecialchars($adj['label']) ?></td>
+                            <td class="py-1.5 text-right font-semibold text-rose-600" <?= $can_edit_note ?>><?= format_money($adj['amount'], $is_intl) ?></td>
                         </tr>
                         <?php endforeach; ?>
 
                         <tr class="border-t border-slate-200">
-                            <td class="py-2 pt-3 text-indigo-600 font-black uppercase tracking-widest text-[11px] text-left">Total (<?= $quo['currency'] ?>)</td>
-                            <td class="py-2 pt-3 text-right font-black text-indigo-600 text-sm" <?= $can_edit_note ?>><?= format_money($totalQuotation, $is_intl) ?></td>
+                            <td class="py-2 pt-3 text-indigo-600 font-bold uppercase tracking-widest text-[11px] text-left">Total (<?= $quo['currency'] ?>)</td>
+                            <td class="py-2 pt-3 text-right font-bold text-indigo-600 text-sm" <?= $can_edit_note ?>><?= format_money($totalQuotation, $is_intl) ?></td>
                         </tr>
                     </tbody>
                 </table>
@@ -420,8 +420,8 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
             
             <div class="col-span-8 flex flex-col gap-3">
                 <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3">
-                    <span class="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-0.5">Amount in words:</span>
-                    <div class="font-bold text-indigo-800 italic text-[10px] leading-snug" <?= $can_edit_note ?>><?= htmlspecialchars($amountInWords) ?></div>
+                    <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest block mb-0.5">Amount in words:</span>
+                    <div class="font-semibold text-indigo-800 italic text-[10px] leading-snug" <?= $can_edit_note ?>><?= htmlspecialchars($amountInWords) ?></div>
                 </div>
 
                 <div>
@@ -431,7 +431,7 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
             </div>
 
             <div class="col-span-4 text-center flex flex-col justify-end pt-2">
-                <p class="text-[10px] font-bold text-slate-800 mb-1">PT. Linksfield Networks Indonesia</p>
+                <p class="text-[10px] font-semibold text-slate-800 mb-1">PT. Linksfield Networks Indonesia</p>
                 
                 <?php 
                     $signPath = ''; $signerName = 'Niawati'; $baseDir = dirname(__DIR__);
@@ -456,16 +456,16 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
                     <?php if (!empty($signPath)): ?>
                         <img src="<?= $signPath ?>" class="max-h-full max-w-[160px] object-contain relative z-10 mix-blend-multiply">
                     <?php else: ?>
-                        <div class="w-full h-16 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[9px] font-bold text-slate-400 bg-slate-50">
+                        <div class="w-full h-16 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[9px] font-semibold text-slate-400 bg-slate-50">
                             (Signature Missing)
                         </div>
                     <?php endif; ?>
                 </div>
                 
-                <div class="inline-block border-b border-slate-800 pb-1 px-4 mb-0.5 font-bold text-[11px]" <?= $can_edit_note ?>>
+                <div class="inline-block border-b border-slate-800 pb-1 px-4 mb-0.5 font-semibold text-[11px]" <?= $can_edit_note ?>>
                     <?= htmlspecialchars($signerName) ?>
                 </div>
-                <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Authorized Signature</p>
+                <p class="text-[9px] text-slate-500 font-semibold uppercase tracking-widest mt-0.5">Authorized Signature</p>
             </div>
             
         </div>
