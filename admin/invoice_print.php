@@ -47,21 +47,11 @@ if($res) {
     while($row = $res->fetch_assoc()) $sets[$row['setting_key']] = $row['setting_value'];
 }
 
-// 5. CEK PERMISSION UNTUK EDIT NOTE & TOTAL (Hanya Admin & Divisi Finance)
-$user_id_session = $_SESSION['user_id'];
-$user_role_session = isset($_SESSION['role']) ? strtolower(trim($_SESSION['role'])) : 'standard';
-$is_finance = false;
-
-$cek_div = $conn->query("SELECT d.name FROM users u LEFT JOIN divisions d ON u.division_id = d.id WHERE u.id = $user_id_session");
-if ($cek_div && $cek_div->num_rows > 0) {
-    $row_div = $cek_div->fetch_assoc();
-    if (!empty($row_div['name']) && stripos($row_div['name'], 'finance') !== false) {
-        $is_finance = true;
-    }
-}
-
-// Berikan hak 'contenteditable' jika user adalah Admin atau divisi Finance
-$can_edit_note = ($user_role_session === 'admin' || $is_finance) ? 'contenteditable="true"' : '';
+// =========================================================================================
+// FITUR EDIT MANUAL DIAKTIFKAN KEMBALI SECARA UNIVERSAL
+// Atribut spellcheck="false" ditambahkan agar tidak ada garis merah saat edit teks Inggris
+// =========================================================================================
+$can_edit_note = 'contenteditable="true" spellcheck="false"';
 
 
 // --- LOGIKA TIPE INVOICE (DOMESTIC / INTERNATIONAL) ---
@@ -114,39 +104,10 @@ function getSpelledOutNumber($number) {
     $separator   = ' ';
     $negative    = 'Negative ';
     $dictionary  = array(
-        0                   => 'Zero',
-        1                   => 'One',
-        2                   => 'Two',
-        3                   => 'Three',
-        4                   => 'Four',
-        5                   => 'Five',
-        6                   => 'Six',
-        7                   => 'Seven',
-        8                   => 'Eight',
-        9                   => 'Nine',
-        10                  => 'Ten',
-        11                  => 'Eleven',
-        12                  => 'Twelve',
-        13                  => 'Thirteen',
-        14                  => 'Fourteen',
-        15                  => 'Fifteen',
-        16                  => 'Sixteen',
-        17                  => 'Seventeen',
-        18                  => 'Eighteen',
-        19                  => 'Nineteen',
-        20                  => 'Twenty',
-        30                  => 'Thirty',
-        40                  => 'Forty',
-        50                  => 'Fifty',
-        60                  => 'Sixty',
-        70                  => 'Seventy',
-        80                  => 'Eighty',
-        90                  => 'Ninety',
-        100                 => 'Hundred',
-        1000                => 'Thousand',
-        1000000             => 'Million',
-        1000000000          => 'Billion',
-        1000000000000       => 'Trillion'
+        0=>'Zero', 1=>'One', 2=>'Two', 3=>'Three', 4=>'Four', 5=>'Five', 6=>'Six', 7=>'Seven', 8=>'Eight', 9=>'Nine',
+        10=>'Ten', 11=>'Eleven', 12=>'Twelve', 13=>'Thirteen', 14=>'Fourteen', 15=>'Fifteen', 16=>'Sixteen', 17=>'Seventeen', 18=>'Eighteen', 19=>'Nineteen',
+        20=>'Twenty', 30=>'Thirty', 40=>'Forty', 50=>'Fifty', 60=>'Sixty', 70=>'Seventy', 80=>'Eighty', 90=>'Ninety',
+        100=>'Hundred', 1000=>'Thousand', 1000000=>'Million', 1000000000=>'Billion', 1000000000000=>'Trillion'
     );
 
     if (!is_numeric($number)) return false;
@@ -243,7 +204,8 @@ function getSpelledOutNumber($number) {
             
             .avoid-break { page-break-inside: avoid; }
             
-            [contenteditable="true"]:hover, [contenteditable="true"]:focus { 
+            /* Sembunyikan efek edit saat di-print */
+            [contenteditable="true"] { 
                 background: transparent !important; 
                 box-shadow: none !important; 
                 outline: none !important; 
@@ -251,9 +213,24 @@ function getSpelledOutNumber($number) {
             }
         }
 
-        [contenteditable="true"] { transition: all 0.2s; outline: none; }
-        [contenteditable="true"]:hover { background-color: #fef08a; box-shadow: 0 0 0 4px #fef08a; border-radius: 2px; cursor: text; }
-        [contenteditable="true"]:focus { background-color: #fef08a; box-shadow: 0 0 0 4px #fef08a; border-radius: 2px; cursor: text; border-bottom: 2px dashed #eab308; }
+        /* Styling Fitur Edit Manual */
+        [contenteditable="true"] { 
+            transition: all 0.2s ease-in-out; 
+            outline: none; 
+            border-radius: 4px;
+            border-bottom: 1px solid transparent;
+        }
+        [contenteditable="true"]:hover { 
+            background-color: #fef08a; /* Warna kuning stabilo */
+            box-shadow: 0 0 0 4px #fef08a; 
+            cursor: text; 
+        }
+        [contenteditable="true"]:focus { 
+            background-color: #fef08a; 
+            box-shadow: 0 0 0 4px #fef08a; 
+            cursor: text; 
+            border-bottom: 1px dashed #ca8a04; 
+        }
         
     </style>
 </head>
@@ -262,7 +239,7 @@ function getSpelledOutNumber($number) {
     <div class="no-print fixed bottom-8 right-8 flex flex-col items-end gap-3 z-50">
         <div class="bg-white px-5 py-4 rounded-2xl shadow-xl border border-slate-200 max-w-sm text-right animate-bounce">
             <p class="text-xs font-bold text-emerald-600 mb-1 flex items-center justify-end gap-1.5"><i class="ph-fill ph-info"></i> Edit Mode Active</p>
-            <p class="text-[10px] text-slate-500 mb-2">Klik area teks (Alamat, Harga, Adjusment, Catatan) untuk <strong>edit manual</strong>.</p>
+            <p class="text-[10px] text-slate-500 mb-2">Arahkan kursor & Klik pada area teks (Alamat, Harga, Adjusment, Catatan) untuk <strong>edit manual</strong>.</p>
             <div class="inline-flex gap-2 text-[9px] font-bold uppercase tracking-widest bg-slate-100 px-2 py-1 rounded text-slate-500">
                 <i class="ph-bold ph-globe"></i> Mode: <?= $inv_type ?> (<?= $inv['currency'] ?>)
             </div>
@@ -279,17 +256,13 @@ function getSpelledOutNumber($number) {
             <div class="w-1/3">
                 <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
             </div>
-
+            <div class="w-1/3 text-center">
+                <h1 class="text-xl font-black tracking-[0.3em] text-slate-900 uppercase">INVOICE</h1>
+            </div>
             <div class="w-1/3 text-right">
-                <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]">
+                <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]" <?= $can_edit_note ?>>
                     <?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?>
                 </div>
-            </div>
-        </div>
-
-        <div class="w-full flex justify-center mb-6 shrink-0">
-            <div class="border border-slate-200 rounded-xl py-2.5 px-10 text-center shadow-sm">
-                <h1 class="text-xl font-bold tracking-[0.3em] text-slate-800 uppercase m-0">INVOICE</h1>
             </div>
         </div>
 
@@ -313,7 +286,7 @@ function getSpelledOutNumber($number) {
                     <tbody>
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium w-24">Invoice No</td>
-                            <td class="py-0.5 font-bold text-slate-800 font-mono">#<?= $inv['invoice_no'] ?></td>
+                            <td class="py-0.5 font-bold text-slate-800 font-mono" <?= $can_edit_note ?>>#<?= $inv['invoice_no'] ?></td>
                         </tr>
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium">Invoice Date</td>
@@ -330,7 +303,7 @@ function getSpelledOutNumber($number) {
                         <tr>
                             <td class="py-0.5 text-slate-500 font-medium pb-1.5">Currency</td>
                             <td class="py-0.5 font-bold text-slate-800 border-b border-slate-200 pb-1.5">
-                                <span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-black tracking-widest"><?= $inv['currency'] ?></span>
+                                <span class="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-black tracking-widest" <?= $can_edit_note ?>><?= $inv['currency'] ?></span>
                             </td>
                         </tr>
                         <tr>
@@ -385,6 +358,10 @@ function getSpelledOutNumber($number) {
                         <td class="py-2 px-3 text-right font-bold text-slate-800 align-middle" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_international) ?></td>
                     </tr>
                     <?php endforeach; ?>
+                    
+                    <tr>
+                        <td colspan="6" class="py-1"></td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -414,9 +391,7 @@ function getSpelledOutNumber($number) {
                     <tbody>
                         <tr id="row-subtotal">
                             <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left">
-                                <?php if($can_edit_note != ''): ?>
-                                    <span contenteditable="false" class="no-print inline-block bg-rose-500 text-white rounded px-1.5 py-0.5 text-[8px] mr-1.5 cursor-pointer hover:bg-rose-600 transition-colors" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
-                                <?php endif; ?>
+                                <span contenteditable="false" class="no-print inline-block bg-rose-500 text-white rounded px-1.5 py-0.5 text-[8px] mr-1.5 cursor-pointer hover:bg-rose-600 transition-colors" onclick="document.getElementById('row-subtotal').style.display='none'" title="Klik untuk menyembunyikan baris Sub Total">✖ Hapus</span>
                                 <span <?= $can_edit_note ?>>Sub Total</span>
                             </td>
                             <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($grandTotal, $is_international) ?></td>
@@ -424,7 +399,7 @@ function getSpelledOutNumber($number) {
                         
                         <?php if(!$is_international): ?>
                         <tr>
-                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left">VAT (11%)</td>
+                            <td class="py-1.5 text-slate-500 font-bold uppercase tracking-widest text-[9px] text-left" <?= $can_edit_note ?>>VAT (11%)</td>
                             <td class="py-1.5 text-right font-bold text-slate-800" <?= $can_edit_note ?>><?= format_money($vatAmount, $is_international) ?></td>
                         </tr>
                         <?php endif; ?>
@@ -437,7 +412,7 @@ function getSpelledOutNumber($number) {
                         <?php endforeach; ?>
 
                         <tr class="border-t border-slate-200">
-                            <td class="py-2 pt-3 text-emerald-600 font-black uppercase tracking-widest text-[11px] text-left">Total (<?= $inv['currency'] ?>)</td>
+                            <td class="py-2 pt-3 text-emerald-600 font-black uppercase tracking-widest text-[11px] text-left" <?= $can_edit_note ?>>Total (<?= $inv['currency'] ?>)</td>
                             <td class="py-2 pt-3 text-right font-black text-emerald-600 text-sm" <?= $can_edit_note ?>><?= format_money($totalInvoice, $is_international) ?></td>
                         </tr>
                     </tbody>
@@ -454,7 +429,7 @@ function getSpelledOutNumber($number) {
                 </div>
 
                 <div>
-                    <strong class="text-[9px] uppercase tracking-widest text-slate-500 block mb-0.5">Note:</strong>
+                    <strong class="text-[9px] uppercase tracking-widest text-slate-500 block mb-0.5" <?= $can_edit_note ?>>Note:</strong>
                     <div class="text-[9px] text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-200" <?= $can_edit_note ?>>
                         <?php if($is_international): ?>
                             <?= htmlspecialchars($special_note_usd) ?>
@@ -465,7 +440,7 @@ function getSpelledOutNumber($number) {
                 </div>
 
                 <div>
-                    <strong class="text-[9px] uppercase tracking-widest text-slate-800 block border-b border-slate-800 pb-1 mb-1.5 w-max"><?= htmlspecialchars($payment_title) ?></strong>
+                    <strong class="text-[9px] uppercase tracking-widest text-slate-800 block border-b border-slate-800 pb-1 mb-1.5 w-max" <?= $can_edit_note ?>><?= htmlspecialchars($payment_title) ?></strong>
                     <table class="w-full text-[9px] text-slate-700" <?= $can_edit_note ?>>
                         <?php foreach($payment_details as $label => $value): ?>
                         <tr>
@@ -479,7 +454,7 @@ function getSpelledOutNumber($number) {
             </div>
 
             <div class="col-span-4 text-center flex flex-col justify-end pt-2">
-                <p class="text-[10px] font-bold text-slate-800 mb-1">PT. Linksfield Networks Indonesia</p>
+                <p class="text-[11px] font-bold text-slate-800 mb-1" <?= $can_edit_note ?>>PT. Linksfield Networks Indonesia</p>
                 
                 <?php 
                     $signPath = ''; $signerName = 'Niawati'; $baseDir = dirname(__DIR__);
@@ -500,20 +475,20 @@ function getSpelledOutNumber($number) {
                     }
                 ?>
                 
-                <div class="h-20 flex items-center justify-center my-1 relative">
+                <div class="h-32 flex items-center justify-center my-2 relative w-full">
                     <?php if (!empty($signPath)): ?>
-                        <img src="<?= $signPath ?>" class="max-h-full max-w-[160px] object-contain relative z-10 mix-blend-multiply">
+                        <img src="<?= $signPath ?>" class="max-h-full w-auto max-w-[220px] object-contain relative z-10 mix-blend-multiply">
                     <?php else: ?>
-                        <div class="w-full h-16 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[9px] font-bold text-slate-400 bg-slate-50">
+                        <div class="w-full h-20 border border-dashed border-slate-300 rounded-lg flex items-center justify-center text-[10px] font-bold text-slate-400 bg-slate-50">
                             (Signature Missing)
                         </div>
                     <?php endif; ?>
                 </div>
                 
-                <div class="inline-block border-b border-slate-800 pb-1 px-4 mb-0.5 font-bold text-[11px]" <?= $can_edit_note ?>>
+                <div class="inline-block border-b border-slate-800 pb-1 px-6 mb-0.5 font-bold text-[12px]" <?= $can_edit_note ?>>
                     <?= htmlspecialchars($signerName) ?>
                 </div>
-                <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Authorized Signature</p>
+                <p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5" <?= $can_edit_note ?>>Authorized Signature</p>
             </div>
             
         </div>
