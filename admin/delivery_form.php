@@ -1,180 +1,228 @@
 <?php
-$page_title = "Input Delivery Request";
+$page_title = "Input Delivery";
 include 'includes/header.php';
 include 'includes/sidebar.php';
-// require_once '../config/database.php'; // Aktifkan jika butuh query dropdown
+require_once '../config/database.php';
+
+// PROSES SIMPAN
+if(isset($_POST['save_delivery'])) {
+    $date = $_POST['delivery_date'];
+    
+    // Item & Project Info
+    $item = $_POST['item_name'];
+    $proj_id = $_POST['project_id'];
+    $proj_name = $_POST['project_name']; // Nama project dari input text
+    $pkg = $_POST['data_package'];
+    $qty = $_POST['qty'];
+    
+    // Sender
+    $s_id = $_POST['sender_id'];
+    $s_comp = $_POST['sender_company'];
+    $s_name = $_POST['sender_name'];
+    $s_phone = $_POST['sender_phone'];
+    $s_addr = $_POST['sender_address'];
+    
+    // Receiver
+    $r_id = $_POST['receiver_id'];
+    $r_comp = $_POST['receiver_company'];
+    $r_name = $_POST['receiver_name'];
+    $r_phone = $_POST['receiver_phone'];
+    $r_addr = $_POST['receiver_address'];
+    
+    // Courier
+    $cour = strtolower($_POST['courier_name']);
+    $track = $_POST['tracking_number'];
+    $price = str_replace(['.', ','], '', $_POST['delivery_price']);
+
+    // 1. Simpan Project Baru jika opsi "New" dipilih & nama diisi
+    if($proj_id == 'new' && !empty($proj_name)) {
+        // Cek duplikat agar tidak double
+        $cekProj = $conn->query("SELECT id FROM projects WHERE name = '$proj_name'");
+        if($cekProj->num_rows == 0) {
+            $conn->query("INSERT INTO projects (name) VALUES ('$proj_name')");
+        }
+    }
+
+    // 2. Simpan Kontak Baru (Sender)
+    if($s_id == 'new') {
+        $conn->query("INSERT INTO delivery_contacts (type, company, name, phone, address) VALUES ('sender', '$s_comp', '$s_name', '$s_phone', '$s_addr')");
+    }
+    
+    // 3. Simpan Kontak Baru (Receiver)
+    if($r_id == 'new') {
+        $conn->query("INSERT INTO delivery_contacts (type, company, name, phone, address) VALUES ('receiver', '$r_comp', '$r_name', '$r_phone', '$r_addr')");
+    }
+
+    // 4. Simpan Transaksi Delivery
+    $sql = "INSERT INTO deliveries (delivery_date, item_name, project_name, data_package, qty, sender_company, sender_name, sender_phone, sender_address, receiver_company, receiver_name, receiver_phone, receiver_address, courier_name, tracking_number, delivery_price) 
+            VALUES ('$date', '$item', '$proj_name', '$pkg', '$qty', '$s_comp', '$s_name', '$s_phone', '$s_addr', '$r_comp', '$r_name', '$r_phone', '$r_addr', '$cour', '$track', '$price')";
+    
+    if($conn->query($sql)) {
+        echo "<script>alert('Data tersimpan!'); window.location='delivery_list.php';</script>";
+    } else {
+        echo "<script>alert('Error: ".$conn->error."');</script>";
+    }
+}
+
+// AMBIL DATA UTK DROPDOWN
+$projects = $conn->query("SELECT * FROM projects ORDER BY name ASC");
+$senders = $conn->query("SELECT * FROM delivery_contacts WHERE type='sender' ORDER BY name ASC");
+$receivers = $conn->query("SELECT * FROM delivery_contacts WHERE type='receiver' ORDER BY name ASC");
 ?>
 
-<style>
-    .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-    .step-line { position: absolute; left: 1.25rem; top: 3rem; bottom: -2rem; width: 2px; background-color: #e2e8f0; z-index: 0; }
-    .dark .step-line { background-color: #334155; }
-</style>
+<div class="page-heading">
+    <h3>Input Delivery Baru</h3>
+</div>
 
-<div class="p-4 sm:p-6 lg:p-8 w-full max-w-5xl mx-auto min-h-screen bg-slate-50 dark:bg-[#1A222C] transition-colors duration-300">
-    
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 animate-fade-in-up">
-        <div>
-            <h1 class="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Delivery Request</h1>
-            <p class="text-slate-500 dark:text-slate-400 mt-1 font-medium">Alur pengajuan pengiriman SIM Card / Perangkat IoT.</p>
-        </div>
-        <a href="delivery_list.php" class="inline-flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95">
-            <i class="ph-bold ph-arrow-left text-lg"></i> Back to List
-        </a>
-    </div>
-
-    <form action="process_delivery.php" method="POST" enctype="multipart/form-data" class="space-y-8 animate-fade-in-up" style="animation-delay: 0.1s;">
-        <input type="hidden" name="action" value="create_logistic">
-
-        <div class="relative">
-            <div class="step-line hidden md:block"></div>
+<div class="page-content">
+    <form method="POST" class="card shadow-sm">
+        <div class="card-body">
             
-            <div class="flex flex-col md:flex-row gap-4 md:gap-6 relative z-10">
-                <div class="shrink-0 flex items-start">
-                    <div class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-lg shadow-indigo-600/30 border-4 border-slate-50 dark:border-[#1A222C]">1</div>
+            <h6 class="text-primary border-bottom pb-2 mb-3">Item & Project Information</h6>
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Date</label>
+                    <input type="date" name="delivery_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
                 </div>
                 
-                <div class="flex-1 bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/50 dark:bg-indigo-500/10 flex justify-between items-center">
-                        <div>
-                            <h3 class="font-black text-indigo-600 dark:text-indigo-400 text-sm uppercase tracking-widest flex items-center gap-2">
-                                <i class="ph-fill ph-hard-drives text-lg"></i> IT Department Section
-                            </h3>
-                            <p class="text-[10px] text-slate-500 font-bold mt-0.5">Submit Delivery Request Data</p>
-                        </div>
-                    </div>
-                    
-                    <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        
-                        <div class="lg:col-span-2">
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Client Name <span class="text-rose-500">*</span></label>
-                            <div class="relative">
-                                <i class="ph-fill ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                                <select name="client_id" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none appearance-none font-bold" required>
-                                    <option value="">- Select Client from Database -</option>
-                                    <option value="1">PT Linksfield Networks</option>
-                                    <option value="2">Client ABC</option>
-                                </select>
-                                <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-                            </div>
-                        </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Project</label>
+                    <select name="project_id" id="project_select" class="form-select mb-1" onchange="fillProject(this.value)">
+                        <option value="new">+ Create New Project</option>
+                        <?php while($p = $projects->fetch_assoc()): ?>
+                            <option value="<?= $p['id'] ?>" data-name="<?= $p['name'] ?>">
+                                <?= $p['name'] ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                    <input type="text" name="project_name" id="project_name" class="form-control" placeholder="Type Project Name" required>
+                </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Card Type / Item Name <span class="text-rose-500">*</span></label>
-                            <input type="text" name="item_name" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" placeholder="e.g. M2M SIM Card" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Card Qty <span class="text-rose-500">*</span></label>
-                            <input type="number" name="qty" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 dark:text-white font-bold outline-none transition-all" value="1" min="1" required>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Data Package</label>
-                            <input type="text" name="data_package" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all" placeholder="e.g. 100MB / 1GB">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Request Date <span class="text-rose-500">*</span></label>
-                            <input type="date" name="delivery_date" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 dark:text-white outline-none transition-all font-medium" value="<?= date('Y-m-d') ?>" required>
-                        </div>
-
-                        <div class="lg:col-span-2 pt-4 border-t border-slate-100 dark:border-slate-700">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Ref Invoice (File/No)</label>
-                                    <input type="text" name="invoice_ref" class="w-full px-4 py-2.5 mb-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" placeholder="Nomor Invoice...">
-                                    <input type="file" name="invoice_file" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">Ref PO (File/No)</label>
-                                    <input type="text" name="po_ref" class="w-full px-4 py-2.5 mb-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" placeholder="Nomor Purchase Order...">
-                                    <input type="file" name="po_file" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Item Name</label>
+                    <input type="text" name="item_name" class="form-control" placeholder="e.g. Modem, SIM Card" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold">Data Package</label>
+                    <input type="text" name="data_package" class="form-control" placeholder="Optional">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small fw-bold">Qty</label>
+                    <input type="number" name="qty" class="form-control" value="1" required>
                 </div>
             </div>
-        </div>
 
-        <div class="relative">
-            <div class="flex flex-col md:flex-row gap-4 md:gap-6 relative z-10">
-                <div class="shrink-0 flex items-start">
-                    <div class="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center font-black text-lg shadow-lg shadow-emerald-500/30 border-4 border-slate-50 dark:border-[#1A222C]">2</div>
+            <div class="row">
+                <div class="col-md-6 border-end">
+                    <h6 class="text-primary border-bottom pb-2 mb-3">Sender Information</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Select Sender</label>
+                        <select name="sender_id" id="sender_select" class="form-select" onchange="fillContact('sender', this.value)">
+                            <option value="new">+ Create New Sender</option>
+                            <?php while($s = $senders->fetch_assoc()): ?>
+                                <option value="<?= $s['id'] ?>" 
+                                    data-comp="<?= $s['company'] ?>" 
+                                    data-name="<?= $s['name'] ?>" 
+                                    data-phone="<?= $s['phone'] ?>" 
+                                    data-addr="<?= $s['address'] ?>">
+                                    <?= $s['name'] ?> (<?= $s['company'] ?>)
+                                </option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+                    <div class="mb-2"><input type="text" name="sender_company" id="s_comp" class="form-control form-control-sm" placeholder="Company"></div>
+                    <div class="mb-2"><input type="text" name="sender_name" id="s_name" class="form-control form-control-sm" placeholder="Name" required></div>
+                    <div class="mb-2"><input type="text" name="sender_phone" id="s_phone" class="form-control form-control-sm" placeholder="Phone"></div>
+                    <div class="mb-2"><textarea name="sender_address" id="s_addr" class="form-control form-control-sm" rows="2" placeholder="Address"></textarea></div>
                 </div>
-                
-                <div class="flex-1 bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-emerald-50/50 dark:bg-emerald-500/10 flex justify-between items-center">
-                        <div>
-                            <h3 class="font-black text-emerald-600 dark:text-emerald-400 text-sm uppercase tracking-widest flex items-center gap-2">
-                                <i class="ph-fill ph-truck text-lg"></i> HR / Logistics Section
-                            </h3>
-                            <p class="text-[10px] text-slate-500 font-bold mt-0.5">Continue Submit Process (Address & Tracking)</p>
-                        </div>
-                    </div>
-                    
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        
-                        <div class="md:col-span-2 space-y-4">
-                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-700 pb-2">Receiver Info</h4>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">PIC Name</label>
-                                    <input type="text" name="receiver_name" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none focus:border-emerald-500 transition-all" placeholder="Person in Charge">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Phone Number</label>
-                                    <input type="text" name="receiver_phone" class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none focus:border-emerald-500 transition-all" placeholder="+62 812...">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Full Receiver Address</label>
-                                <textarea name="receiver_address" rows="2" class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm dark:text-white outline-none focus:border-emerald-500 transition-all resize-none" placeholder="Detailed address for delivery..."></textarea>
-                            </div>
-                        </div>
 
-                        <div class="md:col-span-2 pt-2 border-t border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Delivery Method (Courier)</label>
-                                <div class="relative">
-                                    <i class="ph-fill ph-moped absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                                    <select name="courier_name" class="w-full pl-11 pr-10 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 dark:text-white outline-none transition-all appearance-none cursor-pointer">
-                                        <option value="">- Select Courier -</option>
-                                        <option value="JNE">JNE</option>
-                                        <option value="J&T">J&T Express</option>
-                                        <option value="SICEPAT">SiCepat</option>
-                                        <option value="GOJEK">GoSend / Grab</option>
-                                    </select>
-                                    <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tracking Number (Resi)</label>
-                                <div class="relative">
-                                    <i class="ph-fill ph-barcode absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                                    <input type="text" name="tracking_number" class="w-full pl-11 pr-4 py-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-500/30 rounded-xl focus:ring-2 focus:ring-amber-500 dark:text-white font-mono font-bold uppercase outline-none transition-all" placeholder="Leave empty if not shipped yet">
-                                </div>
-                            </div>
-                        </div>
-
+                <div class="col-md-6">
+                    <h6 class="text-primary border-bottom pb-2 mb-3">Receiver Information</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Select Receiver</label>
+                        <select name="receiver_id" id="receiver_select" class="form-select" onchange="fillContact('receiver', this.value)">
+                            <option value="new">+ Create New Receiver</option>
+                            <?php while($r = $receivers->fetch_assoc()): ?>
+                                <option value="<?= $r['id'] ?>" 
+                                    data-comp="<?= $r['company'] ?>" 
+                                    data-name="<?= $r['name'] ?>" 
+                                    data-phone="<?= $r['phone'] ?>" 
+                                    data-addr="<?= $r['address'] ?>">
+                                    <?= $r['name'] ?> (<?= $r['company'] ?>)
+                                </option>
+                            <?php endwhile; ?>
+                        </select>
                     </div>
+                    <div class="mb-2"><input type="text" name="receiver_company" id="r_comp" class="form-control form-control-sm" placeholder="Company"></div>
+                    <div class="mb-2"><input type="text" name="receiver_name" id="r_name" class="form-control form-control-sm" placeholder="Name" required></div>
+                    <div class="mb-2"><input type="text" name="receiver_phone" id="r_phone" class="form-control form-control-sm" placeholder="Phone"></div>
+                    <div class="mb-2"><textarea name="receiver_address" id="r_addr" class="form-control form-control-sm" rows="2" placeholder="Address"></textarea></div>
                 </div>
             </div>
-        </div>
 
-        <div class="flex justify-end gap-3 pt-6 pb-10">
-            <a href="delivery_list.php" class="px-6 py-3.5 rounded-xl font-bold text-slate-600 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors">
-                Cancel
-            </a>
-            <button type="submit" class="px-8 py-3.5 rounded-xl font-bold text-white bg-slate-800 hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 shadow-lg transition-all flex items-center gap-2 active:scale-95">
-                <i class="ph-bold ph-paper-plane-tilt text-lg"></i> Submit & Process Delivery
-            </button>
-        </div>
+            <h6 class="text-primary border-bottom pb-2 mb-3 mt-4">Delivery Information</h6>
+            <div class="row">
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Courier Name</label>
+                    <select name="courier_name" class="form-select" required>
+                        <option value="jne">JNE</option>
+                        <option value="jnt">J&T</option>
+                        <option value="sicepat">SiCepat</option>
+                        <option value="pos">POS Indonesia</option>
+                        <option value="tiki">TIKI</option>
+                        <option value="anteraja">AnterAja</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Tracking Number</label>
+                    <input type="text" name="tracking_number" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Price (Rp)</label>
+                    <input type="number" name="delivery_price" class="form-control" placeholder="0">
+                </div>
+            </div>
 
+            <div class="mt-4 text-end">
+                <a href="delivery_list.php" class="btn btn-light me-2">Cancel</a>
+                <button type="submit" name="save_delivery" class="btn btn-primary px-4"><i class="bi bi-save me-2"></i> Simpan Data</button>
+            </div>
+        </div>
     </form>
 </div>
+
+<script>
+// Logic Sender & Receiver
+function fillContact(type, id) {
+    const prefix = (type === 'sender') ? 's' : 'r';
+    const select = document.getElementById(type + '_select');
+    
+    if (id === 'new') {
+        document.getElementById(prefix + '_comp').value = '';
+        document.getElementById(prefix + '_name').value = '';
+        document.getElementById(prefix + '_phone').value = '';
+        document.getElementById(prefix + '_addr').value = '';
+    } else {
+        const option = select.options[select.selectedIndex];
+        document.getElementById(prefix + '_comp').value = option.getAttribute('data-comp');
+        document.getElementById(prefix + '_name').value = option.getAttribute('data-name');
+        document.getElementById(prefix + '_phone').value = option.getAttribute('data-phone');
+        document.getElementById(prefix + '_addr').value = option.getAttribute('data-addr');
+    }
+}
+
+// Logic Project (BARU)
+function fillProject(id) {
+    const input = document.getElementById('project_name');
+    if (id === 'new') {
+        input.value = '';
+        input.focus();
+    } else {
+        const select = document.getElementById('project_select');
+        const name = select.options[select.selectedIndex].getAttribute('data-name');
+        input.value = name;
+    }
+}
+</script>
 
 <?php include 'includes/footer.php'; ?>

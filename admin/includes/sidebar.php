@@ -51,7 +51,7 @@ if (!function_exists('isChildActive')) {
                 'internal_view.php' => 'internal_tickets.php',
                 'tsel_upload.php' => 'tsel_inject.php',
                 'tsel_history.php' => 'tsel_inject.php',
-                'tsel_dashboard.php' => 'tsel_dashboard.php', 
+                'tsel_dashboard.php' => 'tsel_dashboard.php', // [NEW MAPPING]
                 'leave_form.php' => 'leave_list.php',
                 'delivery_form.php' => 'delivery_list.php' 
             ];
@@ -76,6 +76,8 @@ if ($role_name === 'admin') {
     $sidebar_menu['sales'] = ['menu_label' => 'Sales', 'url' => '#', 'icon' => 'bi bi-hand-thumbs-up-fill', 'children' => [['menu_label' => 'Dashboard Clients', 'url' => 'dashboard_clients.php'], ['menu_label' => 'Client List', 'url' => 'clients.php']]];
     $sidebar_menu['finance'] = ['menu_label' => 'Finance', 'url' => '#', 'icon' => 'bi bi-currency-dollar', 'children' => [['menu_label' => 'Vendor List', 'url' => 'vendor_list.php'], ['menu_label' => 'Purchase Orders', 'url' => 'po_list.php'], ['menu_label' => 'Quotations', 'url' => 'quotation_list.php'], ['menu_label' => 'PO From Client', 'url' => 'po_client_list.php'], ['menu_label' => 'Invoices', 'url' => 'invoice_list.php'], ['menu_label' => 'Payments', 'url' => 'payment_list.php'], ['menu_label' => 'Delivery Orders', 'url' => 'delivery_order_list.php']]];
     $sidebar_menu['admin'] = ['menu_label' => 'Administration', 'url' => '#', 'icon' => 'bi bi-gear-fill', 'children' => [['menu_label' => 'Manage Users', 'url' => 'manage_users.php'], ['menu_label' => 'Manage Divisions', 'url' => 'manage_divisions.php'], ['menu_label' => 'Manage Permissions', 'url' => 'manage_roles.php'], ['menu_label' => 'Settings', 'url' => 'settings.php']]];
+    
+    // [FIXED ARRAY SYNTAX DISINI]
     $sidebar_menu['ops'] = [
         'menu_label' => 'Telkomsel Ops', 
         'url' => '#', 
@@ -87,6 +89,7 @@ if ($role_name === 'admin') {
         ]
     ];
 } 
+
 // =========================================================================
 // LOGIKA 2: USER STANDARD (LOAD DARI DATABASE)
 // =========================================================================
@@ -148,67 +151,49 @@ else {
         $debug_msg = "Koneksi Database bermasalah.";
     }
 }
-
-// Variables untuk Styling Tailwind
-$active_link_style = "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shadow-sm font-bold";
-$inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-indigo-600 dark:hover:text-white font-medium";
 ?>
 
-<aside id="app-sidebar" class="group fixed left-0 top-0 z-[100] flex h-screen w-[280px] [&.is-collapsed]:w-[88px] flex-col overflow-y-hidden !bg-white dark:!bg-[#1A222C] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 -translate-x-full border-r border-slate-200 dark:border-slate-800 shrink-0 shadow-2xl lg:shadow-none font-sans">
-    
-    <div class="flex items-center justify-between lg:justify-start gap-3 px-6 group-[.is-collapsed]:px-0 group-[.is-collapsed]:justify-center pt-8 pb-6 lg:pt-10 lg:pb-8 transition-all duration-300 shrink-0">
-        <a href="dashboard.php" class="flex items-center gap-3 overflow-hidden">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-transform hover:scale-105">
-                <i class="ph-bold ph-headset text-2xl"></i>
+<div id="sidebar" class="active">
+    <div class="sidebar-wrapper active d-flex flex-column" style="height: 100vh;">
+        <div class="sidebar-header position-relative">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="logo">
+                    <a href="dashboard.php"><h4 class="m-0">Helpdesk</h4></a>
+                </div>
+                <div class="sidebar-toggler x">
+                    <a href="#" class="sidebar-hide d-xl-none d-block"><i class="bi bi-x bi-middle"></i></a>
+                </div>
             </div>
-            <span class="text-xl font-black text-slate-800 dark:text-white tracking-tight group-[.is-collapsed]:opacity-0 group-[.is-collapsed]:hidden whitespace-nowrap transition-all duration-300">
-                Helpdesk
-            </span>
-        </a>
+        </div>
         
-        <button id="closeSidebarMobile" class="block lg:hidden text-slate-400 hover:text-red-500 transition-colors ml-auto p-1">
-            <i class="ph-bold ph-x text-2xl"></i>
-        </button>
-    </div>
+        <div class="sidebar-menu flex-grow-1">
+            <ul class="menu">
+                <li class="sidebar-title">Menu Utama</li>
 
-    <div class="flex flex-col overflow-y-auto no-scrollbar flex-1 py-4 group-[.is-collapsed]:items-center transition-all">
-        <nav class="mt-2 w-full px-4 lg:px-6 group-[.is-collapsed]:px-3">
-            <h3 class="mb-3 ml-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest group-[.is-collapsed]:hidden">Menu Utama</h3>
-            
-            <div class="hidden group-[.is-collapsed]:flex justify-center mb-4">
-                 <i class="ph-fill ph-dots-three-outline text-xl text-slate-300 dark:text-slate-600"></i>
-            </div>
-            
-            <ul class="flex flex-col gap-2">
                 <?php if (!empty($sidebar_menu)): ?>
                     <?php foreach ($sidebar_menu as $key => $menu): ?>
                         
                         <?php if (empty($menu['children'])): ?>
-                            <?php $isActive = ($current_page == $menu['url'] || (isset($mappings[$current_page]) && $mappings[$current_page] == $menu['url'])); ?>
-                            <li>
-                                <a href="<?= htmlspecialchars($menu['url']) ?>" class="relative flex items-center w-full group-[.is-collapsed]:w-12 group-[.is-collapsed]:h-12 gap-3 rounded-xl px-4 py-3 group-[.is-collapsed]:px-0 group-[.is-collapsed]:py-0 transition-all group-[.is-collapsed]:justify-center mx-auto <?= $isActive ? $active_link_style : $inactive_link_style ?>" title="<?= htmlspecialchars($menu['menu_label']) ?>">
-                                    <i class="<?= htmlspecialchars($menu['icon']) ?> text-xl shrink-0"></i>
-                                    <span class="group-[.is-collapsed]:hidden whitespace-nowrap"><?= htmlspecialchars($menu['menu_label']) ?></span>
+                            <li class="sidebar-item <?= ($current_page == $menu['url'] || (isset($mappings[$current_page]) && $mappings[$current_page] == $menu['url'])) ? 'active' : '' ?>">
+                                <a href="<?= htmlspecialchars($menu['url']) ?>" class='sidebar-link'>
+                                    <i class="<?= htmlspecialchars($menu['icon']) ?>"></i>
+                                    <span><?= htmlspecialchars($menu['menu_label']) ?></span>
                                 </a>
                             </li>
                         
                         <?php else: ?>
                             <?php $isActive = isChildActive($menu['children'], $current_page); ?>
-                            <li>
-                                <div class="submenu-toggle relative flex items-center justify-between w-full rounded-xl px-4 py-3 cursor-pointer transition-all <?= $isActive ? $active_link_style : $inactive_link_style ?>" title="<?= htmlspecialchars($menu['menu_label']) ?>">
-                                    <div class="flex items-center gap-3">
-                                        <i class="<?= htmlspecialchars($menu['icon']) ?> text-xl shrink-0"></i>
-                                        <span class="group-[.is-collapsed]:hidden whitespace-nowrap"><?= htmlspecialchars($menu['menu_label']) ?></span>
-                                    </div>
-                                    <i class="ph-bold ph-caret-down text-sm group-[.is-collapsed]:hidden transition-transform duration-200 <?= $isActive ? 'rotate-180' : '' ?>"></i>
-                                </div>
-                                
-                                <ul class="submenu flex flex-col gap-1 mt-1 group-[.is-collapsed]:hidden overflow-hidden transition-all duration-300 <?= $isActive ? 'max-h-[500px]' : 'max-h-0' ?>">
+                            <li class="sidebar-item has-sub <?= $isActive ? 'active' : '' ?>">
+                                <a href="#" class='sidebar-link'>
+                                    <i class="<?= htmlspecialchars($menu['icon']) ?>"></i>
+                                    <span><?= htmlspecialchars($menu['menu_label']) ?></span>
+                                </a>
+                                <ul class="submenu <?= $isActive ? 'active' : '' ?>">
                                     <?php foreach ($menu['children'] as $child): 
                                         $isChildActive = isChildActive([$child], $current_page);
                                     ?>
-                                        <li>
-                                            <a href="<?= htmlspecialchars($child['url']) ?>" class="block py-2 pl-11 pr-4 text-sm rounded-lg transition-colors <?= $isChildActive ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50/50 dark:bg-indigo-500/10' : 'text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50' ?>">
+                                        <li class="submenu-item <?= $isChildActive ? 'active' : '' ?>">
+                                            <a href="<?= htmlspecialchars($child['url']) ?>">
                                                 <?= htmlspecialchars($child['menu_label']) ?>
                                             </a>
                                         </li>
@@ -219,192 +204,116 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
 
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <li class="p-4 bg-red-50 dark:bg-red-500/10 rounded-xl text-red-500">
-                        <i class="ph-bold ph-warning-circle text-2xl mb-2 block"></i>
-                        <span class="font-bold text-sm block">Akses Ditolak</span>
-                        <span class="text-xs text-red-400 mt-1 block">
-                            Role: <?= htmlspecialchars($role_name) ?><br>
-                            Div ID: <?= htmlspecialchars($user_division_id) ?><br>
-                            <?= !empty($debug_msg) ? "Msg: $debug_msg" : "" ?>
-                        </span>
+                    <li class="sidebar-item text-danger">
+                        <div class="p-3">
+                            <i class="bi bi-exclamation-triangle fs-4 mb-2 d-block"></i>
+                            <span class="fw-bold">Akses Ditolak</span><br>
+                            <small>
+                                Role: <?= htmlspecialchars($role_name) ?><br>
+                                Div ID: <?= htmlspecialchars($user_division_id) ?><br>
+                                <?= !empty($debug_msg) ? "Msg: $debug_msg" : "" ?>
+                            </small>
+                        </div>
                     </li>
                 <?php endif; ?>
             </ul>
-        </nav>
-    </div>
-</aside>
+        </div>
 
-
-<div id="main" class="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
-    
-    <header class="sticky top-0 z-40 flex w-full bg-white/80 backdrop-blur-md dark:bg-[#1A222C]/80 shadow-sm transition-all duration-300 border-b border-slate-100 dark:border-slate-800">
-        <div class="flex flex-grow items-center justify-between px-4 py-4 md:px-6 2xl:px-11 h-20">
-            
-            <div class="flex items-center gap-4 sm:gap-6">
-                <button id="sidebarToggle" class="z-50 block rounded-lg p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer transition-colors">
-                     <i class="ph ph-list text-2xl"></i>
-                </button>
-            </div>
-
-            <div class="flex items-center gap-3 2xsm:gap-6">
-                <ul class="flex items-center gap-2">
-                    <li>
-                        <button id="darkModeToggle" class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
-                            <i class="ph ph-moon text-xl dark:hidden"></i>
-                            <i class="ph ph-sun text-xl hidden dark:block"></i>
-                        </button>
-                    </li>
-                </ul>
-
-                <div class="relative">
-                    <div id="profileBtn" class="flex items-center gap-3 cursor-pointer pl-4 border-l border-slate-100 dark:border-slate-700 transition-colors">
-                        <span class="hidden text-right lg:block">
-                            <span class="block text-sm font-bold text-slate-800 dark:text-white"><?= htmlspecialchars($username) ?></span>
-                            <span class="block text-xs font-medium text-slate-400"><?= ucfirst(htmlspecialchars($role_name)) ?></span>
-                        </span>
-                        <div class="h-11 w-11 rounded-full overflow-hidden border-2 border-white dark:border-slate-700 ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm transition-all flex items-center justify-center bg-indigo-600 text-white font-bold text-lg">
-                            <?= strtoupper(substr($username, 0, 1)) ?>
-                        </div>
-                        <i class="ph ph-caret-down text-slate-400 text-sm hidden lg:block"></i>
-                    </div>
-
-                    <div id="profileDropdown" class="hidden absolute right-0 mt-4 flex w-64 flex-col rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-[#24303F] shadow-lg z-50 overflow-hidden transition-all origin-top-right">
-                        <div class="px-6 py-5">
-                            <p class="text-sm font-bold text-slate-800 dark:text-white">Hello, <?= htmlspecialchars($username) ?>!</p>
-                        </div>
-
-                        <ul class="flex flex-col gap-1 px-4">
-                            <li>
-                                <a href="../admin/profile.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2.5 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-white transition-colors">
-                                    <i class="ph ph-user text-xl"></i> My Profile
-                                </a>
-                            </li>
-                        </ul>
-
-                        <div class="px-4 my-2"><div class="border-t border-slate-100 dark:border-slate-700"></div></div>
-
-                        <div class="px-4 pb-4">
-                             <a href="../logout.php" class="flex items-center gap-3.5 rounded-lg px-2 py-2 text-sm font-bold text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-colors">
-                                <i class="ph ph-sign-out text-xl"></i> Logout
-                            </a>
-                        </div>
-                    </div>
-                </div>
+        <div class="sidebar-footer p-3 border-top">
+            <div class="theme-toggle d-flex align-items-center justify-content-between p-2 bg-light rounded cursor-pointer" onclick="toggleTheme()" title="Ganti Tema" style="cursor: pointer;">
+                <span class="small fw-bold text-muted">Mode Tampilan</span>
+                <i class="bi bi-sun-fill fs-5 text-warning" id="theme-icon"></i>
             </div>
         </div>
+    </div>
+</div>
+<div id="main">
+    <header class="mb-3">
+        <nav class="navbar navbar-expand navbar-light navbar-top">
+            <div class="container-fluid d-flex justify-content-between align-items-center px-0">
+                
+                <a href="#" class="burger-btn d-block p-2">
+                    <i class="bi bi-justify fs-3"></i>
+                </a>
+
+                <div class="dropdown">
+                    <a href="#" data-bs-toggle="dropdown" aria-expanded="false" class="d-block text-decoration-none">
+                        <div class="user-menu d-flex align-items-center">
+                            <div class="user-name text-end me-3">
+                                <h6 class="mb-0 text-gray-600"><?= htmlspecialchars($username) ?></h6>
+                                <p class="mb-0 text-sm text-gray-600">
+                                    <?= ucfirst($role_name) ?> 
+                                </p>
+                            </div>
+                            <div class="user-img d-flex align-items-center">
+                                <div class="avatar avatar-md bg-primary">
+                                    <span class="avatar-content text-white"><?= strtoupper(substr($username, 0, 1)) ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="dropdownMenuButton" style="min-width: 12rem;">
+                        <li><h6 class="dropdown-header text-muted">Hello, <?= htmlspecialchars($username) ?>!</h6></li>
+                        <li><a class="dropdown-item" href="../admin/profile.php"><i class="icon-mid bi bi-person me-2"></i> My Profile</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="../logout.php"><i class="icon-mid bi bi-box-arrow-left me-2"></i> Logout</a></li>
+                    </ul>
+                </div>
+
+            </div>
+        </nav>
     </header>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // PERHATIKAN: ID sekarang merujuk ke 'app-sidebar'
-        const sidebar = document.getElementById('app-sidebar'); 
-        const mobileCloseBtn = document.getElementById('closeSidebarMobile');
-        const profileBtn = document.getElementById('profileBtn');
-        const profileDropdown = document.getElementById('profileDropdown');
-        const darkModeToggle = document.getElementById('darkModeToggle');
+    // 1. Cek Tema saat Load
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedTheme = localStorage.getItem('theme');
+        const themeIcon = document.getElementById('theme-icon');
         
-        const html = document.documentElement;
-        const body = document.body;
-
-        // Fungsi Sinkronisasi Tema
-        function applyTheme(theme) {
-            if (theme === 'dark') {
-                html.classList.add('dark');
-                html.setAttribute('data-bs-theme', 'dark');
-                body.classList.add('theme-dark');
-                localStorage.setItem('theme', 'dark');
-                if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph-bold ph-sun text-xl"></i>';
-                }
-            } else {
-                html.classList.remove('dark');
-                html.setAttribute('data-bs-theme', 'light');
-                body.classList.remove('theme-dark');
-                localStorage.setItem('theme', 'light');
-                if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph-bold ph-moon text-xl"></i>';
-                }
+        // Cek apakah user punya preferensi tersimpan
+        if (savedTheme === 'dark') {
+            document.body.classList.add('theme-dark');
+            document.documentElement.setAttribute('data-bs-theme', 'dark'); 
+            if(themeIcon) {
+                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
+                themeIcon.classList.add('bi-moon-fill', 'text-white');
+            }
+        } else {
+            // Default Light
+            if(themeIcon) {
+                themeIcon.classList.add('bi-sun-fill', 'text-warning');
+                themeIcon.classList.remove('bi-moon-fill', 'text-white');
             }
         }
-
-        // Terapkan saat pertama kali dimuat
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        applyTheme(savedTheme);
-
-        // Toggle Switch
-        if (darkModeToggle) {
-            darkModeToggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                const currentTheme = localStorage.getItem('theme');
-                applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
-            });
-        }
-
-        // Mobile Sidebar Close
-        if (mobileCloseBtn && sidebar) {
-            mobileCloseBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                sidebar.classList.add('-translate-x-full');
-            });
-        }
-
-        // Dropdown & Burger Menu
-        document.addEventListener('click', function(e) {
-            const burgerBtn = e.target.closest('#sidebarToggle, .burger-btn');
-            if (burgerBtn && sidebar) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (window.innerWidth < 1024) {
-                    sidebar.classList.toggle('-translate-x-full');
-                } else {
-                    sidebar.classList.toggle('is-collapsed');
-                }
-            } else if (sidebar) {
-                if (window.innerWidth < 1024 && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
-                    sidebar.classList.add('-translate-x-full');
-                }
-            }
-
-            if (profileBtn && profileBtn.contains(e.target)) {
-                profileDropdown.classList.toggle('hidden');
-            } else if (profileDropdown && !profileDropdown.contains(e.target)) {
-                profileDropdown.classList.add('hidden');
-            }
-        });
-
-        // Submenu Accordion
-        const submenuToggles = document.querySelectorAll('.submenu-toggle');
-        submenuToggles.forEach(toggle => {
-            toggle.addEventListener('click', function() {
-                const submenu = this.nextElementSibling;
-                const icon = this.querySelector('.ph-caret-down');
-                
-                if(submenu.classList.contains('max-h-0')) {
-                    submenu.classList.remove('max-h-0');
-                    submenu.classList.add('max-h-[500px]');
-                    if(icon) icon.classList.add('rotate-180');
-                } else {
-                    submenu.classList.add('max-h-0');
-                    submenu.classList.remove('max-h-[500px]');
-                    if(icon) icon.classList.remove('rotate-180');
-                }
-            });
-        });
-
-        // Resize Layar
-        window.addEventListener('resize', function() {
-            if (sidebar) {
-                if (window.innerWidth >= 1024) {
-                    sidebar.classList.remove('-translate-x-full');
-                } else {
-                    sidebar.classList.remove('is-collapsed');
-                    if(!sidebar.classList.contains('-translate-x-full')) {
-                         sidebar.classList.add('-translate-x-full');
-                    }
-                }
-            }
-        });
     });
-</script>
 
-    <main class="p-4 md:p-6 2xl:p-10">
+    // 2. Fungsi Ganti Tema
+    function toggleTheme() {
+        const html = document.documentElement;
+        const themeIcon = document.getElementById('theme-icon');
+        
+        if (html.getAttribute('data-bs-theme') === 'dark') {
+            // Ubah ke Light
+            html.setAttribute('data-bs-theme', 'light');
+            document.body.classList.remove('theme-dark');
+            localStorage.setItem('theme', 'light');
+            
+            // Icon Matahari
+            if(themeIcon) {
+                themeIcon.classList.remove('bi-moon-fill', 'text-white');
+                themeIcon.classList.add('bi-sun-fill', 'text-warning');
+            }
+        } else {
+            // Ubah ke Dark
+            html.setAttribute('data-bs-theme', 'dark');
+            document.body.classList.add('theme-dark');
+            localStorage.setItem('theme', 'dark');
+            
+            // Icon Bulan
+            if(themeIcon) {
+                themeIcon.classList.remove('bi-sun-fill', 'text-warning');
+                themeIcon.classList.add('bi-moon-fill', 'text-white');
+            }
+        }
+    }
+</script>

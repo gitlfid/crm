@@ -2,7 +2,7 @@
 $page_title = "Purchase Orders";
 include 'includes/header.php';
 include 'includes/sidebar.php';
-// include '../config/functions.php'; // Aktifkan jika diperlukan
+include '../config/functions.php';
 
 // --- LOGIKA FILTER DAN PENCARIAN ---
 $search = $_GET['search'] ?? '';
@@ -29,29 +29,7 @@ if ($vendor_filter !== 'all' && is_numeric($vendor_filter)) {
 
 $where_sql = count($where_clauses) > 0 ? " WHERE " . implode(" AND ", $where_clauses) : "";
 
-// --- QUERY STATISTIK DINAMIS ---
-$sql_stats = "SELECT po.status, COUNT(*) as count, SUM(po.total_amount) as total_val 
-              FROM purchase_orders po 
-              LEFT JOIN vendors v ON po.vendor_id = v.id 
-              $where_sql GROUP BY po.status";
-$res_stats = $conn->query($sql_stats);
-
-$stats = [
-    'total_count' => 0, 'total_val' => 0, 
-    'Draft' => 0, 'Submitted' => 0, 'Approved' => 0, 'Rejected' => 0
-];
-
-if ($res_stats) {
-    while($s = $res_stats->fetch_assoc()) {
-        $stats['total_count'] += $s['count'];
-        $stats['total_val'] += $s['total_val'];
-        if (isset($stats[$s['status']])) {
-            $stats[$s['status']] += $s['count'];
-        }
-    }
-}
-
-// --- QUERY UTAMA ---
+// Logic untuk mengambil data PO
 $sql = "SELECT po.*, v.company_name as vendor_name, u.username as created_by 
         FROM purchase_orders po
         LEFT JOIN vendors v ON po.vendor_id = v.id
@@ -59,403 +37,118 @@ $sql = "SELECT po.*, v.company_name as vendor_name, u.username as created_by
         " . $where_sql . "
         ORDER BY po.created_at DESC";
 $pos = $conn->query($sql);
-
-// --- Helper Mapping Status (Tailwind Colors) ---
-$status_styles = [
-    'Draft'     => 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300',
-    'Submitted' => 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-400',
-    'Approved'  => 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400',
-    'Rejected'  => 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400'
-];
-$status_icons = [
-    'Draft'     => 'ph-file-dashed',
-    'Submitted' => 'ph-paper-plane-tilt animate-pulse',
-    'Approved'  => 'ph-check-circle',
-    'Rejected'  => 'ph-x-circle'
-];
 ?>
 
-<style>
-    .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(15px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .modern-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
-    .modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .modern-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    .dark .modern-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
-</style>
-
-<div class="p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto space-y-6 animate-fade-in-up">
-    
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-2">
-        <div>
-            <h1 class="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
-                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/30">
-                    <i class="ph-fill ph-shopping-cart"></i>
-                </div>
-                Purchase Orders
-            </h1>
-            <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Kelola seluruh dokumen pemesanan pembelian (PO) dan pantau status persetujuan.</p>
+<div class="page-heading">
+    <div class="row align-items-center">
+        <div class="col-12 col-md-6">
+            <h3>Purchase Orders</h3>
+            <p class="text-subtitle text-muted">Daftar semua Purchase Order yang dibuat.</p>
         </div>
-        <div class="flex items-center gap-3">
-            <button onclick="window.location.href='po_list.php'" class="group inline-flex items-center justify-center w-12 h-12 bg-white dark:bg-[#24303F] border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-2xl shadow-sm transition-all active:scale-95" title="Refresh / Reset">
-                <i class="ph-bold ph-arrows-clockwise text-xl group-hover:rotate-180 transition-transform duration-500"></i>
-            </button>
-            <a href="po_form.php" class="group inline-flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-3 px-6 rounded-2xl shadow-lg shadow-emerald-500/30 transition-all transform hover:-translate-y-1 active:scale-95 whitespace-nowrap overflow-hidden relative">
-                <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
-                <i class="ph-bold ph-plus text-xl relative z-10"></i> 
-                <span class="relative z-10">Create New PO</span>
+        <div class="col-12 col-md-6 text-end">
+            <a href="po_form.php" class="btn btn-primary shadow-sm">
+                <i class="bi bi-file-earmark-plus me-2"></i> Create New PO
             </a>
         </div>
     </div>
+</div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-files"></i></div>
-            <div class="overflow-hidden">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total PO</p>
-                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none mb-1"><?= number_format($stats['total_count']) ?></h4>
-                <p class="text-[10px] font-bold text-indigo-500 truncate" title="Rp <?= number_format($stats['total_val'], 0, ',', '.') ?>">Rp <?= number_format($stats['total_val'], 0, ',', '.') ?></p>
-            </div>
-        </div>
-        
-        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-check-circle"></i></div>
-            <div>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Approved</p>
-                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['Approved']) ?></h4>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-paper-plane-tilt"></i></div>
-            <div>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Submitted</p>
-                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['Submitted']) ?></h4>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-[#24303F] rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-4 transition-transform hover:-translate-y-1 group">
-            <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400 flex items-center justify-center text-3xl shrink-0 group-hover:scale-110 transition-transform"><i class="ph-fill ph-file-dashed"></i></div>
-            <div>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Draft</p>
-                <h4 class="text-2xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($stats['Draft']) ?></h4>
-            </div>
-        </div>
-    </div>
-
-    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 transition-colors duration-300">
-        <div class="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-t-3xl transition-colors" id="filterToggleBtn">
-            <h3 class="font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-2">
-                <i class="ph-bold ph-funnel text-emerald-500 text-lg"></i> Filter Data PO
-            </h3>
-            <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 transition-transform">
-                <i id="filterIcon" class="ph-bold ph-caret-up transition-transform duration-300"></i>
-            </div>
-        </div>
-        
-        <div id="filterBody" class="p-6 block transition-all duration-300">
-            <form method="GET" action="po_list.php">
-                <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-5 items-end">
-                    
-                    <div class="lg:col-span-4">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Kata Kunci</label>
-                        <div class="relative group">
-                            <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-emerald-500 transition-colors"></i>
-                            <input type="text" name="search" class="w-full pl-11 pr-4 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 dark:text-white outline-none transition-all placeholder-slate-400 shadow-inner" placeholder="Nomor PO / Nama Vendor..." value="<?= htmlspecialchars($search) ?>">
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Pilih Vendor</label>
-                        <div class="relative group">
-                            <i class="ph-bold ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-emerald-500 transition-colors"></i>
-                            <select name="vendor_id" class="w-full pl-11 pr-10 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
-                                <option value="all">Semua Vendor</option>
-                                <?php if($vendors_res->num_rows > 0) { $vendors_res->data_seek(0); while($vendor = $vendors_res->fetch_assoc()): ?>
-                                    <option value="<?= $vendor['id'] ?>" <?= $vendor_filter == $vendor['id'] ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($vendor['company_name']) ?>
-                                    </option>
-                                <?php endwhile; } ?>
-                            </select>
-                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-3">
-                        <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">Status PO</label>
-                        <div class="relative group">
-                            <i class="ph-bold ph-list-checks absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg group-focus-within:text-emerald-500 transition-colors"></i>
-                            <select name="status" class="w-full pl-11 pr-10 h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 dark:text-white appearance-none outline-none transition-all cursor-pointer shadow-inner">
-                                <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>Semua Status</option>
-                                <option value="Draft" <?= $status_filter == 'Draft' ? 'selected' : '' ?>>Draft</option>
-                                <option value="Submitted" <?= $status_filter == 'Submitted' ? 'selected' : '' ?>>Submitted</option>
-                                <option value="Approved" <?= $status_filter == 'Approved' ? 'selected' : '' ?>>Approved</option>
-                                <option value="Rejected" <?= $status_filter == 'Rejected' ? 'selected' : '' ?>>Rejected</option>
-                            </select>
-                            <i class="ph-bold ph-caret-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-2 flex gap-3 h-[42px] shrink-0 w-full">
-                        <button type="submit" class="flex-1 bg-slate-800 hover:bg-slate-900 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-md shadow-slate-200 dark:shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-2">
-                            <i class="ph-bold ph-funnel"></i> Filter
-                        </button>
-                        <?php if(!empty($search) || $status_filter !== 'all' || $vendor_filter !== 'all'): ?>
-                            <a href="po_list.php" class="flex-none w-[42px] bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold rounded-xl transition-all border border-rose-100 dark:border-rose-500/20 active:scale-95 flex items-center justify-center" title="Reset Filters">
-                                <i class="ph-bold ph-arrows-counter-clockwise text-lg"></i>
-                            </a>
-                        <?php endif; ?>
-                    </div>
-
+<div class="page-content">
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" action="po_list.php" class="row g-3 align-items-end">
+                <div class="col-md-4 col-lg-3">
+                    <label for="search" class="form-label">Search PO/Vendor</label>
+                    <input type="text" class="form-control" id="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="PO Number / Vendor Name...">
+                </div>
+                <div class="col-md-3 col-lg-2">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="all" <?= $status_filter == 'all' ? 'selected' : '' ?>>Semua Status</option>
+                        <option value="Draft" <?= $status_filter == 'Draft' ? 'selected' : '' ?>>Draft</option>
+                        <option value="Submitted" <?= $status_filter == 'Submitted' ? 'selected' : '' ?>>Submitted</option>
+                        <option value="Approved" <?= $status_filter == 'Approved' ? 'selected' : '' ?>>Approved</option>
+                        <option value="Rejected" <?= $status_filter == 'Rejected' ? 'selected' : '' ?>>Rejected</option>
+                    </select>
+                </div>
+                <div class="col-md-3 col-lg-3">
+                    <label for="vendor_id" class="form-label">Vendor</label>
+                    <select class="form-select" id="vendor_id" name="vendor_id">
+                        <option value="all" <?= $vendor_filter == 'all' ? 'selected' : '' ?>>Semua Vendor</option>
+                        <?php while($vendor = $vendors_res->fetch_assoc()): ?>
+                            <option value="<?= $vendor['id'] ?>" <?= $vendor_filter == $vendor['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($vendor['company_name']) ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div class="col-md-2 col-lg-4">
+                    <button type="submit" class="btn btn-info w-100"><i class="bi bi-funnel me-2"></i>Filter</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors duration-300 flex flex-col min-h-[500px] relative">
-        
-        <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Tampilkan</span>
-                <select id="pageSize" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-emerald-500/50 outline-none cursor-pointer">
-                    <option value="10">10 Baris</option>
-                    <option value="50">50 Baris</option>
-                    <option value="100">100 Baris</option>
-                </select>
-                <span class="text-xs font-bold text-slate-500 dark:text-slate-400">Data</span>
-            </div>
-            <div class="text-xs font-bold text-slate-500 dark:text-slate-400" id="paginationInfo">
-                Menampilkan 0 dari 0 data
-            </div>
-        </div>
-
-        <div class="overflow-x-auto modern-scrollbar flex-grow pb-24">
-            <table class="w-full text-left border-collapse table-fixed min-w-[1050px]">
-                <thead class="bg-slate-50/80 dark:bg-slate-800/50">
-                    <tr>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-xs font-black text-slate-400 uppercase tracking-wider w-[20%]">PO Details</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-xs font-black text-slate-400 uppercase tracking-wider w-[30%]">Vendor Information</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-right text-xs font-black text-slate-400 uppercase tracking-wider w-[15%]">Total Amount</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-xs font-black text-slate-400 uppercase tracking-wider w-[15%]">Status</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-xs font-black text-slate-400 uppercase tracking-wider w-[15%]">Created By</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-xs font-black text-slate-400 uppercase tracking-wider w-[10%]">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/50">
-                    <?php if ($pos && $pos->num_rows > 0): ?>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="table1">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>PO Number</th>
+                            <th>Vendor</th>
+                            <th>Date</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Created By</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         <?php while($row = $pos->fetch_assoc()): ?>
-                        <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                            
-                            <td class="px-6 py-5 align-middle">
-                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-xs border border-emerald-200 dark:border-emerald-500/20 mb-2">
-                                    <i class="ph-bold ph-hash"></i>
-                                    <?= htmlspecialchars($row['po_number']) ?>
-                                </div>
-                                <div class="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5 whitespace-nowrap">
-                                    <i class="ph-fill ph-calendar-blank"></i>
-                                    <?= date('d M Y', strtotime($row['po_date'])) ?>
-                                </div>
-                            </td>
-
-                            <td class="px-6 py-5 align-middle">
-                                <div class="flex items-center gap-3.5">
-                                    <div class="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-black text-sm uppercase shrink-0 shadow-inner border border-slate-200 dark:border-slate-600">
-                                        <i class="ph-fill ph-buildings text-lg"></i>
-                                    </div>
-                                    <div class="font-bold text-slate-800 dark:text-slate-200 text-sm break-words whitespace-normal pr-2" title="<?= htmlspecialchars($row['vendor_name'] ?? 'N/A') ?>">
-                                        <?= htmlspecialchars($row['vendor_name'] ?? 'N/A') ?>
-                                    </div>
-                                </div>
-                            </td>
-
-                            <td class="px-6 py-5 align-middle text-right">
-                                <div class="inline-flex flex-col items-end">
-                                    <span class="font-black text-slate-800 dark:text-slate-200 text-[15px] tracking-wide">
-                                        <span class="text-[10px] font-bold text-slate-400 mr-1">Rp</span><?= number_format($row['total_amount'], 0, ',', '.') ?>
-                                    </span>
-                                </div>
-                            </td>
-
-                            <td class="px-6 py-5 align-middle text-center">
+                        <tr>
+                            <td><span class="fw-bold text-primary"><?= htmlspecialchars($row['po_number']) ?></span></td>
+                            <td><?= htmlspecialchars($row['vendor_name'] ?? 'N/A') ?></td>
+                            <td><?= date('d M Y', strtotime($row['po_date'])) ?></td>
+                            <td>Rp <?= number_format($row['total_amount'], 2, ',', '.') ?></td>
+                            <td>
                                 <?php 
-                                    $st = $row['status'];
-                                    $sStyle = isset($status_styles[$st]) ? $status_styles[$st] : $status_styles['Draft'];
-                                    $sIcon  = isset($status_icons[$st]) ? $status_icons[$st] : $status_icons['Draft'];
+                                    $status = $row['status'];
+                                    $bg = 'secondary';
+                                    if($status == 'Submitted') $bg = 'info';
+                                    if($status == 'Approved') $bg = 'success';
+                                    if($status == 'Rejected') $bg = 'danger';
+                                    if($status == 'Draft') $bg = 'secondary';
                                 ?>
-                                <span class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest w-32 shadow-sm <?= $sStyle ?>">
-                                    <i class="ph-fill <?= $sIcon ?> text-sm"></i> <?= htmlspecialchars($st) ?>
-                                </span>
+                                <span class="badge bg-<?= $bg ?>"><?= $status ?></span>
                             </td>
-
-                            <td class="px-6 py-5 align-middle">
-                                <div class="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A222C] shadow-sm">
-                                    <div class="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-slate-100 ring-2 ring-white dark:ring-slate-800">
-                                        <img src="https://ui-avatars.com/api/?name=<?= urlencode($row['created_by'] ?? 'User') ?>&background=random&color=fff&size=64" alt="Avatar" class="w-full h-full object-cover">
-                                    </div>
-                                    <span class="text-xs font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                                        <?= htmlspecialchars($row['created_by'] ?? 'N/A') ?>
-                                    </span>
+                            <td><?= htmlspecialchars($row['created_by'] ?? 'N/A') ?></td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        Action
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item" href="po_form.php?id=<?= $row['id'] ?>">
+                                                <i class="bi bi-eye"></i> View/Edit PO
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="po_print.php?id=<?= $row['id'] ?>" target="_blank">
+                                                <i class="bi bi-printer"></i> Print PDF
+                                            </a>
+                                        </li>
+                                        </ul>
                                 </div>
                             </td>
-
-                            <td class="px-6 py-5 align-middle text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <a href="po_form.php?id=<?= $row['id'] ?>" class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 dark:bg-slate-700 dark:hover:bg-emerald-500/10 dark:text-slate-300 dark:hover:text-emerald-400 transition-all shadow-sm active:scale-95 group/btn" title="View / Edit PO">
-                                        <i class="ph-bold ph-pencil-simple text-lg group-hover/btn:-translate-y-0.5 transition-transform"></i>
-                                    </a>
-                                    <a href="po_print.php?id=<?= $row['id'] ?>" target="_blank" class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 dark:bg-slate-700 dark:hover:bg-indigo-500/10 dark:text-slate-300 dark:hover:text-indigo-400 transition-all shadow-sm active:scale-95 group/btn" title="Print PDF">
-                                        <i class="ph-bold ph-printer text-lg group-hover/btn:-translate-y-0.5 transition-transform"></i>
-                                    </a>
-                                </div>
-                            </td>
-
                         </tr>
                         <?php endwhile; ?>
-                    <?php else: ?>
-                        <tr id="emptyRow">
-                            <td colspan="6" class="px-6 py-16 text-center">
-                                <div class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
-                                    <div class="w-24 h-24 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-800 shadow-inner">
-                                        <i class="ph-fill ph-file-text text-5xl text-slate-300 dark:text-slate-600"></i>
-                                    </div>
-                                    <h4 class="font-black text-slate-700 dark:text-slate-200 text-lg mb-1">Data Tidak Ditemukan</h4>
-                                    <p class="text-sm font-medium">Purchase Order tidak ditemukan dengan filter saat ini.</p>
-                                    <?php if(!empty($search) || $status_filter !== 'all' || $vendor_filter !== 'all'): ?>
-                                        <a href="po_list.php" class="mt-5 inline-flex items-center gap-2 bg-slate-800 dark:bg-slate-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors shadow-sm">
-                                            <i class="ph-bold ph-arrows-counter-clockwise"></i> Reset Filter
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between w-full mt-auto shrink-0 z-20">
-            <div class="flex-1 flex justify-start">
-                <button id="btnPrev" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i class="ph-bold ph-arrow-left"></i> Previous
-                </button>
-            </div>
-            
-            <div id="pageNumbers" class="flex-1 flex items-center justify-center gap-1.5">
-                </div>
-            
-            <div class="flex-1 flex justify-end">
-                <button id="btnNext" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                    Next <i class="ph-bold ph-arrow-right"></i>
-                </button>
+                    </tbody>
+                </table>
             </div>
         </div>
-
     </div>
 </div>
-
-<script>
-    // --- PAGINATION LOGIC (Vanilla JS) ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const rows = Array.from(document.querySelectorAll('#tableBody tr.data-row'));
-        const totalRows = rows.length;
-        
-        if(totalRows === 0) return;
-
-        const pageSizeSelect = document.getElementById('pageSize');
-        const paginationInfo = document.getElementById('paginationInfo');
-        const btnPrev = document.getElementById('btnPrev');
-        const btnNext = document.getElementById('btnNext');
-        const pageNumbersContainer = document.getElementById('pageNumbers');
-
-        let currentPage = 1;
-        let rowsPerPage = parseInt(pageSizeSelect.value);
-
-        function renderTable() {
-            const start = (currentPage - 1) * rowsPerPage;
-            const end = start + rowsPerPage;
-
-            rows.forEach((row, index) => {
-                if (index >= start && index < end) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            const currentEnd = end > totalRows ? totalRows : end;
-            paginationInfo.innerHTML = `Menampilkan <span class="text-emerald-600 dark:text-emerald-400 font-black">${start + 1} - ${currentEnd}</span> dari <span class="font-black text-slate-800 dark:text-white">${totalRows}</span> data`;
-
-            updatePaginationButtons();
-        }
-
-        function updatePaginationButtons() {
-            const totalPages = Math.ceil(totalRows / rowsPerPage);
-            
-            btnPrev.disabled = currentPage === 1;
-            btnNext.disabled = currentPage === totalPages;
-
-            pageNumbersContainer.innerHTML = '';
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-                    const pageBtn = document.createElement('button');
-                    pageBtn.innerText = i;
-                    if (i === currentPage) {
-                        pageBtn.className = "w-8 h-8 rounded-xl text-xs font-black text-white bg-emerald-500 shadow-sm shadow-emerald-500/30 flex items-center justify-center transition-all";
-                    } else {
-                        pageBtn.className = "w-8 h-8 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-all flex items-center justify-center";
-                        pageBtn.onclick = () => { currentPage = i; renderTable(); };
-                    }
-                    pageNumbersContainer.appendChild(pageBtn);
-                } else if (i === currentPage - 2 || i === currentPage + 2) {
-                    const dots = document.createElement('span');
-                    dots.innerText = '...';
-                    dots.className = "w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-black tracking-widest";
-                    pageNumbersContainer.appendChild(dots);
-                }
-            }
-        }
-
-        pageSizeSelect.addEventListener('change', (e) => {
-            rowsPerPage = parseInt(e.target.value);
-            currentPage = 1;
-            renderTable();
-        });
-
-        btnPrev.addEventListener('click', () => {
-            if (currentPage > 1) { currentPage--; renderTable(); }
-        });
-
-        btnNext.addEventListener('click', () => {
-            const totalPages = Math.ceil(totalRows / rowsPerPage);
-            if (currentPage < totalPages) { currentPage++; renderTable(); }
-        });
-
-        renderTable();
-    });
-
-    // --- FILTER COLLAPSE LOGIC ---
-    document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('filterToggleBtn');
-        const body = document.getElementById('filterBody');
-        const icon = document.getElementById('filterIcon');
-
-        if(btn && body && icon) {
-            btn.addEventListener('click', () => {
-                if (body.classList.contains('hidden')) {
-                    body.classList.remove('hidden');
-                    setTimeout(() => body.style.opacity = '1', 10); 
-                    icon.classList.replace('ph-caret-down', 'ph-caret-up');
-                } else {
-                    body.classList.add('hidden');
-                    body.style.opacity = '0';
-                    icon.classList.replace('ph-caret-up', 'ph-caret-down');
-                }
-            });
-        }
-    });
-</script>
 
 <?php include 'includes/footer.php'; ?>
