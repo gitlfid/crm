@@ -195,7 +195,11 @@ $res_rep = $conn->query("SELECT * FROM ticket_replies WHERE ticket_id = $ticket_
 while($row = $res_rep->fetch_assoc()) { $replies[] = $row; }
 
 // Helper Functions
-function formatText($text) { return nl2br($text); } // Cukup nl2br agar HTML footer tampil
+function formatText($text) { 
+    // Bersihkan literal \r\n di dalam reply message (jika ada)
+    $text = str_replace(array('\r\n', '\n', '\r'), '<br>', $text);
+    return nl2br($text); 
+} 
 function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp']); }
 ?>
 
@@ -319,8 +323,14 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                         </div>
                         
                         <h6 class="text-uppercase text-muted small fw-bold ls-1">Deskripsi Masalah</h6>
-                        <div class="mb-3 text-dark">
-                            <?= nl2br(htmlspecialchars($ticket['description'])) ?>
+                        
+                        <div class="mb-3 text-dark" style="word-break: break-word;">
+                            <?php 
+                                $desc_clean = htmlspecialchars($ticket['description']);
+                                // Ubah literal string \r\n menjadi HTML break agar nomor ICCID turun ke bawah
+                                $desc_clean = str_replace(array('\r\n', '\n', '\r'), '<br>', $desc_clean);
+                                echo nl2br($desc_clean);
+                            ?>
                         </div>
 
                         <?php if($ticket['attachment']): ?>
@@ -355,7 +365,7 @@ function isImage($file) { return in_array(strtolower(pathinfo($file, PATHINFO_EX
                                             <span class="chat-time"><?= date('d M H:i', strtotime($reply['created_at'])) ?></span>
                                         </div>
                                         
-                                        <div class="chat-message">
+                                        <div class="chat-message" style="word-break: break-word;">
                                             <?= formatText($reply['message']) ?>
                                         </div>
 
