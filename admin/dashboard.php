@@ -124,20 +124,23 @@ else {
     <?php if ($current_role == 'admin'): ?>
     
     <div class="w-full flex pb-2 overflow-x-auto modern-scrollbar">
-        <div class="segmented-control shadow-inner border border-slate-200 dark:border-slate-700/50">
-            <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-button active relative z-10 flex items-center justify-center gap-2 py-2.5 px-8 rounded-xl font-bold text-sm transition-all duration-300 bg-white dark:bg-indigo-600 shadow-md text-indigo-600 dark:text-white min-w-[140px]">
+        <div class="segmented-control shadow-inner border border-slate-200 dark:border-slate-700/50 w-full md:w-auto flex">
+            <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-button active flex-1 md:flex-none relative z-10 flex items-center justify-center gap-2 py-2.5 px-6 sm:px-8 rounded-xl font-bold text-sm transition-all duration-300 bg-white dark:bg-indigo-600 shadow-md text-indigo-600 dark:text-white min-w-max">
                 <i class="ph-bold ph-squares-four text-lg"></i> Overview
             </button>
-            <button onclick="switchTab('external')" id="tab-btn-external" class="tab-button relative z-10 flex items-center justify-center gap-2 py-2.5 px-8 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 min-w-[140px]">
+            <button onclick="switchTab('performance')" id="tab-btn-performance" class="tab-button flex-1 md:flex-none relative z-10 flex items-center justify-center gap-2 py-2.5 px-6 sm:px-8 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 min-w-max">
+                <i class="ph-bold ph-ranking text-lg"></i> Performance
+            </button>
+            <button onclick="switchTab('external')" id="tab-btn-external" class="tab-button flex-1 md:flex-none relative z-10 flex items-center justify-center gap-2 py-2.5 px-6 sm:px-8 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 min-w-max">
                 <i class="ph-bold ph-headset text-lg"></i> External
             </button>
-            <button onclick="switchTab('internal')" id="tab-btn-internal" class="tab-button relative z-10 flex items-center justify-center gap-2 py-2.5 px-8 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 min-w-[140px]">
+            <button onclick="switchTab('internal')" id="tab-btn-internal" class="tab-button flex-1 md:flex-none relative z-10 flex items-center justify-center gap-2 py-2.5 px-6 sm:px-8 rounded-xl font-semibold text-sm transition-all duration-300 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 min-w-max">
                 <i class="ph-bold ph-buildings text-lg"></i> Internal
             </button>
         </div>
     </div>
 
-    <div class="relative">
+    <div class="relative mt-2">
 
         <div id="panel-overview" class="tab-panel block transition-all duration-500 opacity-100">
             
@@ -171,88 +174,101 @@ else {
                 </div>
             </div>
 
-            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 sm:p-8 mb-8 transition-colors">
-                <div class="flex items-center justify-between mb-6">
+            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-6 sm:p-8 transition-colors relative overflow-hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div>
                         <h3 class="text-xl font-black text-slate-800 dark:text-white">Trend Traffic (6 Bulan)</h3>
                         <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Perbandingan volume tiket External vs Internal berdasarkan bulan.</p>
                     </div>
-                    <div class="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 border border-slate-100 dark:border-slate-700 shadow-inner">
-                        <i class="ph-bold ph-chart-line-up text-2xl"></i>
-                    </div>
+                    <button onclick="switchTab('performance')" class="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:hover:bg-indigo-500/20 dark:text-indigo-400 px-4 py-2 rounded-xl font-bold text-xs transition-colors border border-indigo-100 dark:border-indigo-500/20 active:scale-95 shrink-0">
+                        <i class="ph-bold ph-ranking"></i> Lihat Performa Staf
+                    </button>
                 </div>
                 <div id="chart-main-trend" class="w-full h-[350px]"></div>
             </div>
 
-            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
-                <div class="px-6 py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
-                    <div>
-                        <h3 class="text-lg font-black text-slate-800 dark:text-white">User Performance Metrics</h3>
-                        <p class="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-widest">Penyelesaian Tiket oleh Staf</p>
+        </div>
+
+        <div id="panel-performance" class="tab-panel hidden transition-all duration-500 opacity-0 absolute top-0 left-0 w-full">
+            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors flex flex-col min-h-[500px]">
+                
+                <div class="px-6 py-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 dark:bg-amber-500/10 dark:text-amber-400 flex items-center justify-center text-2xl shadow-inner border border-amber-100 dark:border-amber-500/20 shrink-0">
+                            <i class="ph-fill ph-ranking"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-black text-slate-800 dark:text-white">User Performance Metrics</h3>
+                            <p class="text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5 uppercase tracking-widest">Statistik Penyelesaian Tiket Staf</p>
+                        </div>
                     </div>
-                    <i class="ph-fill ph-ranking text-3xl text-amber-500"></i>
+                    
+                    <div class="relative w-full sm:w-64 shrink-0">
+                        <i class="ph-bold ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                        <input type="text" id="searchPerf" onkeyup="filterPerformance()" class="w-full pl-11 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-500/50 outline-none dark:text-white transition-all shadow-sm placeholder-slate-400" placeholder="Cari nama staf...">
+                    </div>
                 </div>
                 
-                <div class="overflow-x-auto modern-scrollbar">
-                    <table class="w-full text-left border-collapse min-w-[900px]">
+                <div class="overflow-x-auto modern-scrollbar flex-grow pb-10">
+                    <table class="w-full text-left border-collapse table-fixed min-w-[1000px]">
                         <thead>
                             <tr class="bg-white dark:bg-[#24303F]">
                                 <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[25%]">Staff Profile</th>
                                 <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[15%]">Role</th>
-                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/10">Ext. Assigned</th>
-                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/10">Ext. Closed</th>
-                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-orange-500 uppercase tracking-widest bg-orange-50/50 dark:bg-orange-900/10 border-l border-slate-100 dark:border-slate-800">Int. Assigned</th>
-                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-orange-50/50 dark:bg-orange-900/10">Int. Closed</th>
+                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/10 w-[15%]">Ext. Assigned</th>
+                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest bg-indigo-50/50 dark:bg-indigo-900/10 w-[15%]">Ext. Closed</th>
+                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest bg-orange-50/50 dark:bg-orange-900/10 border-l border-slate-100 dark:border-slate-800 w-[15%]">Int. Assigned</th>
+                                <th class="px-6 py-5 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest bg-orange-50/50 dark:bg-orange-900/10 w-[15%]">Int. Closed</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50 text-sm">
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800/50 text-sm" id="perfTableBody">
                             <?php if($resPerf && $resPerf->num_rows > 0): while($u = $resPerf->fetch_assoc()): ?>
-                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                <td class="px-6 py-4 align-middle">
+                            <tr class="perf-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                <td class="px-6 py-5 align-middle">
                                     <div class="flex items-center gap-3.5">
                                         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 font-black text-sm uppercase shadow-inner border border-slate-200/50 dark:border-slate-600/50 shrink-0">
                                             <?= substr($u['username'],0,1) ?>
                                         </div>
-                                        <span class="font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                        <span class="perf-name font-bold text-slate-800 dark:text-slate-200 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
                                             <?= htmlspecialchars($u['username']) ?>
                                         </span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 align-middle">
-                                    <span class="px-3 py-1 inline-flex text-[10px] font-bold uppercase tracking-widest rounded-lg bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 shadow-sm">
+                                <td class="px-6 py-5 align-middle">
+                                    <span class="px-3 py-1.5 inline-flex text-[9px] font-black uppercase tracking-widest rounded-lg bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300 shadow-sm">
                                         <?= htmlspecialchars($u['role']) ?>
                                     </span>
                                 </td>
                                 
-                                <td class="px-6 py-4 align-middle text-center bg-indigo-50/30 dark:bg-indigo-900/5">
-                                    <span class="font-black text-slate-700 dark:text-slate-300 text-base"><?= $u['ext_assigned'] ?></span>
+                                <td class="px-6 py-5 align-middle text-center bg-indigo-50/30 dark:bg-indigo-900/5">
+                                    <span class="font-black text-slate-800 dark:text-slate-200 text-lg"><?= $u['ext_assigned'] ?></span>
                                 </td>
-                                <td class="px-6 py-4 align-middle text-center bg-indigo-50/30 dark:bg-indigo-900/5">
+                                <td class="px-6 py-5 align-middle text-center bg-indigo-50/30 dark:bg-indigo-900/5">
                                     <?php if($u['ext_closed'] > 0): ?>
-                                        <span class="inline-flex items-center justify-center min-w-[32px] h-8 px-2 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:border-emerald-500/30 dark:text-emerald-400 font-black text-sm shadow-sm">
+                                        <span class="inline-flex items-center justify-center min-w-[36px] h-9 px-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400 font-black text-base shadow-sm">
                                             <?= $u['ext_closed'] ?>
                                         </span>
                                     <?php else: ?>
-                                        <span class="text-slate-400 font-bold">-</span>
+                                        <span class="text-slate-400 font-black">-</span>
                                     <?php endif; ?>
                                 </td>
                                 
-                                <td class="px-6 py-4 align-middle text-center border-l border-slate-100 dark:border-slate-800 bg-orange-50/30 dark:bg-orange-900/5">
-                                    <span class="font-black text-slate-700 dark:text-slate-300 text-base"><?= $u['int_assigned'] ?></span>
+                                <td class="px-6 py-5 align-middle text-center border-l border-slate-100 dark:border-slate-800 bg-orange-50/30 dark:bg-orange-900/5">
+                                    <span class="font-black text-slate-800 dark:text-slate-200 text-lg"><?= $u['int_assigned'] ?></span>
                                 </td>
-                                <td class="px-6 py-4 align-middle text-center bg-orange-50/30 dark:bg-orange-900/5">
+                                <td class="px-6 py-5 align-middle text-center bg-orange-50/30 dark:bg-orange-900/5">
                                     <?php if($u['int_closed'] > 0): ?>
-                                        <span class="inline-flex items-center justify-center min-w-[32px] h-8 px-2 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:border-emerald-500/30 dark:text-emerald-400 font-black text-sm shadow-sm">
+                                        <span class="inline-flex items-center justify-center min-w-[36px] h-9 px-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400 font-black text-base shadow-sm">
                                             <?= $u['int_closed'] ?>
                                         </span>
                                     <?php else: ?>
-                                        <span class="text-slate-400 font-bold">-</span>
+                                        <span class="text-slate-400 font-black">-</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endwhile; else: ?>
                                 <tr>
-                                    <td colspan="6" class="p-8 text-center text-slate-500 font-medium">Belum ada data performa.</td>
+                                    <td colspan="6" class="p-10 text-center text-slate-500 font-medium">Belum ada data performa.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -394,7 +410,22 @@ else {
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
 <script>
-    // 1. TABS SWITCHING LOGIC DENGAN FADE EFFECT
+    // --- LIVE SEARCH UNTUK PERFORMANCE METRICS ---
+    function filterPerformance() {
+        let input = document.getElementById('searchPerf').value.toLowerCase();
+        let rows = document.querySelectorAll('.perf-row');
+        
+        rows.forEach(row => {
+            let name = row.querySelector('.perf-name').innerText.toLowerCase();
+            if(name.includes(input)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // --- TABS SWITCHING LOGIC DENGAN FADE EFFECT ---
     function switchTab(tabId) {
         // Handle Button States
         document.querySelectorAll('.tab-button').forEach(btn => {
@@ -403,8 +434,10 @@ else {
         });
         
         const activeBtn = document.getElementById('tab-btn-' + tabId);
-        activeBtn.classList.remove('text-slate-500', 'hover:text-slate-700', 'dark:text-slate-400', 'dark:hover:text-slate-200');
-        activeBtn.classList.add('active', 'bg-white', 'dark:bg-indigo-600', 'shadow-md', 'text-indigo-600', 'dark:text-white');
+        if(activeBtn) {
+            activeBtn.classList.remove('text-slate-500', 'hover:text-slate-700', 'dark:text-slate-400', 'dark:hover:text-slate-200');
+            activeBtn.classList.add('active', 'bg-white', 'dark:bg-indigo-600', 'shadow-md', 'text-indigo-600', 'dark:text-white');
+        }
 
         // Handle Panel Visibility with Fade
         document.querySelectorAll('.tab-panel').forEach(panel => {
@@ -419,18 +452,20 @@ else {
 
         setTimeout(() => {
             const activePanel = document.getElementById('panel-' + tabId);
-            activePanel.classList.remove('hidden', 'absolute', 'top-0', 'left-0', 'w-full');
-            activePanel.classList.add('block');
-            
-            // Trigger reflow before adding opacity back
-            void activePanel.offsetWidth;
-            
-            activePanel.classList.remove('opacity-0');
-            activePanel.classList.add('opacity-100');
+            if(activePanel) {
+                activePanel.classList.remove('hidden', 'absolute', 'top-0', 'left-0', 'w-full');
+                activePanel.classList.add('block');
+                
+                // Trigger reflow before adding opacity back
+                void activePanel.offsetWidth;
+                
+                activePanel.classList.remove('opacity-0');
+                activePanel.classList.add('opacity-100');
+            }
         }, 300);
     }
 
-    // 2. CHART CONFIGURATION & DYNAMIC THEME
+    // --- CHART CONFIGURATION & DYNAMIC THEME ---
     const fontFam = "'Inter', sans-serif";
     
     function getChartColors() {
