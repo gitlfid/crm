@@ -280,7 +280,7 @@ function getSpelledOutNumber($number) {
                 <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
             </div>
             <div class="w-1/3 text-center">
-                <h1 class="text-3xl font-black tracking-tight text-slate-900 uppercase">Invoice</h1>
+                <h1 class="text-2xl font-black tracking-widest text-slate-900 uppercase">INVOICE</h1>
             </div>
             <div class="w-1/3 text-right">
                 <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]">
@@ -342,12 +342,12 @@ function getSpelledOutNumber($number) {
             <table class="w-full text-left text-[10px]">
                 <thead class="bg-slate-800 text-white font-bold uppercase tracking-wider text-[9px]">
                     <tr>
-                        <th class="py-2 px-3 text-center w-[5%]">No</th>
-                        <th class="py-2 px-3 w-[40%]">Description</th>
-                        <th class="py-2 px-3 text-center w-[8%]">Qty</th>
-                        <th class="py-2 px-3 text-center w-[15%]">Pay Mode</th>
-                        <th class="py-2 px-3 text-right w-[15%]">Unit Price</th>
-                        <th class="py-2 px-3 text-right w-[17%]">Line Total</th>
+                        <th class="py-2.5 px-3 text-center w-[5%]">No</th>
+                        <th class="py-2.5 px-3 w-[40%]">Description</th>
+                        <th class="py-2.5 px-3 text-center w-[8%]">Qty</th>
+                        <th class="py-2.5 px-3 text-center w-[15%]">Pay Mode</th>
+                        <th class="py-2.5 px-3 text-right w-[15%]">Unit Price</th>
+                        <th class="py-2.5 px-3 text-right w-[17%]">Line Total</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 bg-white">
@@ -364,26 +364,26 @@ function getSpelledOutNumber($number) {
                         $payMethod = !empty($inv['payment_method']) ? $inv['payment_method'] : (!empty($item['card_type']) ? $item['card_type'] : 'Prepaid');
                     ?>
                     <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-2 px-3 text-center font-medium text-slate-500 align-top"><?= $no++ ?></td>
-                        <td class="py-2 px-3 align-top">
+                        <td class="py-2.5 px-3 text-center font-medium text-slate-500 align-middle"><?= $no++ ?></td>
+                        <td class="py-2.5 px-3 align-middle">
                             <div class="font-bold text-slate-800" <?= $can_edit_note ?>><?= htmlspecialchars($item['item_name']) ?></div>
                             <?php if(!empty($item['description']) && $item['description'] != 'Exclude Tax'): ?>
                                 <div class="text-[9px] text-slate-500 mt-0.5 leading-snug" <?= $can_edit_note ?>><?= nl2br(htmlspecialchars($item['description'])) ?></div>
                             <?php endif; ?>
                         </td>
-                        <td class="py-2 px-3 text-center font-bold text-slate-800 align-top" <?= $can_edit_note ?>><?= $qty ?></td> 
-                        <td class="py-2 px-3 text-center align-top">
+                        <td class="py-2.5 px-3 text-center font-bold text-slate-800 align-middle" <?= $can_edit_note ?>><?= $qty ?></td> 
+                        <td class="py-2.5 px-3 text-center align-middle">
                             <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest border border-slate-200" <?= $can_edit_note ?>>
                                 <?= htmlspecialchars($payMethod) ?>
                             </span>
                         </td>
-                        <td class="py-2 px-3 text-right font-medium text-slate-700 align-top" <?= $can_edit_note ?>><?= format_money($price, $is_international) ?></td>
-                        <td class="py-2 px-3 text-right font-bold text-slate-800 align-top" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_international) ?></td>
+                        <td class="py-2.5 px-3 text-right font-medium text-slate-700 align-middle" <?= $can_edit_note ?>><?= format_money($price, $is_international) ?></td>
+                        <td class="py-2.5 px-3 text-right font-bold text-slate-800 align-middle" <?= $can_edit_note ?>><?= format_money($lineTotal, $is_international) ?></td>
                     </tr>
                     <?php endforeach; ?>
                     
                     <tr>
-                        <td colspan="6" class="py-3"></td>
+                        <td colspan="6" class="py-1"></td>
                     </tr>
                 </tbody>
             </table>
@@ -407,7 +407,7 @@ function getSpelledOutNumber($number) {
             $currency_text = $is_international ? ($inv['currency'] == 'USD' ? "US Dollars" : $inv['currency']) : "Rupiah";
             $amountInWords = ucwords(strtolower(getSpelledOutNumber($totalInvoice))) . " " . $currency_text;
         ?>
-        <div class="flex justify-end mb-4 shrink-0 avoid-break mt-auto">
+        <div class="flex justify-end mb-6 shrink-0 avoid-break">
             <div class="w-1/2 rounded-xl bg-slate-50 border border-slate-200 p-3">
                 <table class="w-full text-[10px]">
                     <tbody>
@@ -439,7 +439,7 @@ function getSpelledOutNumber($number) {
             </div>
         </div>
 
-        <div class="grid grid-cols-12 gap-6 shrink-0 avoid-break">
+        <div class="grid grid-cols-12 gap-6 shrink-0 avoid-break mt-auto">
             
             <div class="col-span-8 flex flex-col gap-3">
                 <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
