@@ -9,9 +9,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Load Konfigurasi & Fungsi DULUAN (Best Practice)
+// Load Konfigurasi & Fungsi DULUAN
 require_once '../config/database.php'; 
-// include '../config/functions.php'; // Sesuaikan jika ada fungsi eksternal
+// PENTING: Wajib di-include agar fungsi sendEmailNotification() bisa dieksekusi
+require_once '../config/functions.php'; 
 
 // --- PERMISSION CHECK ---
 $can_access = false;
@@ -163,10 +164,18 @@ if (isset($_POST['reset_password'])) {
         $new_pass = generateRandomPassword(10);
         $new_hash = password_hash($new_pass, PASSWORD_DEFAULT);
         if ($conn->query("UPDATE users SET password='$new_hash', must_change_password=1 WHERE id=$id")) {
+            // Pastikan fungsi berjalan
             if (function_exists('sendEmailNotification')) {
-                sendEmailNotification(trim($uData['email']), "Reset Password", "Password baru Anda: $new_pass <br><br> Harap segera login dan ganti password ini.");
+                $emailResult = sendEmailNotification(trim($uData['email']), "Reset Password Akun", "Halo " . $uData['username'] . ",<br><br>Password akun Anda telah berhasil direset oleh Administrator. <br><br>Password baru Anda: <strong>$new_pass</strong> <br><br> Harap segera login dan ganti password ini demi keamanan akun Anda.");
+                
+                if($emailResult === true) {
+                    $msg = setTailwindMsg('success', 'Password berhasil direset. Password baru telah dikirimkan ke email user.', 'ph-key');
+                } else {
+                    $msg = setTailwindMsg('warning', 'Password direset, namun pengiriman email gagal! Error: ' . $emailResult, 'ph-warning-circle');
+                }
+            } else {
+                $msg = setTailwindMsg('warning', 'Password berhasil direset, tetapi sistem email tidak aktif.', 'ph-key');
             }
-            $msg = setTailwindMsg('warning', 'Password berhasil direset. Password baru telah dibuat (cek email user).', 'ph-key');
         }
     }
 }
@@ -243,7 +252,7 @@ include 'includes/sidebar.php';
         <div class="bg-white dark:bg-[#24303F] rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-5 transition-transform hover:-translate-y-1">
             <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 flex items-center justify-center text-3xl shrink-0"><i class="ph-fill ph-users"></i></div>
             <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Users</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Users</p>
                 <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($totalUsers) ?></h4>
             </div>
         </div>
@@ -251,7 +260,7 @@ include 'includes/sidebar.php';
         <div class="bg-white dark:bg-[#24303F] rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-5 transition-transform hover:-translate-y-1">
             <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400 flex items-center justify-center text-3xl shrink-0"><i class="ph-fill ph-shield-check"></i></div>
             <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Administrator</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Administrator</p>
                 <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($adminCount) ?></h4>
             </div>
         </div>
@@ -259,7 +268,7 @@ include 'includes/sidebar.php';
         <div class="bg-white dark:bg-[#24303F] rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center gap-5 transition-transform hover:-translate-y-1">
             <div class="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center text-3xl shrink-0"><i class="ph-fill ph-briefcase"></i></div>
             <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Standard Staff</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Standard Staff</p>
                 <h4 class="text-3xl font-black text-slate-800 dark:text-white leading-none"><?= number_format($staffCount) ?></h4>
             </div>
         </div>
@@ -289,17 +298,17 @@ include 'includes/sidebar.php';
             </div>
         </div>
 
-        <div class="overflow-x-auto modern-scrollbar flex-grow pb-24">
+        <div class="overflow-x-auto modern-scrollbar flex-grow pb-32">
             <table class="w-full text-left border-collapse table-fixed min-w-[1100px]">
                 <thead class="bg-slate-50/80 dark:bg-slate-800/50">
                     <tr>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[25%]">User Profile</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[20%]">Role & Division</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-wider w-[15%]">Job Title</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[10%]">Leave Quota</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[10%]">Security</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[8%]">Sign</th>
-                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider w-[12%]">Actions</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[25%]">User Profile</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[20%]">Role & Division</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[15%]">Job Title</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[10%]">Leave Quota</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[10%]">Security</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[8%]">Sign</th>
+                        <th class="px-6 py-4 border-b border-slate-200 dark:border-slate-700 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-[12%]">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800/50">
@@ -307,7 +316,7 @@ include 'includes/sidebar.php';
                         <?php while($row = $users->fetch_assoc()): ?>
                         <tr class="data-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                             
-                            <td class="px-6 py-5 align-middle search-target">
+                            <td class="px-6 py-4 align-middle search-target">
                                 <div class="flex items-center gap-4">
                                     <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-100 to-indigo-50 dark:from-indigo-500/20 dark:to-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black text-sm uppercase shrink-0 ring-2 ring-white dark:ring-[#24303F] shadow-sm">
                                         <?= strtoupper(substr($row['username'], 0, 1)) ?>
@@ -316,7 +325,7 @@ include 'includes/sidebar.php';
                                         <div class="font-bold text-slate-800 dark:text-slate-200 text-sm mb-0.5 break-words whitespace-normal group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                                             <?= htmlspecialchars($row['username']) ?>
                                         </div>
-                                        <div class="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium break-words whitespace-normal">
+                                        <div class="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium break-words whitespace-normal">
                                             <i class="ph-fill ph-envelope-simple text-slate-400 shrink-0"></i>
                                             <?= htmlspecialchars($row['email']) ?>
                                         </div>
@@ -329,14 +338,14 @@ include 'includes/sidebar.php';
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle search-target">
+                            <td class="px-6 py-4 align-middle search-target">
                                 <div class="flex flex-col items-start gap-1.5">
                                     <?php if($row['role'] == 'admin'): ?>
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20 shadow-sm">
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20 shadow-sm">
                                             <i class="ph-fill ph-shield-check text-xs"></i> ADMIN
                                         </span>
                                     <?php else: ?>
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 shadow-sm">
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 shadow-sm">
                                             <i class="ph-fill ph-user text-xs"></i> STANDARD
                                         </span>
                                     <?php endif; ?>
@@ -347,32 +356,32 @@ include 'includes/sidebar.php';
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle search-target">
-                                <span class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-700/50 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-600 text-xs inline-block break-words whitespace-normal text-center">
+                            <td class="px-6 py-4 align-middle search-target">
+                                <span class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-700/50 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-600 text-[11px] inline-block break-words whitespace-normal text-center shadow-sm">
                                     <?= htmlspecialchars($row['job_title'] ?? 'Staff') ?>
                                 </span>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center">
+                            <td class="px-6 py-4 align-middle text-center">
                                 <div class="inline-flex flex-col items-center justify-center w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20 shadow-sm" title="Sisa Cuti Tahunan">
                                     <span class="font-black text-lg leading-none"><?= $row['leave_quota'] ?></span>
                                     <span class="text-[8px] font-bold uppercase tracking-widest opacity-70">Hari</span>
                                 </div>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center">
+                            <td class="px-6 py-4 align-middle text-center">
                                 <?php if($row['must_change_password'] == 1): ?>
-                                    <span class="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 text-[9px] font-bold uppercase tracking-widest shadow-sm" title="Menunggu user mengganti password">
+                                    <span class="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 text-[9px] font-bold uppercase tracking-widest shadow-sm" title="Menunggu user mengganti password">
                                         <i class="ph-fill ph-warning-circle text-xs"></i> Change
                                     </span>
                                 <?php else: ?>
-                                    <span class="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 text-[9px] font-bold uppercase tracking-widest shadow-sm">
+                                    <span class="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-slate-50 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 text-[9px] font-bold uppercase tracking-widest shadow-sm">
                                         <i class="ph-fill ph-check-circle text-xs"></i> Secure
                                     </span>
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center">
+                            <td class="px-6 py-4 align-middle text-center">
                                 <?php if($row['signature']): ?>
                                     <div class="w-8 h-8 rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center justify-center mx-auto border border-emerald-200 dark:border-emerald-500/20 shadow-sm" title="Signature Uploaded">
                                         <i class="ph-bold ph-pen-nib text-sm"></i>
@@ -384,21 +393,35 @@ include 'includes/sidebar.php';
                                 <?php endif; ?>
                             </td>
 
-                            <td class="px-6 py-5 align-middle text-center">
-                                <div class="flex items-center justify-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <?php $userJson = htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>
-                                    
-                                    <button onclick='openEditModal(<?= $userJson ?>)' class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-blue-600 dark:hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-95 group/btn" title="Edit Profile">
-                                        <i class="ph-bold ph-pencil-simple text-sm group-hover/btn:scale-110 transition-transform"></i>
+                            <td class="px-6 py-4 align-middle text-center relative">
+                                <?php $userJson = htmlspecialchars(json_encode($row), ENT_QUOTES, 'UTF-8'); ?>
+                                
+                                <div class="relative inline-block text-left" data-dropdown>
+                                    <button type="button" onclick="toggleActionMenu(event, <?= $row['id'] ?>)" class="inline-flex justify-center items-center w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-slate-50 dark:bg-[#24303F] dark:border-slate-700 dark:text-slate-400 dark:hover:text-indigo-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dropdown-toggle-btn active:scale-95" aria-expanded="true" aria-haspopup="true">
+                                        <i class="ph-bold ph-dots-three-vertical text-lg pointer-events-none"></i>
                                     </button>
 
-                                    <button onclick="openResetModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-amber-500 hover:text-white dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-amber-500 dark:hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-95 group/btn" title="Reset Password">
-                                        <i class="ph-bold ph-key text-sm group-hover/btn:scale-110 transition-transform"></i>
-                                    </button>
+                                    <div id="action-menu-<?= $row['id'] ?>" class="dropdown-menu hidden absolute right-8 top-0 w-44 bg-white dark:bg-[#24303F] rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 z-[100] overflow-hidden text-left origin-top-right transition-all divide-y divide-slate-50 dark:divide-slate-700/50">
+                                        
+                                        <div class="py-1">
+                                            <button type="button" onclick='openEditModal(<?= $userJson ?>)' class="w-full text-left group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-400 transition-colors">
+                                                <i class="ph-bold ph-pencil-simple text-base text-slate-400 group-hover:text-indigo-500"></i> Edit Profile
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="py-1">
+                                            <button type="button" onclick="openResetModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-full text-left group flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10 dark:hover:text-amber-400 transition-colors">
+                                                <i class="ph-bold ph-key text-base text-slate-400 group-hover:text-amber-500"></i> Reset Password
+                                            </button>
+                                        </div>
 
-                                    <button onclick="openDeleteModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-95 group/btn" title="Delete User">
-                                        <i class="ph-bold ph-trash text-sm group-hover/btn:scale-110 transition-transform"></i>
-                                    </button>
+                                        <div class="py-1 bg-slate-50/50 dark:bg-slate-800/30">
+                                            <button type="button" onclick="openDeleteModal(<?= $row['id'] ?>, '<?= htmlspecialchars($row['username'], ENT_QUOTES) ?>')" class="w-full text-left group flex items-center gap-2.5 px-4 py-2.5 text-xs font-black text-rose-600 hover:bg-rose-600 hover:text-white dark:text-rose-400 dark:hover:bg-rose-600 dark:hover:text-white transition-colors">
+                                                <i class="ph-bold ph-trash text-base"></i> Delete User
+                                            </button>
+                                        </div>
+                                        
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -442,10 +465,8 @@ include 'includes/sidebar.php';
 
 <div id="addUserModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('addUserModal')"></div>
-    
     <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all scale-95 opacity-0 modal-box">
         <form method="POST" enctype="multipart/form-data" class="flex flex-col h-full">
-            
             <div class="px-6 py-5 border-b border-indigo-500/20 bg-indigo-600 text-white flex justify-between items-center shrink-0">
                 <h3 class="text-base font-black flex items-center gap-2 tracking-wide"><i class="ph-bold ph-user-plus text-xl"></i> Tambah User Baru</h3>
                 <button type="button" onclick="closeModal('addUserModal')" class="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/40 transition-colors">
@@ -569,10 +590,8 @@ include 'includes/sidebar.php';
 
 <div id="editUserModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closeModal('editUserModal')"></div>
-    
     <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden transform transition-all scale-95 opacity-0 modal-box">
         <form method="POST" enctype="multipart/form-data" class="flex flex-col h-full">
-            
             <div class="px-6 py-5 border-b border-blue-500/20 bg-blue-600 text-white flex justify-between items-center shrink-0">
                 <h3 class="text-base font-black flex items-center gap-2 tracking-wide"><i class="ph-bold ph-pencil-simple text-xl"></i> Edit Data User</h3>
                 <button type="button" onclick="closeModal('editUserModal')" class="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/40 transition-colors">
@@ -699,7 +718,7 @@ include 'includes/sidebar.php';
     <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300 modal-box text-center overflow-hidden flex flex-col">
         <form method="POST">
             <div class="pt-8 pb-6 px-6">
-                <div class="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center mx-auto mb-5 border border-amber-100 dark:border-amber-500/20">
+                <div class="w-20 h-20 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center mx-auto mb-5 border border-amber-100 dark:border-amber-500/20 shadow-inner">
                     <i class="ph-fill ph-password text-4xl text-amber-500 dark:text-amber-400"></i>
                 </div>
                 <h3 class="text-xl font-black text-slate-800 dark:text-white mb-2">Reset Password?</h3>
@@ -719,7 +738,7 @@ include 'includes/sidebar.php';
     <div class="relative bg-white dark:bg-[#24303F] rounded-3xl shadow-2xl w-full max-w-sm transform scale-95 opacity-0 transition-all duration-300 modal-box text-center overflow-hidden flex flex-col">
         <form method="POST">
             <div class="pt-8 pb-6 px-6">
-                <div class="w-20 h-20 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mx-auto mb-5 border border-rose-100 dark:border-rose-500/20">
+                <div class="w-20 h-20 rounded-full bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center mx-auto mb-5 border border-rose-100 dark:border-rose-500/20 shadow-inner">
                     <i class="ph-fill ph-warning-circle text-4xl text-rose-500 dark:text-rose-400"></i>
                 </div>
                 <h3 class="text-xl font-black text-slate-800 dark:text-white mb-2">Hapus Pengguna?</h3>
@@ -742,7 +761,6 @@ include 'includes/sidebar.php';
         let input = document.getElementById("searchInput").value.toLowerCase();
         let rows = document.querySelectorAll(".data-row");
 
-        // Jika ada pencarian, matikan pagination sementara, jika kosong, jalankan renderTable()
         if(input.trim() !== '') {
             rows.forEach(row => {
                 let text = row.innerText.toLowerCase();
@@ -838,6 +856,28 @@ include 'includes/sidebar.php';
         window.renderTable();
     });
 
+    // --- CUSTOM DROPDOWN MENU LOGIC (Fix Propagation) ---
+    let currentOpenDropdown = null;
+    
+    function toggleActionMenu(e, id) {
+        e.stopPropagation(); 
+        const menu = document.getElementById('action-menu-' + id);
+        
+        if (currentOpenDropdown && currentOpenDropdown !== menu) {
+            currentOpenDropdown.classList.add('hidden');
+        }
+        
+        menu.classList.toggle('hidden');
+        currentOpenDropdown = menu.classList.contains('hidden') ? null : menu;
+    }
+    
+    document.addEventListener('click', (e) => {
+        if (currentOpenDropdown && !currentOpenDropdown.contains(e.target)) {
+            currentOpenDropdown.classList.add('hidden');
+            currentOpenDropdown = null;
+        }
+    });
+
     // --- CUSTOM MODAL HANDLERS ---
     function openModal(id) {
         const modal = document.getElementById(id);
@@ -848,6 +888,7 @@ include 'includes/sidebar.php';
         setTimeout(() => {
             box.classList.remove('scale-95', 'opacity-0');
             box.classList.add('scale-100', 'opacity-100');
+            modal.classList.remove('opacity-0');
             
             // Adjust canvas specifically for Add/Edit Modals
             if(id === 'addUserModal') {
@@ -869,6 +910,7 @@ include 'includes/sidebar.php';
         
         box.classList.remove('scale-100', 'opacity-100');
         box.classList.add('scale-95', 'opacity-0');
+        modal.classList.add('opacity-0');
         
         setTimeout(() => {
             modal.classList.add('hidden');
