@@ -367,7 +367,7 @@ function getSpelledOutNumber($number) {
             
             $totalInvoice = $grandTotal + $vatAmount;
             
-            <?php 
+            
                 // Kalkulasi Dasar (Subtotal + VAT saja)
                 if ($is_international) {
                     $vatAmount = 0;
