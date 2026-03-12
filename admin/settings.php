@@ -164,53 +164,55 @@ while($row = $res->fetch_assoc()) { $settings[$row['setting_key']] = $row['setti
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <div class="lg:col-span-3 flex flex-col gap-4">
-            
-            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-2 overflow-x-auto lg:overflow-visible modern-scrollbar sticky top-24 z-10">
-                <ul class="flex lg:flex-col gap-2 min-w-max lg:min-w-0" id="settingTabs">
-                    <li>
-                        <button onclick="switchTab('general')" id="tab-general" class="tab-btn w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold transition-all bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 shadow-sm">
-                            <i class="ph-fill ph-envelope-simple text-xl"></i> General & SMTP
-                        </button>
-                    </li>
-                    <li>
-                        <button onclick="switchTab('quotation')" id="tab-quotation" class="tab-btn w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold text-slate-600 border border-transparent hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
-                            <i class="ph-fill ph-clipboard-text text-xl"></i> Quotation Assets
-                        </button>
-                    </li>
-                    <li>
-                        <button onclick="switchTab('invoice')" id="tab-invoice" class="tab-btn w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold text-slate-600 border border-transparent hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
-                            <i class="ph-fill ph-receipt text-xl"></i> Invoice Settings
-                        </button>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-5 hidden lg:block">
-                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="ph-fill ph-flask text-lg"></i> Connection Test</h4>
+        <div class="lg:col-span-3">
+            <div class="sticky top-24 flex flex-col gap-6 z-20 max-h-[calc(100vh-100px)] overflow-y-auto modern-scrollbar pb-4 pr-1">
                 
-                <form method="POST" class="mb-5">
-                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">Test SMTP Email</label>
-                    <div class="relative flex items-center">
-                        <i class="ph-bold ph-envelope absolute left-3 text-slate-400"></i>
-                        <input type="email" name="test_to" class="w-full pl-9 pr-10 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" placeholder="Alamat email tujuan..." required>
-                        <button type="submit" name="test_email" class="absolute right-1.5 w-7 h-7 bg-indigo-100 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-colors flex items-center justify-center">
-                            <i class="ph-bold ph-paper-plane-tilt"></i>
+                <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-2 overflow-x-auto lg:overflow-visible modern-scrollbar shrink-0">
+                    <ul class="flex lg:flex-col gap-2 min-w-max lg:min-w-0" id="settingTabs">
+                        <li>
+                            <button onclick="switchTab('general')" id="tab-general" class="tab-btn w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold transition-all bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 shadow-sm">
+                                <i class="ph-fill ph-envelope-simple text-xl"></i> General & SMTP
+                            </button>
+                        </li>
+                        <li>
+                            <button onclick="switchTab('quotation')" id="tab-quotation" class="tab-btn w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold text-slate-600 border border-transparent hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
+                                <i class="ph-fill ph-clipboard-text text-xl"></i> Quotation Assets
+                            </button>
+                        </li>
+                        <li>
+                            <button onclick="switchTab('invoice')" id="tab-invoice" class="tab-btn w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-bold text-slate-600 border border-transparent hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
+                                <i class="ph-fill ph-receipt text-xl"></i> Invoice Settings
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white dark:bg-[#24303F] rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 p-5 hidden lg:block shrink-0">
+                    <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="ph-fill ph-flask text-lg"></i> Connection Test</h4>
+                    
+                    <form method="POST" class="mb-5">
+                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1.5">Test SMTP Email</label>
+                        <div class="relative flex items-center">
+                            <i class="ph-bold ph-envelope absolute left-3 text-slate-400"></i>
+                            <input type="email" name="test_to" class="w-full pl-9 pr-10 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white" placeholder="Alamat email tujuan..." required>
+                            <button type="submit" name="test_email" class="absolute right-1.5 w-7 h-7 bg-indigo-100 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-colors flex items-center justify-center">
+                                <i class="ph-bold ph-paper-plane-tilt"></i>
+                            </button>
+                        </div>
+                    </form>
+
+                    <form method="POST" class="flex flex-col gap-2">
+                        <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">Test Discord Webhook</label>
+                        <button type="submit" name="test_discord_customer" class="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                            <i class="ph-fill ph-discord-logo text-base"></i> Customer Ticket
                         </button>
-                    </div>
-                </form>
+                        <button type="submit" name="test_discord_internal" class="w-full bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                            <i class="ph-fill ph-discord-logo text-base"></i> Internal Ticket
+                        </button>
+                    </form>
+                </div>
 
-                <form method="POST" class="flex flex-col gap-2">
-                    <label class="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">Test Discord Webhook</label>
-                    <button type="submit" name="test_discord_customer" class="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
-                        <i class="ph-fill ph-discord-logo text-base"></i> Customer Ticket
-                    </button>
-                    <button type="submit" name="test_discord_internal" class="w-full bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2">
-                        <i class="ph-fill ph-discord-logo text-base"></i> Internal Ticket
-                    </button>
-                </form>
             </div>
-
         </div>
 
         <div class="lg:col-span-9 flex flex-col gap-6">
