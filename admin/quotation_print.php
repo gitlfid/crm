@@ -244,22 +244,21 @@ $remarks = !empty($quo['remarks']) ? $quo['remarks'] : "- Please required the nu
 
     <div class="print-container bg-white w-full max-w-[210mm] min-h-[297mm] mx-auto p-10 shadow-2xl rounded flex flex-col">
         
-        <div class="flex justify-between items-center border-b-[3px] border-slate-800 pb-4 mb-5 shrink-0">
-            <div class="w-1/3">
+        <div class="flex justify-between items-center border-b-[3px] border-slate-800 pb-4 mb-6 shrink-0">
+            <div class="w-1/2">
                 <img src="../uploads/<?= $sets['company_logo'] ?? 'default-logo.png' ?>" class="max-h-12 object-contain" onerror="this.style.display='none'">
             </div>
-
-            <div class="w-1/3 text-right">
-                <div class="text-[9px] text-slate-600 leading-snug font-medium text-right ml-auto max-w-[200px]">
+            <div class="w-1/2 text-right flex justify-end">
+                <div class="text-[9px] text-slate-600 leading-snug font-medium text-right max-w-[220px]">
                     <?= nl2br(htmlspecialchars($sets['company_address_full'] ?? '')) ?>
                 </div>
             </div>
         </div>
 
-        <div class="w-full flex justify-center mb-10">
-            <h1 class="text-2xl font-semibold tracking-[0.15em] text-slate-800 uppercase">
-                QUOTATION
-            </h1>
+        <div class="w-full flex justify-center mb-6 shrink-0">
+            <div class="border border-slate-200 rounded-xl py-2.5 px-10 text-center shadow-sm">
+                <h1 class="text-xl font-black tracking-[0.3em] text-slate-900 uppercase m-0">QUOTATION</h1>
+            </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4 mb-5 shrink-0">
