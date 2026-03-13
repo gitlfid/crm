@@ -166,8 +166,8 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
             </span>
         </a>
         
-        <button id="closeSidebarMobile" class="block lg:hidden text-slate-400 hover:text-red-500 transition-colors ml-auto p-1">
-            <i class="ph-bold ph-x text-2xl"></i>
+        <button id="closeSidebarMobile" onclick="closeSidebarAction(event)" class="block lg:hidden text-slate-400 hover:text-red-500 transition-colors ml-auto p-1">
+            <i class="ph-bold ph-x text-2xl pointer-events-none"></i>
         </button>
     </div>
 
@@ -197,10 +197,10 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                             <li>
                                 <div class="submenu-toggle relative flex items-center justify-between w-full rounded-xl px-4 py-3 cursor-pointer transition-all <?= $isActive ? $active_link_style : $inactive_link_style ?>" title="<?= htmlspecialchars($menu['menu_label']) ?>">
                                     <div class="flex items-center gap-3">
-                                        <i class="<?= htmlspecialchars($menu['icon']) ?> text-xl shrink-0"></i>
-                                        <span class="group-[.is-collapsed]:hidden whitespace-nowrap"><?= htmlspecialchars($menu['menu_label']) ?></span>
+                                        <i class="<?= htmlspecialchars($menu['icon']) ?> text-xl shrink-0 pointer-events-none"></i>
+                                        <span class="group-[.is-collapsed]:hidden whitespace-nowrap pointer-events-none"><?= htmlspecialchars($menu['menu_label']) ?></span>
                                     </div>
-                                    <i class="ph-bold ph-caret-down text-sm group-[.is-collapsed]:hidden transition-transform duration-200 <?= $isActive ? 'rotate-180' : '' ?>"></i>
+                                    <i class="ph-bold ph-caret-down text-sm group-[.is-collapsed]:hidden transition-transform duration-200 pointer-events-none <?= $isActive ? 'rotate-180' : '' ?>"></i>
                                 </div>
                                 
                                 <ul class="submenu flex flex-col gap-1 mt-1 group-[.is-collapsed]:hidden overflow-hidden transition-all duration-300 <?= $isActive ? 'max-h-[500px]' : 'max-h-0' ?>">
@@ -234,15 +234,14 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
     </div>
 </aside>
 
-
 <div id="main" class="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
     
     <header class="sticky top-0 z-40 flex w-full bg-white/80 backdrop-blur-md dark:bg-[#1A222C]/80 shadow-sm transition-all duration-300 border-b border-slate-100 dark:border-slate-800">
         <div class="flex flex-grow items-center justify-between px-4 py-4 md:px-6 2xl:px-11 h-20">
             
             <div class="flex items-center gap-4 sm:gap-6">
-                <button id="sidebarToggle" class="z-50 block rounded-lg p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer transition-colors">
-                     <i class="ph ph-list text-2xl"></i>
+                <button id="sidebarToggle" onclick="toggleSidebarAction(event)" class="z-50 block rounded-lg p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer transition-colors relative">
+                     <i class="ph ph-list text-2xl pointer-events-none"></i>
                 </button>
             </div>
 
@@ -250,22 +249,22 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 <ul class="flex items-center gap-2">
                     <li>
                         <button id="darkModeToggle" class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
-                            <i class="ph ph-moon text-xl dark:hidden"></i>
-                            <i class="ph ph-sun text-xl hidden dark:block"></i>
+                            <i class="ph ph-moon text-xl dark:hidden pointer-events-none"></i>
+                            <i class="ph ph-sun text-xl hidden dark:block pointer-events-none"></i>
                         </button>
                     </li>
                 </ul>
 
                 <div class="relative">
-                    <div id="profileBtn" class="flex items-center gap-3 cursor-pointer pl-4 border-l border-slate-100 dark:border-slate-700 transition-colors">
-                        <span class="hidden text-right lg:block">
+                    <div id="profileBtn" onclick="toggleProfileDropdown(event)" class="flex items-center gap-3 cursor-pointer pl-4 border-l border-slate-100 dark:border-slate-700 transition-colors">
+                        <span class="hidden text-right lg:block pointer-events-none">
                             <span class="block text-sm font-bold text-slate-800 dark:text-white"><?= htmlspecialchars($username) ?></span>
                             <span class="block text-xs font-medium text-slate-400"><?= ucfirst(htmlspecialchars($role_name)) ?></span>
                         </span>
-                        <div class="h-11 w-11 rounded-full overflow-hidden border-2 border-white dark:border-slate-700 ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm transition-all flex items-center justify-center bg-indigo-600 text-white font-bold text-lg">
+                        <div class="h-11 w-11 rounded-full overflow-hidden border-2 border-white dark:border-slate-700 ring-2 ring-slate-100 dark:ring-slate-800 shadow-sm transition-all flex items-center justify-center bg-indigo-600 text-white font-bold text-lg pointer-events-none">
                             <?= strtoupper(substr($username, 0, 1)) ?>
                         </div>
-                        <i class="ph ph-caret-down text-slate-400 text-sm hidden lg:block"></i>
+                        <i class="ph ph-caret-down text-slate-400 text-sm hidden lg:block pointer-events-none"></i>
                     </div>
 
                     <div id="profileDropdown" class="hidden absolute right-0 mt-4 flex w-64 flex-col rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-[#24303F] shadow-lg z-50 overflow-hidden transition-all origin-top-right">
@@ -295,10 +294,42 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
     </header>
 
 <script>
+    // =========================================================================
+    // FUNGSI INLINE KEBAL (Mencegah blokir Event Listener dari Mazer app.js)
+    // =========================================================================
+    window.toggleSidebarAction = function(e) {
+        if(e) { e.preventDefault(); e.stopPropagation(); }
+        const sidebar = document.getElementById('app-sidebar');
+        if (sidebar) {
+            if (window.innerWidth < 1024) {
+                sidebar.classList.toggle('-translate-x-full');
+            } else {
+                sidebar.classList.toggle('is-collapsed');
+            }
+        }
+    };
+
+    window.closeSidebarAction = function(e) {
+        if(e) { e.preventDefault(); e.stopPropagation(); }
+        const sidebar = document.getElementById('app-sidebar');
+        if (sidebar) {
+            sidebar.classList.add('-translate-x-full');
+        }
+    };
+
+    window.toggleProfileDropdown = function(e) {
+        if(e) { e.preventDefault(); e.stopPropagation(); }
+        const dropdown = document.getElementById('profileDropdown');
+        if (dropdown) {
+            dropdown.classList.toggle('hidden');
+        }
+    };
+
+    // =========================================================================
+    // EVENT LISTENER NORMAL
+    // =========================================================================
     document.addEventListener('DOMContentLoaded', function() {
-        // PERHATIKAN: ID sekarang merujuk ke 'app-sidebar'
         const sidebar = document.getElementById('app-sidebar'); 
-        const mobileCloseBtn = document.getElementById('closeSidebarMobile');
         const profileBtn = document.getElementById('profileBtn');
         const profileDropdown = document.getElementById('profileDropdown');
         const darkModeToggle = document.getElementById('darkModeToggle');
@@ -314,7 +345,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 body.classList.add('theme-dark');
                 localStorage.setItem('theme', 'dark');
                 if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph-bold ph-sun text-xl"></i>';
+                    darkModeToggle.innerHTML = '<i class="ph-bold ph-sun text-xl pointer-events-none"></i>';
                 }
             } else {
                 html.classList.remove('dark');
@@ -322,7 +353,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 body.classList.remove('theme-dark');
                 localStorage.setItem('theme', 'light');
                 if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph-bold ph-moon text-xl"></i>';
+                    darkModeToggle.innerHTML = '<i class="ph-bold ph-moon text-xl pointer-events-none"></i>';
                 }
             }
         }
@@ -331,7 +362,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
         const savedTheme = localStorage.getItem('theme') || 'light';
         applyTheme(savedTheme);
 
-        // Toggle Switch
+        // Toggle Switch Dark Mode
         if (darkModeToggle) {
             darkModeToggle.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -340,42 +371,28 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
             });
         }
 
-        // Mobile Sidebar Close
-        if (mobileCloseBtn && sidebar) {
-            mobileCloseBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                sidebar.classList.add('-translate-x-full');
-            });
-        }
-
-        // Dropdown & Burger Menu
+        // Klik Di Luar Sidebar/Dropdown untuk menutup (Aman dari bentrok)
         document.addEventListener('click', function(e) {
-            const burgerBtn = e.target.closest('#sidebarToggle, .burger-btn');
-            if (burgerBtn && sidebar) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (window.innerWidth < 1024) {
-                    sidebar.classList.toggle('-translate-x-full');
-                } else {
-                    sidebar.classList.toggle('is-collapsed');
-                }
-            } else if (sidebar) {
-                if (window.innerWidth < 1024 && !sidebar.contains(e.target) && !sidebar.classList.contains('-translate-x-full')) {
+            // Tutup sidebar di mobile
+            if (sidebar && window.innerWidth < 1024) {
+                if (!sidebar.contains(e.target) && !e.target.closest('#sidebarToggle') && !sidebar.classList.contains('-translate-x-full')) {
                     sidebar.classList.add('-translate-x-full');
                 }
             }
 
-            if (profileBtn && profileBtn.contains(e.target)) {
-                profileDropdown.classList.toggle('hidden');
-            } else if (profileDropdown && !profileDropdown.contains(e.target)) {
-                profileDropdown.classList.add('hidden');
+            // Tutup profile dropdown
+            if (profileBtn && profileDropdown) {
+                if (!profileBtn.contains(e.target) && !profileDropdown.contains(e.target)) {
+                    profileDropdown.classList.add('hidden');
+                }
             }
         });
 
         // Submenu Accordion
         const submenuToggles = document.querySelectorAll('.submenu-toggle');
         submenuToggles.forEach(toggle => {
-            toggle.addEventListener('click', function() {
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault();
                 const submenu = this.nextElementSibling;
                 const icon = this.querySelector('.ph-caret-down');
                 
