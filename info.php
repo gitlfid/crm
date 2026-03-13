@@ -128,7 +128,7 @@ header("HTTP/1.1 200 OK");
                     <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Manajemen PT. Linksfield Networks Indonesia</p>
                     
                     <div class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">&copy; <?= date('Y') ?> Linksfield</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">&copy; <?= date('Y') ?> Linksfield Networks Indonesia</p>
                         <a href="login.php" class="inline-flex items-center justify-center gap-2 text-xs font-bold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors">
                             <span class="lang-id"><i class="ph-bold ph-lock-key"></i> Login Internal Staff</span>
                             <span class="lang-en hidden"><i class="ph-bold ph-lock-key"></i> Internal Staff Login</span>
