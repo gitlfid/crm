@@ -2,12 +2,32 @@
 $page_title = "Generate Invoice";
 include 'includes/header.php';
 include 'includes/sidebar.php';
-// include '../config/functions.php'; // Aktifkan jika diperlukan
+// include '../config/functions.php'; // Tetap dinonaktifkan tidak masalah karena logika sudah mandiri
 
 $my_id = $_SESSION['user_id'];
 
-// Fungsi generator, pastikan ada di functions.php
-$auto_inv = function_exists('generateInvoiceNo') ? generateInvoiceNo($conn) : 'INV-' . time();
+// --- LOGIKA GENERATE NOMOR INVOICE (INVLF2026030001) ---
+$prefix = "INVLF";
+$periode = date('Ym'); // Mendapatkan Tahun & Bulan saat ini (Contoh: 202603)
+
+// Cari nomor invoice terakhir di database pada bulan ini
+$cek_last_inv = $conn->query("SELECT invoice_no FROM invoices WHERE invoice_no LIKE '$prefix$periode%' ORDER BY id DESC LIMIT 1");
+
+if ($cek_last_inv && $cek_last_inv->num_rows > 0) {
+    $row_inv = $cek_last_inv->fetch_assoc();
+    $last_no = $row_inv['invoice_no'];
+    
+    // Ambil 4 digit angka terakhir dari nomor sebelumnya lalu tambah 1
+    $last_urut = intval(substr($last_no, -4));
+    $new_urut = $last_urut + 1;
+} else {
+    // Jika belum ada invoice di bulan ini, mulai dari 1
+    $new_urut = 1;
+}
+
+// Format hasil akhir: INVLF + 202603 + 0001
+$auto_inv = $prefix . $periode . str_pad($new_urut, 4, "0", STR_PAD_LEFT);
+// --------------------------------------------------------
 
 $is_manual = true; // Default Manual
 $source_data = [];
@@ -322,7 +342,7 @@ $default_due_date = $startDate->format('Y-m-d');
                         <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Invoice No <span class="text-rose-500">*</span></label>
                         <div class="relative group">
                             <i class="ph-bold ph-receipt absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-                            <input type="text" name="invoice_no" value="<?= $auto_inv ?>" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black text-emerald-600 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all shadow-inner tracking-wider" required>
+                            <input type="text" name="invoice_no" value="<?= htmlspecialchars($auto_inv) ?>" class="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black text-emerald-600 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all shadow-inner tracking-wider" required>
                         </div>
                     </div>
                     
