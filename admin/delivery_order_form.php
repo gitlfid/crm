@@ -239,7 +239,7 @@ if (isset($_POST['save_do'])) {
                 <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30">
                     <i class="ph-fill ph-truck"></i>
                 </div>
-                <?= $do_id > 0 ? 'Edit Delivery Order (V2)' : 'Create Delivery Order (V2)' ?>
+                <?= $do_id > 0 ? 'Edit Delivery Order' : 'Create Delivery Order ' ?>
             </h1>
             <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Formulir untuk membuat surat jalan pengiriman dokumen / SIM Card ke klien.</p>
         </div>
