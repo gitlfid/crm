@@ -2,11 +2,13 @@
 $page_title = "Generate Invoice";
 include 'includes/header.php';
 include 'includes/sidebar.php';
-// include '../config/functions.php'; // Tetap dinonaktifkan tidak masalah karena logika sudah mandiri
+// include '../config/functions.php'; // Aktifkan jika diperlukan
 
 $my_id = $_SESSION['user_id'];
 
-// --- LOGIKA GENERATE NOMOR INVOICE (INVLF2026030001) ---
+// =====================================================================
+// --- GENERATOR NOMOR INVOICE OTOMATIS (FORMAT: INVLF2026030001) ---
+// =====================================================================
 $prefix = "INVLF";
 $periode = date('Ym'); // Mendapatkan Tahun & Bulan saat ini (Contoh: 202603)
 
@@ -21,13 +23,14 @@ if ($cek_last_inv && $cek_last_inv->num_rows > 0) {
     $last_urut = intval(substr($last_no, -4));
     $new_urut = $last_urut + 1;
 } else {
-    // Jika belum ada invoice di bulan ini, mulai dari 1
+    // Jika belum ada invoice di bulan ini, mulai dari 0001
     $new_urut = 1;
 }
 
 // Format hasil akhir: INVLF + 202603 + 0001
 $auto_inv = $prefix . $periode . str_pad($new_urut, 4, "0", STR_PAD_LEFT);
-// --------------------------------------------------------
+// =====================================================================
+
 
 $is_manual = true; // Default Manual
 $source_data = [];
