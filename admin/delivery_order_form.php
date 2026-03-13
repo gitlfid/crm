@@ -14,7 +14,7 @@ $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
 // =====================================================================
-// --- GENERATOR NOMOR DO OTOMATIS (FORMAT: DO2026030001) ---
+// --- GENERATOR NOMOR DO OTOMATIS (FORMAT: DO2026030001) TANPA STRIP ---
 // =====================================================================
 $prefix = "DO";
 $periode = date('Ym'); // Mendapatkan Tahun & Bulan saat ini (Contoh: 202603)
@@ -34,7 +34,7 @@ if ($cek_last_do && $cek_last_do->num_rows > 0) {
     $new_urut = 1;
 }
 
-// Format hasil akhir: DO + 202603 + 0001
+// Format hasil akhir: DO + 202603 + 0001 (Tanpa strip/hyphen)
 $do_number_auto = $prefix . $periode . str_pad($new_urut, 4, "0", STR_PAD_LEFT);
 // =====================================================================
 
