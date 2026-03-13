@@ -10,6 +10,6 @@ if (strpos($request, 'ticket.php') !== false || strpos($request, 'track_ticket.p
 }
 
 // Redirect default halaman utama aplikasi ke login
-header("Location: login.php");
+header("Location: info.php");
 exit();
 ?>
