@@ -2,7 +2,11 @@
 $page_title = "Form Delivery Order";
 include 'includes/header.php';
 include 'includes/sidebar.php';
-// include '../config/functions.php'; // Sesuaikan jika ada
+
+// Pastikan koneksi database tersedia
+if (!isset($conn)) {
+    include '../config/database.php';
+}
 
 // --- AUTO-PATCH DATABASE ---
 $checkCol = $conn->query("SHOW COLUMNS FROM delivery_orders LIKE 'invoice_id'");
@@ -13,12 +17,34 @@ if ($checkCol && $checkCol->num_rows == 0) {
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// [UPDATE] GENERATOR NOMOR PAKAI FUNGSI PUSAT (CONTINUOUS)
-// Pastikan fungsi ini ada di functions.php Anda
-$do_number_auto = function_exists('generateDONumber') ? generateDONumber($conn) : 'DO-' . time();
+// =====================================================================
+// --- LOGIKA MUTLAK: GENERATOR NOMOR DO (FORMAT: DO2026030001) ---
+// =====================================================================
+$do_prefix = "DO";
+$do_periode = date('Ym'); // Tahun & Bulan saat ini (Contoh: 202603)
+
+// Cari nomor DO terakhir di database secara akurat
+$sql_last_do = "SELECT do_number FROM delivery_orders WHERE do_number LIKE '{$do_prefix}{$do_periode}%' ORDER BY id DESC LIMIT 1";
+$cek_last_do = $conn->query($sql_last_do);
+
+if ($cek_last_do && $cek_last_do->num_rows > 0) {
+    $row_do = $cek_last_do->fetch_assoc();
+    $last_do_number = $row_do['do_number']; 
+    
+    // Ambil 4 digit angka terakhir lalu tambah 1
+    $last_do_urut = intval(substr($last_do_number, -4));
+    $new_do_urut = $last_do_urut + 1;
+} else {
+    // Jika belum ada DO di bulan ini, paksa mulai dari 1
+    $new_do_urut = 1;
+}
+
+// Format hasil akhir: DO + 202603 + 0001 (Sama sekali tidak ada strip)
+$final_auto_do_number = $do_prefix . $do_periode . str_pad($new_do_urut, 4, "0", STR_PAD_LEFT);
+// =====================================================================
 
 // Default Values
-$do_number = $do_number_auto;
+$do_number = $final_auto_do_number;
 $do_date = date('Y-m-d');
 $status = 'draft';
 $pic_name = ''; $pic_phone = ''; $payment_id = 0; $current_invoice_id = 0;
@@ -213,7 +239,7 @@ if (isset($_POST['save_do'])) {
                 <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30">
                     <i class="ph-fill ph-truck"></i>
                 </div>
-                <?= $do_id > 0 ? 'Edit Delivery Order' : 'Create Delivery Order' ?>
+                <?= $do_id > 0 ? 'Edit Delivery Order' : 'Create Delivery Order ' ?>
             </h1>
             <p class="text-slate-500 dark:text-slate-400 mt-2 font-medium">Formulir untuk membuat surat jalan pengiriman dokumen / SIM Card ke klien.</p>
         </div>
