@@ -2,7 +2,8 @@
 $page_title = "Form Delivery Order";
 include 'includes/header.php';
 include 'includes/sidebar.php';
-// include '../config/functions.php'; // Sesuaikan jika ada
+// File functions.php di-include jika butuh fungsi lain, tapi jangan pakai fungsi penomoran lamanya
+include_once '../config/functions.php'; 
 
 // --- AUTO-PATCH DATABASE ---
 $checkCol = $conn->query("SHOW COLUMNS FROM delivery_orders LIKE 'invoice_id'");
@@ -14,32 +15,33 @@ $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
 // =====================================================================
-// --- GENERATOR NOMOR DO OTOMATIS (FORMAT: DO2026030001) TANPA STRIP ---
+// --- LOGIKA MUTLAK: GENERATOR NOMOR DO (FORMAT: DO2026030001) ---
 // =====================================================================
-$prefix = "DO";
-$periode = date('Ym'); // Mendapatkan Tahun & Bulan saat ini (Contoh: 202603)
+$do_prefix = "DO";
+$do_periode = date('Ym'); // Mendapatkan Tahun & Bulan saat ini (Contoh: 202603)
 
-// Cari nomor DO terakhir di database pada bulan ini
-$cek_last_do = $conn->query("SELECT do_number FROM delivery_orders WHERE do_number LIKE '$prefix$periode%' ORDER BY id DESC LIMIT 1");
+// Cari nomor DO terakhir di database secara akurat
+$sql_last_do = "SELECT do_number FROM delivery_orders WHERE do_number LIKE '{$do_prefix}{$do_periode}%' ORDER BY id DESC LIMIT 1";
+$cek_last_do = $conn->query($sql_last_do);
 
 if ($cek_last_do && $cek_last_do->num_rows > 0) {
     $row_do = $cek_last_do->fetch_assoc();
-    $last_no = $row_do['do_number'];
+    $last_do_number = $row_do['do_number']; // Contoh: DO2026030042
     
-    // Ambil 4 digit angka terakhir dari nomor sebelumnya lalu tambah 1
-    $last_urut = intval(substr($last_no, -4));
-    $new_urut = $last_urut + 1;
+    // Ambil 4 digit angka terakhir lalu tambah 1
+    $last_do_urut = intval(substr($last_do_number, -4));
+    $new_do_urut = $last_do_urut + 1;
 } else {
-    // Jika belum ada DO di bulan ini, mulai dari 0001
-    $new_urut = 1;
+    // Jika belum ada DO di bulan ini, paksa mulai dari 1
+    $new_do_urut = 1;
 }
 
-// Format hasil akhir: DO + 202603 + 0001 (Tanpa strip/hyphen)
-$do_number_auto = $prefix . $periode . str_pad($new_urut, 4, "0", STR_PAD_LEFT);
+// Format hasil akhir: DO + 202603 + 0043 (Sama sekali tidak ada strip)
+$final_auto_do_number = $do_prefix . $do_periode . str_pad($new_do_urut, 4, "0", STR_PAD_LEFT);
 // =====================================================================
 
 // Default Values
-$do_number = $do_number_auto;
+$do_number = $final_auto_do_number;
 $do_date = date('Y-m-d');
 $status = 'draft';
 $pic_name = ''; $pic_phone = ''; $payment_id = 0; $current_invoice_id = 0;
@@ -95,7 +97,7 @@ if ($do_id > 0) {
     if ($resData && $resData->num_rows > 0) {
         $row = $resData->fetch_assoc();
         
-        $do_number = $row['do_number']; 
+        $do_number = $row['do_number']; // Timpa dengan nomor DO lama dari DB
         $do_date = $row['do_date'];
         $status = $row['status'];
         $pic_name = $row['pic_name'];
