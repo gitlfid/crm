@@ -249,8 +249,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
                 <ul class="flex items-center gap-2">
                     <li>
                         <button id="darkModeToggle" class="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:text-indigo-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
-                            <i class="ph ph-moon text-xl dark:hidden pointer-events-none"></i>
-                            <i class="ph ph-sun text-xl hidden dark:block pointer-events-none"></i>
+                            <i class="ph-bold ph-moon text-xl pointer-events-none"></i>
                         </button>
                     </li>
                 </ul>
@@ -295,7 +294,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
 
 <script>
     // =========================================================================
-    // FUNGSI INLINE KEBAL (Mencegah blokir Event Listener dari Mazer app.js)
+    // 1. FUNGSI INLINE (Mencegah terblokir dari skrip error eksternal)
     // =========================================================================
     window.toggleSidebarAction = function(e) {
         if(e) { e.preventDefault(); e.stopPropagation(); }
@@ -326,61 +325,48 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
     };
 
     // =========================================================================
-    // EVENT LISTENER NORMAL
+    // 2. SINKRONISASI THEME & EVENT LISTENER PENDUKUNG
     // =========================================================================
     document.addEventListener('DOMContentLoaded', function() {
         const sidebar = document.getElementById('app-sidebar'); 
         const profileBtn = document.getElementById('profileBtn');
         const profileDropdown = document.getElementById('profileDropdown');
-        const darkModeToggle = document.getElementById('darkModeToggle');
         
-        const html = document.documentElement;
-        const body = document.body;
-
-        // Fungsi Sinkronisasi Tema
-        function applyTheme(theme) {
-            if (theme === 'dark') {
-                html.classList.add('dark');
-                html.setAttribute('data-bs-theme', 'dark');
-                body.classList.add('theme-dark');
-                localStorage.setItem('theme', 'dark');
+        // PENTING: Kami melakukan intersep ke fungsi applyTheme milik header.php 
+        // Hal ini dilakukan agar pergantian icon sun/moon terpicu otomatis tanpa 
+        // bentrok penyimpanan LocalStorage yang menyebabkan gagal simpan saat refresh.
+        if (typeof window.applyTheme === 'function') {
+            const originalApplyTheme = window.applyTheme;
+            window.applyTheme = function(isDark) {
+                originalApplyTheme(isDark); // Eksekusi bawaan header.php
+                const darkModeToggle = document.getElementById('darkModeToggle');
                 if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph-bold ph-sun text-xl pointer-events-none"></i>';
+                    darkModeToggle.innerHTML = isDark 
+                        ? '<i class="ph-bold ph-sun text-xl pointer-events-none"></i>' 
+                        : '<i class="ph-bold ph-moon text-xl pointer-events-none"></i>';
                 }
-            } else {
-                html.classList.remove('dark');
-                html.setAttribute('data-bs-theme', 'light');
-                body.classList.remove('theme-dark');
-                localStorage.setItem('theme', 'light');
-                if (darkModeToggle) {
-                    darkModeToggle.innerHTML = '<i class="ph-bold ph-moon text-xl pointer-events-none"></i>';
-                }
-            }
+            };
         }
 
-        // Terapkan saat pertama kali dimuat
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        applyTheme(savedTheme);
-
-        // Toggle Switch Dark Mode
+        // Terapkan icon yang sesuai dengan tema saat halaman selesai dimuat pertama kali
+        const darkModeToggle = document.getElementById('darkModeToggle');
         if (darkModeToggle) {
-            darkModeToggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                const currentTheme = localStorage.getItem('theme');
-                applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
-            });
+            const isDark = document.documentElement.classList.contains('dark');
+            darkModeToggle.innerHTML = isDark 
+                ? '<i class="ph-bold ph-sun text-xl pointer-events-none"></i>' 
+                : '<i class="ph-bold ph-moon text-xl pointer-events-none"></i>';
         }
 
-        // Klik Di Luar Sidebar/Dropdown untuk menutup (Aman dari bentrok)
+        // Event listener tambahan untuk menutup sidebar / dropdown jika diklik di luar kotak
         document.addEventListener('click', function(e) {
-            // Tutup sidebar di mobile
+            // Logika untuk Mobile
             if (sidebar && window.innerWidth < 1024) {
                 if (!sidebar.contains(e.target) && !e.target.closest('#sidebarToggle') && !sidebar.classList.contains('-translate-x-full')) {
                     sidebar.classList.add('-translate-x-full');
                 }
             }
 
-            // Tutup profile dropdown
+            // Logika untuk Profile Menu
             if (profileBtn && profileDropdown) {
                 if (!profileBtn.contains(e.target) && !profileDropdown.contains(e.target)) {
                     profileDropdown.classList.add('hidden');
@@ -388,7 +374,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
             }
         });
 
-        // Submenu Accordion
+        // Logika Dropdown Submenu pada Sidebar Kiri
         const submenuToggles = document.querySelectorAll('.submenu-toggle');
         submenuToggles.forEach(toggle => {
             toggle.addEventListener('click', function(e) {
@@ -408,7 +394,7 @@ $inactive_link_style = "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dar
             });
         });
 
-        // Resize Layar
+        // Deteksi Perubahan Resolusi Layar 
         window.addEventListener('resize', function() {
             if (sidebar) {
                 if (window.innerWidth >= 1024) {
