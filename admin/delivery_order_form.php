@@ -13,9 +13,30 @@ if ($checkCol && $checkCol->num_rows == 0) {
 $do_id = isset($_GET['edit_id']) ? intval($_GET['edit_id']) : 0;
 $from_inv_id = isset($_GET['from_invoice_id']) ? intval($_GET['from_invoice_id']) : 0;
 
-// [UPDATE] GENERATOR NOMOR PAKAI FUNGSI PUSAT (CONTINUOUS)
-// Pastikan fungsi ini ada di functions.php Anda
-$do_number_auto = function_exists('generateDONumber') ? generateDONumber($conn) : 'DO-' . time();
+// =====================================================================
+// --- GENERATOR NOMOR DO OTOMATIS (FORMAT: DO2026030001) ---
+// =====================================================================
+$prefix = "DO";
+$periode = date('Ym'); // Mendapatkan Tahun & Bulan saat ini (Contoh: 202603)
+
+// Cari nomor DO terakhir di database pada bulan ini
+$cek_last_do = $conn->query("SELECT do_number FROM delivery_orders WHERE do_number LIKE '$prefix$periode%' ORDER BY id DESC LIMIT 1");
+
+if ($cek_last_do && $cek_last_do->num_rows > 0) {
+    $row_do = $cek_last_do->fetch_assoc();
+    $last_no = $row_do['do_number'];
+    
+    // Ambil 4 digit angka terakhir dari nomor sebelumnya lalu tambah 1
+    $last_urut = intval(substr($last_no, -4));
+    $new_urut = $last_urut + 1;
+} else {
+    // Jika belum ada DO di bulan ini, mulai dari 0001
+    $new_urut = 1;
+}
+
+// Format hasil akhir: DO + 202603 + 0001
+$do_number_auto = $prefix . $periode . str_pad($new_urut, 4, "0", STR_PAD_LEFT);
+// =====================================================================
 
 // Default Values
 $do_number = $do_number_auto;
